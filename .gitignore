@@ -12,7 +12,7 @@ uploads/
 *.db
 frontend/.env.local
 backend/.env
-UI/prototype
+UI prototype/
 .agents
 backend/.env.example
 backend/.env
