@@ -14,5 +14,6 @@ frontend/.env.local
 backend/.env
 UI prototype/
 .agents
+.vscode/
 backend/.env.example
 backend/.env
