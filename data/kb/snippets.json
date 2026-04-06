@@ -1,0 +1,50 @@
+[
+  {
+    "snippet_id": "kb-connectivity-driver",
+    "issue_category": "connectivity",
+    "resolver_tier": "driver",
+    "keywords": ["offline", "wifi", "network", "screen on"],
+    "title": "Basic connectivity recovery",
+    "body": [
+      "Check whether the charger display is powered and the connector is fully seated.",
+      "If the charger appears online but the session will not start, stop and restart the charging session once.",
+      "If the problem persists, escalate to remote support instead of retrying repeatedly."
+    ]
+  },
+  {
+    "snippet_id": "kb-local-resolver-connectivity",
+    "issue_category": "connectivity",
+    "resolver_tier": "local_site_resolver",
+    "keywords": ["dim", "offline", "network", "screen on", "led"],
+    "title": "Local responder connectivity SOP",
+    "body": [
+      "Confirm the charger screen is powered and no visible damage is present before touching site controls.",
+      "Run the approved local restart or isolation checklist once using site SOP.",
+      "If the charger does not recover immediately, stop local action and escalate to remote ops."
+    ]
+  },
+  {
+    "snippet_id": "kb-ops-connectivity",
+    "issue_category": "connectivity",
+    "resolver_tier": "remote_ops",
+    "keywords": ["offline", "network", "blank screen", "red led"],
+    "title": "Remote connectivity checks",
+    "body": [
+      "Verify charger heartbeat or last-seen status from the backend if available.",
+      "Confirm whether the charger was recently power-cycled or lost Wi-Fi connectivity.",
+      "If the charger is unreachable and no local resolver is available, queue technician escalation."
+    ]
+  },
+  {
+    "snippet_id": "kb-safety-tech",
+    "issue_category": "hardware_risk",
+    "resolver_tier": "technician",
+    "keywords": ["burn", "damage", "exposed", "water", "overheat"],
+    "title": "Safety-critical technician instructions",
+    "body": [
+      "Treat the charger as potentially hazardous and isolate access to the unit.",
+      "Inspect for cable, connector, or enclosure damage before any restart attempt.",
+      "Document visible hazard evidence and prioritize on-site inspection."
+    ]
+  }
+]

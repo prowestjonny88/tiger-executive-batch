@@ -1,0 +1,20 @@
+[
+  {
+    "site_id": "site-mall-01",
+    "site_name": "Sunrise Mall Basement Charging Bay",
+    "charger_id": "rex-ac-01",
+    "charger_label": "Bay A1",
+    "has_local_resolver": true,
+    "has_remote_ops": true,
+    "notes": "Mall security can access the isolator cabinet and restart SOP."
+  },
+  {
+    "site_id": "site-condo-01",
+    "site_name": "North Residences Visitor Parking",
+    "charger_id": "rex-ac-09",
+    "charger_label": "Visitor Lot V3",
+    "has_local_resolver": false,
+    "has_remote_ops": true,
+    "notes": "No on-site resolver after office hours."
+  }
+]

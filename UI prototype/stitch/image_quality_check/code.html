@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Confirm Photo Quality - RExharge</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#474646",
+                    "primary-container": "#27b24d",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-container": "#e7eefe",
+                    "on-secondary-fixed": "#151c27",
+                    "inverse-on-surface": "#ebf1ff",
+                    "primary-fixed": "#7bfd8d",
+                    "surface-dim": "#d3daea",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f0f3ff",
+                    "secondary-fixed-dim": "#c0c7d6",
+                    "on-primary-container": "#003c12",
+                    "tertiary-container": "#9d9b9b",
+                    "surface-container-high": "#e2e8f8",
+                    "on-primary-fixed": "#002107",
+                    "tertiary": "#5f5e5e",
+                    "surface-bright": "#f9f9ff",
+                    "surface": "#f9f9ff",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#dce2f3",
+                    "on-secondary-container": "#5e6572",
+                    "on-primary-fixed-variant": "#00531c",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#3e4a3c",
+                    "primary-fixed-dim": "#5de074",
+                    "outline-variant": "#bdcab9",
+                    "on-background": "#151c27",
+                    "on-secondary-fixed-variant": "#404754",
+                    "outline": "#6d7b6b",
+                    "tertiary-fixed-dim": "#c9c6c5",
+                    "surface-tint": "#006e28",
+                    "secondary": "#585f6c",
+                    "on-tertiary-fixed": "#1c1b1b",
+                    "on-surface": "#151c27",
+                    "surface-variant": "#dce2f3",
+                    "secondary-fixed": "#dce2f3",
+                    "tertiary-fixed": "#e5e2e1",
+                    "inverse-surface": "#2a313d",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-container": "#343333",
+                    "inverse-primary": "#5de074",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#dce2f3",
+                    "primary": "#006e28",
+                    "background": "#f9f9ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9f9ff;
+            color: #151c27;
+        }
+        h1, h2, h3 {
+            font-family: 'Manrope', sans-serif;
+        }
+        .tonal-glass {
+            background: rgba(249, 249, 255, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
+<div class="flex justify-between items-center px-6 py-4 max-w-5xl mx-auto w-full">
+<div class="text-xl font-extrabold tracking-tighter text-slate-900 dark:text-slate-50 font-manrope">
+                RExharge
+            </div>
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Dashboard</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Incidents</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Diagnostics</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-green-700 dark:text-green-500 font-medium hover:text-green-600 transition-colors duration-300 text-sm">
+                    Help &amp; Support
+                </button>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-32 pb-24 px-6 flex flex-col items-center">
+<div class="w-full max-w-2xl">
+<!-- Header Section -->
+<div class="text-center mb-12">
+<span class="inline-flex items-center gap-2 px-3 py-1 bg-primary-container/10 text-primary font-semibold text-xs tracking-widest uppercase rounded-full mb-4">
+                    Step 2 of 4 • Diagnostic Verification
+                </span>
+<h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-on-surface mb-4">
+                    Confirm Photo Quality
+                </h1>
+<p class="text-on-surface-variant text-lg max-w-lg mx-auto">
+                    Our AI-assisted inspection needs a clear view of the charging port and connector pins to identify electrical wear.
+                </p>
+</div>
+<!-- Bento Preview Container -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+<!-- Main Image Preview Card -->
+<div class="md:col-span-12 lg:col-span-12 group relative overflow-hidden bg-surface-container-low rounded-xl p-2">
+<div class="relative aspect-video rounded-lg overflow-hidden bg-slate-200">
+<img alt="Professional EV charger diagnostic photo" class="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-700 ease-in-out" data-alt="Close-up of a premium electric vehicle charging station connector and port with sharp focus and clean industrial aesthetic lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxujqFMAWUzvXNHNxwWVCizLIl1MOSCcMOj04rKpS205Edf6QYODxMwwcKhK3RkF9mYBs5kQkWsyDfaTtmROktsY1Bdj3eozGRn7zELFxZJcpY40h6IIgPKekWnNGaBkGeYtmFn4kNvBDaOD7-2XbYsNzEXn4trjKyLGq1iT7R1R62U-eoOZKOHEihtSyYP4nfAbKdIQ6OdQ3ahs6-Kr3yp1XieM2BVhFPEbeKgHccc6tkYOqCYsoipuqgOxIJlWHMgB2Oy_SMtQ"/>
+<!-- Overlay Feedback -->
+<div class="absolute bottom-4 left-4 right-4">
+<div class="bg-surface/90 backdrop-blur-md p-4 rounded-lg flex items-center justify-between border border-white/20 shadow-lg">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-sm">check_circle</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Image quality looks good</p>
+<p class="text-xs text-on-surface-variant">Lighting and focus are optimal for analysis.</p>
+</div>
+</div>
+<div class="hidden sm:block">
+<span class="text-[10px] font-mono uppercase tracking-tighter bg-on-surface/5 px-2 py-1 rounded">Confidence: 98.4%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Specs / Metadata -->
+<div class="md:col-span-12 flex flex-col md:flex-row gap-4 mt-2">
+<div class="flex-1 bg-surface-container-low p-4 rounded-xl flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">light_mode</span>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Exposure</p>
+<p class="text-sm font-semibold">Calibrated</p>
+</div>
+</div>
+<div class="flex-1 bg-surface-container-low p-4 rounded-xl flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">center_focus_strong</span>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Focus</p>
+<p class="text-sm font-semibold">Sharp</p>
+</div>
+</div>
+<div class="flex-1 bg-surface-container-low p-4 rounded-xl flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">straighten</span>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Alignment</p>
+<p class="text-sm font-semibold">Centered</p>
+</div>
+</div>
+</div>
+</div>
+<!-- CTA Action Bar -->
+<div class="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+<button class="w-full sm:w-auto px-10 py-4 bg-secondary-container text-on-secondary-container font-bold rounded-lg hover:bg-slate-200 transition-all duration-300 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">refresh</span>
+                    Retake Photo
+                </button>
+<button class="w-full sm:w-auto px-10 py-4 bg-primary text-on-primary font-bold rounded-lg shadow-[0_4_20_rgba(0,110,40,0.15)] hover:bg-green-700 transition-all duration-300 scale-100 active:scale-95 flex items-center justify-center gap-2">
+                    Continue with this Photo
+                    <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+<!-- Task Focused Note -->
+<div class="mt-16 border-t border-slate-200/50 pt-8 text-center">
+<p class="text-xs text-on-surface-variant italic">
+                    All images are encrypted and processed locally for your privacy.
+                </p>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-50 dark:bg-slate-900 w-full py-12">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 border-t border-slate-200/50 dark:border-slate-800/50 max-w-5xl mx-auto pt-8">
+<div class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 md:mb-0">
+                © 2024 RExharge Precision Systems
+            </div>
+<div class="flex gap-8">
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Privacy Policy</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Terms of Service</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Contact Engineering</a>
+</div>
+</div>
+</footer>
+</body></html>

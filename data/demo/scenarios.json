@@ -1,0 +1,62 @@
+[
+  {
+    "scenario_id": "demo-driver-connectivity",
+    "name": "Driver-resolvable connectivity issue",
+    "site_id": "site-mall-01",
+    "headline": "Charging never starts but charger appears powered",
+    "photo_hint": "display on, no damage",
+    "symptom_text": "Blinking blue LED, charging never starts.",
+    "error_code": "NET-01",
+    "follow_up_answers": {
+      "screen_on": "yes",
+      "visible_damage": "no",
+      "charging_state": "never_started"
+    },
+    "expected_tier": "driver"
+  },
+  {
+    "scenario_id": "demo-remote-ops",
+    "name": "Remote ops investigation case",
+    "site_id": "site-condo-01",
+    "headline": "Charger offline with no local resolver",
+    "photo_hint": "screen dim, no visible damage",
+    "symptom_text": "Screen is dim and LED blinks red intermittently.",
+    "error_code": "OFF-12",
+    "follow_up_answers": {
+      "screen_on": "dim",
+      "visible_damage": "no",
+      "charging_state": "stopped_suddenly"
+    },
+    "expected_tier": "remote_ops"
+  },
+  {
+    "scenario_id": "demo-local-resolver",
+    "name": "Local resolver SOP check",
+    "site_id": "site-mall-01",
+    "headline": "Powered charger needs a safe on-site SOP restart",
+    "photo_hint": "screen dim, no visible damage",
+    "symptom_text": "Session stopped suddenly and the LED is blinking red.",
+    "error_code": "OFF-12",
+    "follow_up_answers": {
+      "screen_on": "yes",
+      "visible_damage": "no",
+      "charging_state": "stopped_suddenly"
+    },
+    "expected_tier": "local_site_resolver"
+  },
+  {
+    "scenario_id": "demo-technician-hazard",
+    "name": "Technician escalation for visible damage",
+    "site_id": "site-mall-01",
+    "headline": "Cable jacket damage with burn marks",
+    "photo_hint": "visible connector damage and scorching",
+    "symptom_text": "User reports a burnt smell near the connector.",
+    "error_code": "SAFE-99",
+    "follow_up_answers": {
+      "screen_on": "yes",
+      "visible_damage": "yes",
+      "charging_state": "stopped_suddenly"
+    },
+    "expected_tier": "technician"
+  }
+]

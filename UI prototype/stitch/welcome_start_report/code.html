@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RExharge | Start Report</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#474646",
+                    "primary-container": "#27b24d",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-container": "#e7eefe",
+                    "on-secondary-fixed": "#151c27",
+                    "inverse-on-surface": "#ebf1ff",
+                    "primary-fixed": "#7bfd8d",
+                    "surface-dim": "#d3daea",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f0f3ff",
+                    "secondary-fixed-dim": "#c0c7d6",
+                    "on-primary-container": "#003c12",
+                    "tertiary-container": "#9d9b9b",
+                    "surface-container-high": "#e2e8f8",
+                    "on-primary-fixed": "#002107",
+                    "tertiary": "#5f5e5e",
+                    "surface-bright": "#f9f9ff",
+                    "surface": "#f9f9ff",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#dce2f3",
+                    "on-secondary-container": "#5e6572",
+                    "on-primary-fixed-variant": "#00531c",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#3e4a3c",
+                    "primary-fixed-dim": "#5de074",
+                    "outline-variant": "#bdcab9",
+                    "on-background": "#151c27",
+                    "on-secondary-fixed-variant": "#404754",
+                    "outline": "#6d7b6b",
+                    "tertiary-fixed-dim": "#c9c6c5",
+                    "surface-tint": "#006e28",
+                    "secondary": "#585f6c",
+                    "on-tertiary-fixed": "#1c1b1b",
+                    "on-surface": "#151c27",
+                    "surface-variant": "#dce2f3",
+                    "secondary-fixed": "#dce2f3",
+                    "tertiary-fixed": "#e5e2e1",
+                    "inverse-surface": "#2a313d",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-container": "#343333",
+                    "inverse-primary": "#5de074",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#dce2f3",
+                    "primary": "#006e28",
+                    "background": "#f9f9ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": [
+                            "Manrope"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "label": [
+                            "Inter"
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, h2, h3 {
+            font-family: 'Manrope', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
+<div class="flex justify-between items-center px-6 py-4 max-w-5xl mx-auto w-full">
+<div class="text-xl font-extrabold tracking-tighter text-slate-900 dark:text-slate-50 font-manrope">
+                RExharge
+            </div>
+<div class="hidden md:flex gap-8 items-center">
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Home</a>
+<a class="text-green-700 dark:text-green-500 font-bold border-b-2 border-green-700 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Report</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">History</a>
+</div>
+<div class="text-green-700 dark:text-green-500 font-manrope tracking-tight font-bold cursor-pointer hover:text-green-600 transition-colors duration-300">
+                Help &amp; Support
+            </div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex items-center justify-center pt-24 pb-12 px-6">
+<div class="max-w-2xl w-full text-center">
+<!-- Hero Illustration/Visual -->
+<div class="mb-12 relative inline-block">
+<div class="absolute -inset-4 bg-primary/5 rounded-full blur-2xl"></div>
+<div class="relative w-24 h-24 mx-auto bg-surface-container-lowest flex items-center justify-center rounded-xl shadow-sm">
+<span class="material-symbols-outlined text-primary text-5xl" data-icon="electric_car">electric_car</span>
+</div>
+</div>
+<!-- Content Header -->
+<h1 class="text-5xl md:text-6xl font-extrabold tracking-tight text-on-surface mb-6 leading-tight">
+                Report Charger Issue
+            </h1>
+<p class="text-lg md:text-xl text-on-surface-variant mb-10 max-w-lg mx-auto font-body leading-relaxed">
+                Experience a fast, precision-guided troubleshooting process. We'll identify the fault and initiate recovery steps in under two minutes.
+            </p>
+<!-- Action Area -->
+<div class="space-y-6">
+<button class="group relative inline-flex items-center justify-center gap-3 bg-primary px-10 py-5 text-on-primary font-headline font-bold text-xl rounded-lg transition-all duration-300 active:scale-95 shadow-[0px_4px_20px_rgba(0,110,40,0.15)] hover:shadow-[0px_8px_30px_rgba(0,110,40,0.25)]">
+                    Start Report
+                    <span class="material-symbols-outlined transition-transform duration-300 group-hover:translate-x-1" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Trust Note Section -->
+<div class="flex items-center justify-center gap-6 pt-12">
+<div class="flex flex-col items-center gap-2">
+<div class="bg-surface-container-low p-3 rounded-full">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="gpp_good" style="font-variation-settings: 'FILL' 1;">gpp_good</span>
+</div>
+<span class="text-xs uppercase tracking-widest font-label font-medium text-on-secondary-fixed-variant">Safe Guidance</span>
+</div>
+<div class="w-px h-12 bg-outline-variant opacity-30"></div>
+<div class="flex flex-col items-center gap-2">
+<div class="bg-surface-container-low p-3 rounded-full">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="support_agent" style="font-variation-settings: 'FILL' 1;">support_agent</span>
+</div>
+<span class="text-xs uppercase tracking-widest font-label font-medium text-on-secondary-fixed-variant">Escalation Ready</span>
+</div>
+</div>
+<p class="text-sm text-on-surface-variant/70 italic mt-8 font-body">
+                    Rest assured, all diagnostic data is encrypted and used solely for system restoration.
+                </p>
+</div>
+<!-- Background Aesthetic Element -->
+<div class="mt-20 opacity-40">
+<img class="w-full h-32 object-contain filter grayscale opacity-20" data-alt="Technical blueprint of an EV charging station with clean white lines on a subtle grey background architectural style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAa-lMpmS9Z2RPjpCjShF5UkYY3jklxiYNUXWRsWe8uHXCSa7aCFs2TOyETwM_A4Mh0621AyochFc8n74uvQsnwoZfX33VG5WUkRrXh39PSIgtPXx6_j4hQtnx2-lE3zTJ_RapVD_OyaV4clzJY0_P4ru0G3YpZ8AfA1GWd8UHzaHa8khU4M0HMW5H-kJduS_UEAYJNuzeFLvs1Bcf3rdSn7w11yn9QPwoy1UmpkYxN45kRnWs2JE-k32Av3mLWYo7Pa6WPH3Qydg"/>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 bg-slate-50 dark:bg-slate-900">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 border-t border-slate-200/50 dark:border-slate-800/50 max-w-5xl mx-auto pt-8">
+<div class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 md:mb-0">
+                © 2024 RExharge Precision Systems
+            </div>
+<div class="flex gap-8">
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500 transition-all duration-300" href="#">Privacy Policy</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500 transition-all duration-300" href="#">Terms of Service</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500 transition-all duration-300" href="#">Contact Engineering</a>
+</div>
+</div>
+</footer>
+</body></html>

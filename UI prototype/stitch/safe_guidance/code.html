@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Safe Next Steps | RExharge</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#474646",
+                    "primary-container": "#27b24d",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "surface-container": "#e7eefe",
+                    "on-secondary-fixed": "#151c27",
+                    "inverse-on-surface": "#ebf1ff",
+                    "primary-fixed": "#7bfd8d",
+                    "surface-dim": "#d3daea",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#f0f3ff",
+                    "secondary-fixed-dim": "#c0c7d6",
+                    "on-primary-container": "#003c12",
+                    "tertiary-container": "#9d9b9b",
+                    "surface-container-high": "#e2e8f8",
+                    "on-primary-fixed": "#002107",
+                    "tertiary": "#5f5e5e",
+                    "surface-bright": "#f9f9ff",
+                    "surface": "#f9f9ff",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#dce2f3",
+                    "on-secondary-container": "#5e6572",
+                    "on-primary-fixed-variant": "#00531c",
+                    "error-container": "#ffdad6",
+                    "on-surface-variant": "#3e4a3c",
+                    "primary-fixed-dim": "#5de074",
+                    "outline-variant": "#bdcab9",
+                    "on-background": "#151c27",
+                    "on-secondary-fixed-variant": "#404754",
+                    "outline": "#6d7b6b",
+                    "tertiary-fixed-dim": "#c9c6c5",
+                    "surface-tint": "#006e28",
+                    "secondary": "#585f6c",
+                    "on-tertiary-fixed": "#1c1b1b",
+                    "on-surface": "#151c27",
+                    "surface-variant": "#dce2f3",
+                    "secondary-fixed": "#dce2f3",
+                    "tertiary-fixed": "#e5e2e1",
+                    "inverse-surface": "#2a313d",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-container": "#343333",
+                    "inverse-primary": "#5de074",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#dce2f3",
+                    "primary": "#006e28",
+                    "background": "#f9f9ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl">
+<div class="flex justify-between items-center px-6 py-4 max-w-5xl mx-auto w-full">
+<div class="text-xl font-extrabold tracking-tighter text-slate-900 dark:text-slate-50 font-manrope tracking-tight font-bold">
+                RExharge
+            </div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Diagnostics</a>
+<a class="text-green-700 dark:text-green-500 font-bold border-b-2 border-green-700 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Safety Guide</a>
+<a class="text-slate-600 dark:text-slate-400 font-medium hover:text-green-600 dark:hover:text-green-400 transition-colors duration-300" href="#">Hardware</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-600 dark:text-slate-400 font-medium text-sm hover:underline">Help &amp; Support</button>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="pt-32 pb-24 px-6 min-h-screen flex flex-col items-center">
+<div class="max-w-2xl w-full">
+<!-- Hero Header -->
+<header class="mb-12 text-center">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary font-medium text-sm mb-4">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+                    Secured Protocol
+                </div>
+<h1 class="text-5xl font-extrabold tracking-tight text-on-surface mb-4">Safe Next Steps</h1>
+<p class="text-on-surface-variant text-lg leading-relaxed">Follow these recalibration steps to safely restore power delivery to your vehicle module.</p>
+</header>
+<!-- Safety Warning Box -->
+<div class="bg-error-container/40 border-l-4 border-error p-6 rounded-xl mb-12 flex gap-5 items-start">
+<div class="p-2 bg-error-container rounded-lg text-on-error-container">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div>
+<h2 class="text-on-error-container font-bold text-lg mb-1">Safety Warning</h2>
+<p class="text-on-error-container/80 text-sm leading-relaxed">Do not attempt to open the charging port cover or touch exposed pins if the grounding light is flashing amber. Ensure the surrounding area is dry before proceeding.</p>
+</div>
+</div>
+<!-- Bento Layout Guidance -->
+<div class="grid grid-cols-1 gap-6 mb-12">
+<!-- Action Card 1 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex gap-6 items-center shadow-[0px_4px_20px_rgba(21,28,39,0.04)] border-l-4 border-primary">
+<div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-primary text-on-primary rounded-lg text-xl font-bold">1</div>
+<div class="flex-grow">
+<h3 class="text-xl font-bold text-on-surface mb-1">Engage Safety Lock</h3>
+<p class="text-on-surface-variant text-sm">Depress the connector release button for 3 seconds until the blue LED turns solid.</p>
+</div>
+</div>
+<!-- Action Card 2 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex gap-6 items-center shadow-[0px_4px_20px_rgba(21,28,39,0.04)]">
+<div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-secondary-container text-on-secondary-container rounded-lg text-xl font-bold">2</div>
+<div class="flex-grow">
+<h3 class="text-xl font-bold text-on-surface mb-1">Cycle Power Module</h3>
+<p class="text-on-surface-variant text-sm">Toggle the physical switch on the pedestal base to the 'OFF' position, wait for 10 seconds, and return to 'ON'.</p>
+</div>
+</div>
+<!-- Action Card 3 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl flex gap-6 items-center shadow-[0px_4px_20px_rgba(21,28,39,0.04)]">
+<div class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-secondary-container text-on-secondary-container rounded-lg text-xl font-bold">3</div>
+<div class="flex-grow">
+<h3 class="text-xl font-bold text-on-surface mb-1">Rescan QR Code</h3>
+<p class="text-on-surface-variant text-sm">Reconnect the cable and initiate the handshake sequence via the primary dashboard scanner.</p>
+</div>
+</div>
+</div>
+<!-- Image/Visual Anchor -->
+<div class="relative w-full h-64 rounded-2xl overflow-hidden mb-12 bg-surface-container-low group">
+<img alt="EV Charging Protocol" class="w-full h-full object-cover grayscale transition-all duration-700 group-hover:grayscale-0" data-alt="high-end electric vehicle charging port detail with a glowing green status ring, sleek metallic textures, and soft industrial studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeOSOGAxPBQlc4Kv4xNb2UxjmjaRvA5z8FZspLTFpQfra62TL-ifsjeiax8PT0fGRzwdX0Cydp3DL9GRv7RFO-GnxQ-PaV4L5bmcpvwChKtL58j8RfvID3XYKrTzyF9NNUooTCFtl4Npq-wyH0vplw1TKe-6zKzbEFH1xdQTnRq8Cx5jT4FdH9Bj5lzsLLZJ0fflD9IUkJoRng033NqkAzqVAvMjRQ1FBvP_OX7EHyc6MemnKfnKgLpN7Ru3RAQfklskSGAuuAKg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface/80 to-transparent flex items-end p-8">
+<p class="text-on-surface font-semibold text-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">info</span>
+                        Reference: Standard ISO 15118 Communication Protocol
+                    </p>
+</div>
+</div>
+<!-- Escalation Footer -->
+<div class="text-center">
+<p class="text-on-surface-variant mb-4">Still experiencing issues after following these steps?</p>
+<a class="inline-flex items-center gap-2 text-primary font-bold hover:underline group" href="#">
+                    Escalate to Engineering Support
+                    <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</a>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-50 dark:bg-slate-900 w-full py-12">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 border-t border-slate-200/50 dark:border-slate-800/50 max-w-5xl mx-auto py-8">
+<div class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-6 md:mb-0">
+                © 2024 RExharge Precision Systems
+            </div>
+<div class="flex gap-8">
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Privacy Policy</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Terms of Service</a>
+<a class="font-inter text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:underline decoration-green-500" href="#">Contact Engineering</a>
+</div>
+</div>
+</footer>
+</body></html>
