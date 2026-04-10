@@ -1,5 +1,10 @@
 # OmniTriage Setup Guide
 
+Implementation note:
+- the live app now follows the organizer decision tree, not the older resolver-tier backbone
+- current triage outputs are organizer-native: `issue_type`, `basic_conditions`, `workflow.outcome`, and `workflow.rationale`
+- the four canonical issue types are `no_power`, `tripping_mcb_rccb`, `charging_slow`, and `not_responding`
+
 ## Prerequisites
 
 - Windows PowerShell
@@ -85,9 +90,11 @@ Useful routes:
 - `.\.venv\Scripts\python.exe .\vlm_doctor.py` reports successful client initialization
 - `.\.venv\Scripts\python.exe .\test_live_api.py` returns structured preview/triage results
 - Stored audit payloads contain a meaningful `diagnosis.raw_provider_output` instead of a Gemini failure fallback message
+- Stored audit payloads should also show organizer-native fields such as `diagnosis.issue_type` and `workflow.outcome`
 
 ## 5. Troubleshooting
 
 - Hydration errors about `<html>` under `<main>` mean a nested App Router layout is rendering document tags. Only `frontend/app/layout.tsx` should render `<html>` and `<body>`.
 - If uploads do not render in the result page, confirm the backend is running and `frontend/.env.local` points to `http://127.0.0.1:8001`.
 - If Gemini is configured but triage still behaves heuristically, inspect the latest `triage_audits` payload and check whether `diagnosis.raw_provider_output` says Gemini failed and heuristic fallback was used.
+- If the UI still mentions driver/local resolver/remote ops/technician as the primary decision model, you are likely running stale frontend code. The current flow should show organizer issue type, shared basic checks, and `resolved` or `escalate`.

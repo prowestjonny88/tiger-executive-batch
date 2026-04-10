@@ -1,5 +1,16 @@
 # OmniTriage — Implementation Roadmap
 
+## Implementation Status Note
+This roadmap includes older wording about deterministic resolver routing and tier-specific outputs.
+
+The live MVP has since been refactored around the organizer decision tree:
+- `issue_type -> basic_checks -> branch_sop -> resolved/escalate`
+
+Use this roadmap as historical sequencing context, but treat the following as the current implementation references:
+- `README.md`
+- `docs/OmniTriage_Technical_Architecture.md`
+- `docs/progress_tracker.md`
+
 ## 1. Purpose
 This roadmap converts the locked product, architecture, and tech stack into a practical execution sequence.
 

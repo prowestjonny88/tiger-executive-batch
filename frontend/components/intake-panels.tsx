@@ -1,9 +1,11 @@
-﻿import type {
-  ApiTriageResponse,
-  IncidentHistoryItem,
-  PreviewResponse,
-  ScenarioOption,
-  UploadedPhotoEvidence,
+import {
+  formatBasicCheckStatus,
+  formatIssueType,
+  type ApiTriageResponse,
+  type IncidentHistoryItem,
+  type PreviewResponse,
+  type ScenarioOption,
+  type UploadedPhotoEvidence,
 } from "../lib/api";
 
 type ActiveSite = {
@@ -24,11 +26,11 @@ export function IntakeIntro({
   return (
     <div className="section-header">
       <span className="section-subheading">{demoMode ? "Guided replay mode" : "Diagnostic module 04"}</span>
-      <h2 className="section-heading">{demoMode ? "Replay a seeded field scenario" : "Upload Charger Photo"}</h2>
+      <h2 className="section-heading">{demoMode ? "Replay an organizer branch scenario" : "Upload Charger Photo"}</h2>
       <p className="muted">
         {demoMode
-          ? `Use "${selectedScenario?.name ?? "the active scenario"}" to rehearse the full premium intake flow before dataset-driven backend work arrives.`
-          : "Capture the visible charger state, add optional telemetry, and preserve the current API-powered preview and triage flow."}
+          ? `Use "${selectedScenario?.name ?? "the active scenario"}" to rehearse the organizer decision tree end to end.`
+          : "Capture the visible charger state, add optional telemetry, and preserve the current API-powered preview and organizer triage flow."}
       </p>
     </div>
   );
@@ -57,11 +59,11 @@ export function EvidenceUploadCard({
         {demoMode ? "DM" : "CAM"}
       </div>
       <div className="stack stack-tight stack-centered">
-        <h3>{demoMode ? "Load a precision replay" : "Capture or drop image"}</h3>
+        <h3>{demoMode ? "Load a branch replay" : "Capture or drop image"}</h3>
         <p className="muted copy-narrow">
           {demoMode
-            ? "Seeded evidence keeps the experience demo-ready even before real upload and dataset wiring lands."
-            : "Upload a real charger photo now. Stored file metadata feeds preview quality checks while deeper image understanding stays heuristic pre-dataset."}
+            ? "Seeded organizer scenarios keep the experience demo-ready while preserving the same intake and triage contracts."
+            : "Upload a real charger photo now. Stored file metadata feeds preview quality checks while the organizer tree drives the live outcome."}
         </p>
       </div>
       {!demoMode ? (
@@ -86,7 +88,7 @@ export function EvidenceUploadCard({
         <div className="soft-panel stack stack-tight">
           <strong>{uploadedPhoto.filename}</strong>
           <p className="caption">
-            {uploadedPhoto.media_type} · {(uploadedPhoto.byte_size / 1024).toFixed(1)} KB
+            {uploadedPhoto.media_type} | {(uploadedPhoto.byte_size / 1024).toFixed(1)} KB
           </p>
           <p className="caption">{uploadedPhoto.storage_path}</p>
           {!demoMode ? (
@@ -122,16 +124,16 @@ export function TechnicalChecklist() {
         </ul>
       </section>
       <section className="panel">
-        <span className="micro-label">What this retrofit preserves</span>
+        <span className="micro-label">Organizer backbone</span>
         <p className="muted">
-          Current payloads remain stable while the UI takes on the trust-first, editorial structure from the prototype.
+          Triage now follows the organizer flow directly: identify issue type, confirm basic checks, run branch SOP, then close or escalate.
         </p>
         <div className="split-callout">
           <div>
-            <strong>Pre-dataset safe</strong>
-            <p className="caption">Live contracts now stay aligned even while image understanding remains heuristic.</p>
+            <strong>Canonical workflow</strong>
+            <p className="caption">Issue type to basic checks to branch SOP to resolved or escalate.</p>
           </div>
-          <span className="status-badge status-high">API stable</span>
+          <span className="status-badge status-high">Tree aligned</span>
         </div>
       </section>
     </div>
@@ -171,10 +173,10 @@ export function SiteSummary({
         ) : null}
         <div className="meta-chip">
           <strong>
-            {activeSite.has_local_resolver ? "Local resolver ready" : "Remote-first resolution"} /{" "}
+            {activeSite.has_local_resolver ? "Local site access available" : "Remote-first site"} /{" "}
             {activeSite.has_remote_ops ? "Remote ops available" : "Remote ops unavailable"}
           </strong>
-          <span className="caption">Capability routing</span>
+          <span className="caption">Site capability context</span>
         </div>
       </div>
     </section>
@@ -210,8 +212,7 @@ export function IncidentHistoryPanel({
 
       {!isLoading && incidents.length === 0 ? (
         <p className="muted">
-          No persisted incidents yet. Run preview or triage with the live backend enabled to populate the judge/debug
-          history.
+          No persisted incidents yet. Run preview or triage with the live backend enabled to populate the judge/debug history.
         </p>
       ) : null}
 
@@ -222,7 +223,7 @@ export function IncidentHistoryPanel({
               <div className="action-row space-between align-center">
                 <strong>INC-{incident.id}</strong>
                 <span className="status-badge status-neutral">
-                  {humanizeAuditValue(incident.latest_resolver_tier, "Awaiting triage")}
+                  {incident.latest_issue_type ? formatIssueType(incident.latest_issue_type) : "Awaiting triage"}
                 </span>
               </div>
               <div className="site-meta">
@@ -246,10 +247,16 @@ export function IncidentHistoryPanel({
                     <span className="caption">Confidence</span>
                   </div>
                 ) : null}
+                {incident.latest_outcome ? (
+                  <div className="meta-chip">
+                    <strong>{incident.latest_outcome}</strong>
+                    <span className="caption">Outcome</span>
+                  </div>
+                ) : null}
               </div>
               {incident.latest_fault ? <p className="muted">{incident.latest_fault}</p> : null}
               <p className="caption">
-                {incident.error_code ? `Error ${incident.error_code} · ` : ""}
+                {incident.error_code ? `Error ${incident.error_code} | ` : ""}
                 {incident.symptom_text || incident.photo_hint || "No symptom summary recorded yet."}
               </p>
               {incident.photo_evidence ? <p className="caption">Stored photo: {incident.photo_evidence.filename}</p> : null}
@@ -286,7 +293,7 @@ export function ResultsPanel({
         <span className="section-subheading">Assessment window</span>
         <h2 className="section-heading">Likely issue identified</h2>
         <p className="muted">
-          Preview, triage, routing, and guidance remain live while the visual system catches up to the prototype.
+          Preview, organizer triage, and branch guidance remain live while the visual system catches up to the prototype.
         </p>
       </div>
 
@@ -322,7 +329,7 @@ export function ResultsPanel({
           </ul>
           {preview.quality.storage_path ? (
             <p className="caption">
-              Stored evidence: {preview.quality.filename || "incident photo"} · {preview.quality.storage_path}
+              Stored evidence: {preview.quality.filename || "incident photo"} | {preview.quality.storage_path}
             </p>
           ) : null}
           {preview.follow_up_questions.length > 0 ? (
@@ -345,7 +352,7 @@ export function ResultsPanel({
               <div className="stack stack-micro">
                 <span className="micro-label">Primary diagnosis</span>
                 <h3 className="result-panel__title">{result.diagnosis.likely_fault}</h3>
-                <p className="muted">{result.diagnosis.internal_issue_category}</p>
+                <p className="muted">{formatIssueType(result.diagnosis.issue_type)}</p>
               </div>
               <span className={confidenceClass(result.diagnosis.confidence_band)}>
                 {result.diagnosis.confidence_band} confidence / {result.diagnosis.confidence_score.toFixed(2)}
@@ -368,18 +375,26 @@ export function ResultsPanel({
               </ul>
             </article>
             <article className="result-panel">
-              <span className="micro-label">Report analysis</span>
+              <span className="micro-label">Workflow analysis</span>
               <ul className="artifact-list">
-                <li>Resolver tier: {result.routing.resolver_tier}</li>
-                <li>Priority: {result.routing.priority}</li>
-                <li>Next action: {result.routing.next_action}</li>
-                <li>Fallback action: {result.routing.fallback_action}</li>
+                <li>Issue type: {formatIssueType(result.workflow.issue_type)}</li>
+                <li>Outcome: {result.workflow.outcome}</li>
+                <li>Next action: {result.workflow.next_action}</li>
+                <li>Fallback action: {result.workflow.fallback_action}</li>
+              </ul>
+            </article>
+            <article className="result-panel">
+              <span className="micro-label">Basic checks</span>
+              <ul className="artifact-list">
+                <li>Main power supply: {formatBasicCheckStatus(result.diagnosis.basic_conditions.main_power_supply)}</li>
+                <li>Cable condition: {formatBasicCheckStatus(result.diagnosis.basic_conditions.cable_condition)}</li>
+                <li>Indicator / error code: {formatBasicCheckStatus(result.diagnosis.basic_conditions.indicator_or_error_code)}</li>
               </ul>
             </article>
           </div>
 
           <article className="result-panel">
-            <span className="micro-label">Safe guidance</span>
+            <span className="micro-label">Branch SOP</span>
             <h3 className="result-panel__title">{result.artifact.title}</h3>
             {result.artifact.summary ? <p className="muted">{result.artifact.summary}</p> : null}
             <ol className="artifact-list">
@@ -396,14 +411,14 @@ export function ResultsPanel({
             {result.confidence.requires_confirmation ? (
               <div className="soft-panel">
                 <span className="micro-label">Confirmation status</span>
-                <p className="muted">Additional answers were required before safe routing.</p>
+                <p className="muted">Additional organizer-check answers were required before safe routing.</p>
               </div>
             ) : null}
           </article>
 
           <article className="result-panel">
-            <span className="micro-label">Escalation rationale</span>
-            <p className="muted">{result.routing.rationale}</p>
+            <span className="micro-label">Workflow rationale</span>
+            <p className="muted">{result.workflow.rationale}</p>
             {result.artifact.evidence_focus?.length ? (
               <ul className="artifact-list">
                 {result.artifact.evidence_focus.map((item) => (

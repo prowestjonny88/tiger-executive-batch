@@ -112,6 +112,65 @@ def save_audit(stage: str, payload: dict[str, Any], incident_id: int | None = No
         return 0 if row_id is None else int(row_id)
 
 
+def _derive_legacy_issue_type(payload: dict[str, Any]) -> str:
+    diagnosis = payload.get("diagnosis", {})
+    text = " ".join(
+        str(item)
+        for item in [
+            diagnosis.get("internal_issue_category", ""),
+            diagnosis.get("likely_fault", ""),
+            diagnosis.get("evidence_summary", ""),
+            diagnosis.get("raw_provider_output", ""),
+        ]
+    ).lower()
+
+    if any(token in text for token in ["mcb", "rccb", "breaker", "trip"]):
+        return "tripping_mcb_rccb"
+    if any(token in text for token in ["slow", "voltage drop", "low current", "vehicle limitation"]):
+        return "charging_slow"
+    if any(token in text for token in ["power", "supply", "lights off", "dead"]):
+        return "no_power"
+    return "not_responding"
+
+
+def _normalize_triage_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("workflow") and payload.get("diagnosis", {}).get("issue_type"):
+        return payload
+
+    diagnosis = payload.get("diagnosis", {})
+    routing = payload.get("routing", {})
+    artifact = payload.get("artifact", {})
+    issue_type = _derive_legacy_issue_type(payload)
+    hazard_flags = diagnosis.get("hazard_flags", [])
+    outcome = "escalate" if routing.get("resolver_tier") in {"remote_ops", "technician"} or hazard_flags else "resolved"
+
+    return {
+        **payload,
+        "diagnosis": {
+            **diagnosis,
+            "issue_type": issue_type,
+            "basic_conditions": {
+                "main_power_supply": "unknown",
+                "cable_condition": "problem" if hazard_flags else "unknown",
+                "indicator_or_error_code": "ok" if diagnosis.get("raw_ocr_text") or diagnosis.get("evidence_summary") else "unknown",
+                "indicator_detail": diagnosis.get("raw_ocr_text") or None,
+            },
+        },
+        "workflow": {
+            "issue_type": issue_type,
+            "branch_actions": artifact.get("steps") or [routing.get("next_action"), routing.get("fallback_action")],
+            "outcome": outcome,
+            "rationale": routing.get("rationale") or "Legacy triage record normalized into organizer decision-tree format.",
+            "next_action": routing.get("next_action") or "Review the legacy incident details.",
+            "fallback_action": routing.get("fallback_action") or "Escalate if the issue remains unresolved.",
+        },
+        "artifact": {
+            **artifact,
+            "issue_type": issue_type,
+        },
+    }
+
+
 def _extract_incident_history(row: sqlite3.Row) -> dict[str, Any]:
     summary: dict[str, Any] = dict(row)
     latest_triage_payload_raw = summary.pop("latest_triage_payload_json", None)
@@ -120,17 +179,17 @@ def _extract_incident_history(row: sqlite3.Row) -> dict[str, Any]:
     summary["photo_evidence"] = json.loads(photo_evidence_raw) if photo_evidence_raw else None
 
     if latest_triage_payload_raw:
-        latest_triage_payload = json.loads(latest_triage_payload_raw)
-        routing = latest_triage_payload.get("routing", {})
+        latest_triage_payload = _normalize_triage_payload(json.loads(latest_triage_payload_raw))
+        workflow = latest_triage_payload.get("workflow", {})
         diagnosis = latest_triage_payload.get("diagnosis", {})
         confidence = latest_triage_payload.get("confidence", {})
-        summary["latest_resolver_tier"] = routing.get("resolver_tier")
-        summary["latest_priority"] = routing.get("priority")
+        summary["latest_issue_type"] = diagnosis.get("issue_type")
+        summary["latest_outcome"] = workflow.get("outcome")
         summary["latest_fault"] = diagnosis.get("likely_fault")
         summary["latest_confidence_band"] = confidence.get("band")
     else:
-        summary["latest_resolver_tier"] = None
-        summary["latest_priority"] = None
+        summary["latest_issue_type"] = None
+        summary["latest_outcome"] = None
         summary["latest_fault"] = None
         summary["latest_confidence_band"] = None
 
@@ -233,6 +292,6 @@ def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
     
     triage_raw = dict(row).get("latest_triage_payload_json")
     if triage_raw:
-        result["triage_payload"] = json.loads(triage_raw)
+        result["triage_payload"] = _normalize_triage_payload(json.loads(triage_raw))
         
     return result

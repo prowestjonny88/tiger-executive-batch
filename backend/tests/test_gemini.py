@@ -37,7 +37,7 @@ def test_gemini_intake_provider_weak():
         {
             "quality_status": "weak",
             "quality_notes": "A bit blurry.",
-            "follow_up_questions": [{"question_id": "visible_damage", "prompt": "Any damage?"}],
+            "follow_up_questions": [{"question_id": "main_power_supply", "prompt": "Is the main power supply available?"}],
         }
     )
 
@@ -54,7 +54,7 @@ def test_gemini_intake_provider_weak():
     assert status == "weak"
     assert notes == "A bit blurry."
     assert len(questions) == 1
-    assert questions[0]["question_id"] == "visible_damage"
+    assert questions[0]["question_id"] == "main_power_supply"
 
 
 def test_gemini_diagnosis_provider():
@@ -62,11 +62,17 @@ def test_gemini_diagnosis_provider():
     mock_response.text = json.dumps(
         {
             "provider_summary": "Diagnosis complete.",
-            "issue_category": "hardware_risk",
+            "issue_type": "tripping_mcb_rccb",
             "likely_fault": "Broken plug",
             "confidence_score": 0.95,
             "raw_ocr_text": "ERR123",
             "severity": "critical",
+            "basic_conditions": {
+                "main_power_supply": "ok",
+                "cable_condition": "problem",
+                "indicator_or_error_code": "ok",
+                "indicator_detail": "ERR123",
+            },
             "hazard_flags": ["visible_hazard"],
         }
     )
@@ -83,11 +89,12 @@ def test_gemini_diagnosis_provider():
         result = provider.analyze(incident)
 
     assert result.provider_summary == "Diagnosis complete."
-    assert result.issue_category == "hardware_risk"
+    assert result.issue_type == "tripping_mcb_rccb"
     assert result.likely_fault == "Broken plug"
     assert result.confidence_score == 0.95
     assert result.raw_ocr_text == "ERR123"
     assert result.severity == SeverityLevel.CRITICAL
+    assert result.basic_conditions.cable_condition == "problem"
     assert "visible_hazard" in result.hazard_flags
 
 
@@ -106,5 +113,5 @@ def test_gemini_diagnosis_fallback_on_parse_error():
         provider = GeminiDiagnosisProvider()
         result = provider.analyze(incident)
 
-    assert result.issue_category == "unknown"
+    assert result.issue_type == "not_responding"
     assert result.confidence_score == 0.45

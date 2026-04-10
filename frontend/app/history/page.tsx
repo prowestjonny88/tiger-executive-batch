@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { fetchIncidents, IncidentHistoryItem } from "../../lib/api";
+import { fetchIncidents, formatIssueType, IncidentHistoryItem } from "../../lib/api";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 
@@ -44,14 +44,14 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 md:py-12">
+    <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
             Incident Database
           </h1>
           <p className="mt-2 text-slate-600">
-            Recent triaged incidents across all sites.
+            Recent organizer-tree triage incidents across all sites.
           </p>
         </div>
         <Button asChild>
@@ -68,14 +68,15 @@ export default function HistoryPage() {
                 <th className="px-6 py-4 font-medium uppercase tracking-wider">Time</th>
                 <th className="px-6 py-4 font-medium uppercase tracking-wider">Site / Charger</th>
                 <th className="px-6 py-4 font-medium uppercase tracking-wider">Fault</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Resolver Tier</th>
+                <th className="px-6 py-4 font-medium uppercase tracking-wider">Issue Type</th>
+                <th className="px-6 py-4 font-medium uppercase tracking-wider">Outcome</th>
                 <th className="px-6 py-4 font-medium uppercase tracking-wider text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {incidents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                     No incidents recorded yet.
                   </td>
                 </tr>
@@ -92,26 +93,25 @@ export default function HistoryPage() {
                       <div className="font-medium text-slate-900">{incident.site_id}</div>
                       <div className="text-slate-500 text-xs mt-0.5">{incident.charger_id || "Unspecified"}</div>
                     </td>
-                    <td className="px-6 py-4 max-w-[200px] truncate text-slate-700">
+                    <td className="px-6 py-4 max-w-[220px] truncate text-slate-700">
                       {incident.latest_fault || "Pending"}
                     </td>
                     <td className="px-6 py-4">
-                      {incident.latest_resolver_tier ? (
-                        <Badge
-                          variant={
-                            incident.latest_resolver_tier === "driver"
-                              ? "success"
-                              : incident.latest_resolver_tier === "local_site_resolver"
-                                ? "warning"
-                                : incident.latest_resolver_tier === "technician"
-                                  ? "destructive"
-                                  : "default"
-                          }
-                        >
-                          {incident.latest_resolver_tier.replace(/_/g, " ")}
+                      {incident.latest_issue_type ? (
+                        <Badge variant="secondary">
+                          {formatIssueType(incident.latest_issue_type)}
                         </Badge>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {incident.latest_outcome ? (
+                        <Badge variant={incident.latest_outcome === "resolved" ? "success" : "warning"}>
+                          {incident.latest_outcome}
+                        </Badge>
+                      ) : (
+                        <span className="text-slate-400">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">

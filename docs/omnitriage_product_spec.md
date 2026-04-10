@@ -1,5 +1,18 @@
 # OmniTriage Product Specification
 
+## Implementation Status Note
+This document contains earlier design-phase language about resolver tiers and tier-specific artifacts.
+
+The current implementation has moved to the organizer decision tree as the live backbone:
+- issue type: `no_power`, `tripping_mcb_rccb`, `charging_slow`, `not_responding`
+- shared checks: main power supply, cable condition, indicator/error code
+- workflow outcome: `resolved` or `escalate`
+
+When this file conflicts with current code, prefer:
+- `README.md`
+- `docs/OmniTriage_Technical_Architecture.md`
+- `docs/progress_tracker.md`
+
 **Working Title:** OmniTriage  
 **Theme:** ESUM x RExharge Case Study Competition — Theme 2: EV Charger Troubleshooting  
 **Document Type:** Consolidated product spec based on the full working discussion  
@@ -864,4 +877,3 @@ OmniTriage is a **confidence-aware, resolver-specific EV charger troubleshooting
 In short:
 
 > **OmniTriage is not a model demo. It is a decision-and-action system for EV charger troubleshooting.**
-

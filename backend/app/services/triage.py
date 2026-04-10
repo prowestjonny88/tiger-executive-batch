@@ -14,13 +14,13 @@ def run_triage(incident: IncidentInput) -> TriageResult:
 
     diagnosis = run_diagnosis(incident)
     confidence = assess_confidence(diagnosis)
-    routing = route_incident(incident, diagnosis, confidence, site)
-    artifact = build_artifact(routing, diagnosis, load_snippets())
+    workflow = route_incident(incident, diagnosis, confidence, site)
+    artifact = build_artifact(workflow, diagnosis, load_snippets())
 
     return TriageResult(
         incident=incident,
         diagnosis=diagnosis,
         confidence=confidence,
-        routing=routing,
+        workflow=workflow,
         artifact=artifact,
     )

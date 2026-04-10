@@ -3,19 +3,22 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import svgPaths from "../../imports/8Confirmation/svg-sylya79o1n";
-import { readSession, clearSession } from "../../lib/triage-session";
+import { clearSession, readSession } from "../../lib/triage-session";
+import { formatIssueType } from "../../lib/api";
 
 export default function Confirmation() {
   const router = useRouter();
   const [incidentId, setIncidentId] = useState<number | undefined>();
-  const [tier, setTier] = useState<string | undefined>();
+  const [outcome, setOutcome] = useState<string | undefined>();
+  const [issueType, setIssueType] = useState<string | undefined>();
   const [fault, setFault] = useState<string | undefined>();
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const session = readSession();
     setIncidentId(session.triage?.incident_id);
-    setTier(session.triage?.routing?.resolver_tier);
+    setOutcome(session.triage?.workflow?.outcome);
+    setIssueType(session.triage?.diagnosis?.issue_type);
     setFault(session.triage?.diagnosis?.likely_fault);
     setLoaded(true);
   }, []);
@@ -30,16 +33,12 @@ export default function Confirmation() {
     router.push("/upload");
   };
 
-  const tierLabel =
-    tier === "driver"
-      ? "Driver Self-Resolved"
-      : tier === "local_site_resolver"
-        ? "Local Responder Assigned"
-        : tier === "remote_ops"
-          ? "Remote Ops Notified"
-          : tier === "technician"
-            ? "Technician Dispatched"
-            : "Triage Complete";
+  const outcomeLabel =
+    outcome === "resolved"
+      ? "Case Closed and Reported"
+      : outcome === "escalate"
+        ? "Escalation Logged"
+        : "Triage Complete";
 
   if (!loaded) {
     return (
@@ -51,51 +50,45 @@ export default function Confirmation() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-2xl mx-auto px-6 py-16">
-
-      {/* Confirmation Card */}
       <div className="bg-white border border-slate-200 shadow-xl rounded-3xl w-full flex flex-col items-center overflow-hidden mb-6 relative z-10 p-12 md:p-16 text-center">
-
-        {/* Main Icon */}
         <div className="bg-green-400 w-24 h-24 rounded-3xl flex items-center justify-center shadow-lg mb-10 transform -rotate-3 transition-transform hover:rotate-0 duration-300">
           <svg className="w-12 h-12 text-green-950" fill="none" viewBox="0 0 40 40">
             <path d={svgPaths.pf059c0} fill="currentColor" />
           </svg>
         </div>
 
-        {/* Content Header */}
-        <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-6 tracking-tight uppercase leading-none">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-6 tracking-tight uppercase leading-none whitespace-pre-line">
           {incidentId ? "Report Successfully\nSubmitted" : "Diagnosis\nComplete"}
         </h1>
 
-        {/* Resolution Status Badge */}
         <div className="bg-green-50 border border-green-200 text-green-800 font-bold text-sm tracking-wide px-5 py-2.5 rounded-lg shadow-sm mb-4">
-          {tierLabel}
+          {outcomeLabel}
         </div>
 
-        {/* Incident ID Badge */}
         {incidentId && (
           <div className="bg-slate-100 border border-slate-200 text-slate-800 font-mono text-sm font-bold tracking-[0.1em] px-5 py-2.5 rounded-lg shadow-sm mb-4">
             INCIDENT ID: INC-{incidentId}
           </div>
         )}
 
-        {/* Fault Summary */}
         {fault && (
-          <p className="text-slate-500 text-sm font-medium mb-8">
+          <p className="text-slate-500 text-sm font-medium mb-3">
             Identified issue: <span className="text-slate-800 font-bold">{fault}</span>
           </p>
         )}
 
-        {/* Subtext */}
+        {issueType && (
+          <p className="text-slate-500 text-sm font-medium mb-8">
+            Organizer branch: <span className="text-slate-800 font-bold">{formatIssueType(issueType)}</span>
+          </p>
+        )}
+
         <p className="text-slate-600 text-lg max-w-md mx-auto mb-14 leading-relaxed font-medium">
-          {tier === "driver"
-            ? "The suggested steps have been acknowledged. Please retry the charging session and contact support if the issue persists."
-            : tier === "local_site_resolver"
-              ? "The local site responder has been notified and will attend to the charger. Please do not attempt further intervention."
-              : "Your report has been logged and the relevant team has been notified. An update will follow shortly."}
+          {outcome === "resolved"
+            ? "The branch SOP has been completed and the case can be reported as resolved."
+            : "The case has been logged for escalation. Preserve the current charger state until follow-up is complete."}
         </p>
 
-        {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mb-16">
           <button
             id="confirmation-new-triage-btn"
@@ -113,7 +106,6 @@ export default function Confirmation() {
           </button>
         </div>
 
-        {/* Secondary Context Info */}
         <div className="flex items-center justify-between w-full border-t border-slate-200 pt-8 opacity-60">
           <div className="flex items-center gap-2.5 text-slate-900 font-bold text-xs uppercase tracking-widest">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 9.33333 11.6667">
@@ -128,7 +120,6 @@ export default function Confirmation() {
             Data Logged
           </div>
         </div>
-
       </div>
     </div>
   );

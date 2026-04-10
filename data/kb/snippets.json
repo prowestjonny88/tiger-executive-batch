@@ -1,50 +1,46 @@
 [
   {
-    "snippet_id": "kb-connectivity-driver",
-    "issue_category": "connectivity",
-    "resolver_tier": "driver",
-    "keywords": ["offline", "wifi", "network", "screen on"],
-    "title": "Basic connectivity recovery",
+    "snippet_id": "kb-no-power",
+    "issue_type": "no_power",
+    "keywords": ["power", "lights off", "breaker", "voltage"],
+    "title": "No power supply checks",
     "body": [
-      "Check whether the charger display is powered and the connector is fully seated.",
-      "If the charger appears online but the session will not start, stop and restart the charging session once.",
-      "If the problem persists, escalate to remote support instead of retrying repeatedly."
+      "Check the DB / MCB state before touching the charger.",
+      "Measure or confirm incoming voltage at the charger feed.",
+      "Restore the supply if the upstream issue is confirmed; otherwise escalate."
     ]
   },
   {
-    "snippet_id": "kb-local-resolver-connectivity",
-    "issue_category": "connectivity",
-    "resolver_tier": "local_site_resolver",
-    "keywords": ["dim", "offline", "network", "screen on", "led"],
-    "title": "Local responder connectivity SOP",
+    "snippet_id": "kb-tripping-mcb-rccb",
+    "issue_type": "tripping_mcb_rccb",
+    "keywords": ["trip", "mcb", "rccb", "breaker", "overheat", "loose cable"],
+    "title": "Tripping protection checks",
     "body": [
-      "Confirm the charger screen is powered and no visible damage is present before touching site controls.",
-      "Run the approved local restart or isolation checklist once using site SOP.",
-      "If the charger does not recover immediately, stop local action and escalate to remote ops."
+      "Confirm the installed MCB / RCCB rating matches the charger load.",
+      "Inspect for overheating, looseness, or abnormal heating at cable and termination points.",
+      "Reduce current or replace the protection device only if the site SOP allows it; otherwise escalate."
     ]
   },
   {
-    "snippet_id": "kb-ops-connectivity",
-    "issue_category": "connectivity",
-    "resolver_tier": "remote_ops",
-    "keywords": ["offline", "network", "blank screen", "red led"],
-    "title": "Remote connectivity checks",
+    "snippet_id": "kb-charging-slow",
+    "issue_type": "charging_slow",
+    "keywords": ["slow", "low current", "vehicle limiting", "voltage drop"],
+    "title": "Charging slow checks",
     "body": [
-      "Verify charger heartbeat or last-seen status from the backend if available.",
-      "Confirm whether the charger was recently power-cycled or lost Wi-Fi connectivity.",
-      "If the charger is unreachable and no local resolver is available, queue technician escalation."
+      "Review the configured current output setting.",
+      "Confirm whether the vehicle is limiting charge acceptance.",
+      "Check for voltage drop or supply limitations and advise the customer."
     ]
   },
   {
-    "snippet_id": "kb-safety-tech",
-    "issue_category": "hardware_risk",
-    "resolver_tier": "technician",
-    "keywords": ["burn", "damage", "exposed", "water", "overheat"],
-    "title": "Safety-critical technician instructions",
+    "snippet_id": "kb-not-responding",
+    "issue_type": "not_responding",
+    "keywords": ["frozen", "not responding", "reset", "blank screen", "pcb"],
+    "title": "Not responding recovery steps",
     "body": [
-      "Treat the charger as potentially hazardous and isolate access to the unit.",
-      "Inspect for cable, connector, or enclosure damage before any restart attempt.",
-      "Document visible hazard evidence and prioritize on-site inspection."
+      "Perform a controlled power cycle of the charger.",
+      "Inspect the PCB / control path if the display or controls remain frozen.",
+      "Reset the system once; escalate if the charger still does not respond."
     ]
   }
 ]

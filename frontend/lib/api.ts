@@ -5,6 +5,10 @@ export type UploadedPhotoEvidence = {
   byte_size: number;
 };
 
+export type IssueType = "no_power" | "tripping_mcb_rccb" | "charging_slow" | "not_responding";
+export type BasicCheckStatus = "ok" | "problem" | "unknown";
+export type WorkflowOutcome = "resolved" | "escalate";
+
 export type ApiTriageResponse = {
   incident_id: number;
   incident: {
@@ -19,9 +23,17 @@ export type ApiTriageResponse = {
     demo_scenario_id?: string;
   };
   diagnosis: {
-    internal_issue_category: string;
+    issue_type: IssueType;
     likely_fault: string;
     evidence_summary: string;
+    basic_conditions: {
+      main_power_supply: BasicCheckStatus;
+      cable_condition: BasicCheckStatus;
+      indicator_or_error_code: BasicCheckStatus;
+      indicator_detail?: string | null;
+    };
+    raw_provider_output: string;
+    raw_ocr_text?: string | null;
     confidence_score: number;
     confidence_band: "high" | "medium" | "low";
     hazard_flags: string[];
@@ -33,15 +45,16 @@ export type ApiTriageResponse = {
     safety_override: boolean;
     rationale: string;
   };
-  routing: {
-    resolver_tier: string;
-    priority: string;
+  workflow: {
+    issue_type: IssueType;
+    branch_actions: string[];
+    outcome: WorkflowOutcome;
     rationale: string;
     next_action: string;
     fallback_action: string;
   };
   artifact: {
-    resolver_tier?: string;
+    issue_type?: IssueType;
     title: string;
     summary?: string;
     steps: string[];
@@ -82,7 +95,8 @@ export type ScenarioOption = {
   symptom_text: string;
   error_code: string;
   follow_up_answers: Record<string, string>;
-  expected_tier: "driver" | "local_site_resolver" | "remote_ops" | "technician";
+  expected_issue_type: IssueType;
+  expected_outcome: WorkflowOutcome;
 };
 
 export type IncidentHistoryItem = {
@@ -97,8 +111,8 @@ export type IncidentHistoryItem = {
   created_at: string;
   latest_stage?: string | null;
   latest_stage_at?: string | null;
-  latest_resolver_tier?: string | null;
-  latest_priority?: string | null;
+  latest_issue_type?: IssueType | null;
+  latest_outcome?: WorkflowOutcome | null;
   latest_fault?: string | null;
   latest_confidence_band?: "high" | "medium" | "low" | null;
 };
@@ -210,4 +224,32 @@ export async function uploadIncidentPhoto(file: File) {
   const payload = new FormData();
   payload.append("file", file);
   return postForm<UploadedPhotoEvidence>("/api/uploads", payload);
+}
+
+export function formatIssueType(issueType?: string | null) {
+  switch (issueType) {
+    case "no_power":
+      return "No Power";
+    case "tripping_mcb_rccb":
+      return "Tripping MCB/RCCB";
+    case "charging_slow":
+      return "Charging Slow";
+    case "not_responding":
+      return "Not Responding";
+    default:
+      return "Unknown";
+  }
+}
+
+export function formatBasicCheckStatus(status?: string | null) {
+  switch (status) {
+    case "ok":
+      return "OK";
+    case "problem":
+      return "Problem";
+    case "unknown":
+      return "Unknown";
+    default:
+      return "Unknown";
+  }
 }

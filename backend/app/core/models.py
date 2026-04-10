@@ -5,7 +5,9 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-ResolverTier = Literal["driver", "local_site_resolver", "remote_ops", "technician"]
+IssueType = Literal["no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"]
+BasicCheckStatus = Literal["ok", "problem", "unknown"]
+WorkflowOutcome = Literal["resolved", "escalate"]
 
 
 class ConfidenceBand(str, Enum):
@@ -61,11 +63,19 @@ class IncidentInput(BaseModel):
     demo_scenario_id: Optional[str] = None
 
 
+class BasicConditionsAssessment(BaseModel):
+    main_power_supply: BasicCheckStatus = "unknown"
+    cable_condition: BasicCheckStatus = "unknown"
+    indicator_or_error_code: BasicCheckStatus = "unknown"
+    indicator_detail: Optional[str] = None
+
+
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
-    internal_issue_category: str
+    issue_type: IssueType
     likely_fault: str
     evidence_summary: str
+    basic_conditions: BasicConditionsAssessment
     raw_ocr_text: Optional[str] = None
     confidence_score: float = Field(ge=0.0, le=1.0)
     confidence_band: ConfidenceBand
@@ -92,16 +102,17 @@ class SiteCapabilityProfile(BaseModel):
     notes: Optional[str] = None
 
 
-class RoutingDecision(BaseModel):
-    resolver_tier: ResolverTier
-    priority: SeverityLevel
+class WorkflowDecision(BaseModel):
+    issue_type: IssueType
+    branch_actions: List[str]
+    outcome: WorkflowOutcome
     rationale: str
     next_action: str
     fallback_action: str
 
 
 class ActionArtifact(BaseModel):
-    resolver_tier: ResolverTier
+    issue_type: IssueType
     title: str
     summary: str
     steps: List[str]
@@ -111,8 +122,7 @@ class ActionArtifact(BaseModel):
 
 class KnowledgeSnippet(BaseModel):
     snippet_id: str
-    issue_category: str
-    resolver_tier: str
+    issue_type: IssueType
     keywords: List[str]
     title: str
     body: List[str]
@@ -122,7 +132,7 @@ class TriageResult(BaseModel):
     incident: IncidentInput
     diagnosis: DiagnosisResult
     confidence: ConfidenceAssessment
-    routing: RoutingDecision
+    workflow: WorkflowDecision
     artifact: ActionArtifact
 
 
@@ -135,4 +145,5 @@ class DemoScenario(BaseModel):
     symptom_text: str
     error_code: str
     follow_up_answers: Dict[str, str]
-    expected_tier: ResolverTier
+    expected_issue_type: IssueType
+    expected_outcome: WorkflowOutcome

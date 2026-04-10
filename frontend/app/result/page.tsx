@@ -8,10 +8,16 @@ import { AnnotatedImage } from "../../components/ui/annotated-image";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ApiTriageResponse, fetchIncidentById, resolveEvidenceUrl } from "../../lib/api";
+import {
+  ApiTriageResponse,
+  fetchIncidentById,
+  formatBasicCheckStatus,
+  formatIssueType,
+  resolveEvidenceUrl,
+} from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
 
-type TierInfo = {
+type OutcomeInfo = {
   label: string;
   color: "success" | "warning" | "destructive" | "secondary";
   description: string;
@@ -19,49 +25,25 @@ type TierInfo = {
   nextLabel: string;
 };
 
-function tierInfo(tier: string | undefined): TierInfo {
-  switch (tier) {
-    case "driver":
-      return {
-        label: "Tier 1 - Driver Resolution",
-        color: "success",
-        description: "This issue can be resolved by the driver on-site without specialist support.",
-        nextHref: "/guidance",
-        nextLabel: "View Self-Help Steps",
-      };
-    case "local_site_resolver":
-      return {
-        label: "Tier 2 - Local Site Resolver",
-        color: "warning",
-        description: "This issue requires the local site responder to intervene with on-site access.",
-        nextHref: "/guidance",
-        nextLabel: "View Responder Steps",
-      };
-    case "remote_ops":
-      return {
-        label: "Tier 3 - Remote Ops",
-        color: "secondary",
-        description: "Remote operations needs to review this incident and continue the resolution remotely.",
-        nextHref: "/escalation",
-        nextLabel: "View Escalation Details",
-      };
-    case "technician":
-      return {
-        label: "Tier 4 - Technician Dispatch",
-        color: "destructive",
-        description: "A qualified technician must be dispatched to the site to resolve this issue safely.",
-        nextHref: "/escalation",
-        nextLabel: "View Escalation Details",
-      };
-    default:
-      return {
-        label: "Assessment Complete",
-        color: "secondary",
-        description: "Triage complete. Review the diagnosis below.",
-        nextHref: "/guidance",
-        nextLabel: "View Next Steps",
-      };
+function outcomeInfo(triage: ApiTriageResponse): OutcomeInfo {
+  const outcome = triage.workflow.outcome;
+  if (outcome === "resolved") {
+    return {
+      label: "Branch Guidance Ready",
+      color: "success",
+      description: "The organizer decision tree has enough information to continue with branch SOP guidance.",
+      nextHref: "/guidance",
+      nextLabel: "View Branch SOP",
+    };
   }
+
+  return {
+    label: "Escalation Required",
+    color: triage.diagnosis.hazard_flags.length > 0 ? "destructive" : "warning",
+    description: "The organizer decision tree cannot close this case safely and requires escalation.",
+    nextHref: "/escalation",
+    nextLabel: "View Escalation Details",
+  };
 }
 
 function confidenceBandClass(band: ApiTriageResponse["diagnosis"]["confidence_band"]) {
@@ -111,7 +93,8 @@ function ResultAssessment() {
                 photo_hint: incidentDetail.photo_hint,
                 demo_scenario_id: incidentDetail.demo_scenario_id,
                 photo_evidence: incidentDetail.photo_evidence || undefined,
-                follow_up_answers: incidentDetail.follow_up_answers ?? incidentDetail.triage_payload.incident.follow_up_answers,
+                follow_up_answers:
+                  incidentDetail.follow_up_answers ?? incidentDetail.triage_payload.incident.follow_up_answers,
               },
             };
 
@@ -165,9 +148,10 @@ function ResultAssessment() {
     );
   }
 
-  const info = tierInfo(triage.routing.resolver_tier);
+  const info = outcomeInfo(triage);
   const isHazard = triage.diagnosis.hazard_flags.length > 0;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence?.storage_path);
+  const checks = triage.diagnosis.basic_conditions;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16">
@@ -204,7 +188,7 @@ function ResultAssessment() {
           <CardTitle className="text-3xl font-extrabold mb-3 tracking-tight leading-snug">
             {triage.diagnosis.likely_fault}
           </CardTitle>
-          <p className="text-slate-500 text-base mb-2">{triage.diagnosis.internal_issue_category}</p>
+          <p className="text-slate-500 text-base mb-2">{formatIssueType(triage.diagnosis.issue_type)}</p>
         </CardHeader>
 
         <CardContent className="px-10 md:px-14 pb-6 flex flex-col items-center">
@@ -228,7 +212,7 @@ function ResultAssessment() {
                             y: 30,
                             width: 60,
                             height: 40,
-                            label: "Detected Damage",
+                            label: "Detected Hazard",
                           },
                         ]
                       : []
@@ -251,7 +235,7 @@ function ResultAssessment() {
               }`}
             >
               <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                Resolver Tier
+                Workflow Outcome
               </h4>
               <p className="font-bold text-slate-900 text-base">{info.label}</p>
               <p className="text-slate-600 text-sm mt-1">{info.description}</p>
@@ -273,14 +257,30 @@ function ResultAssessment() {
               <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
                 Next Action
               </h4>
-              <p className="font-bold text-slate-900 text-base">{triage.routing.next_action}</p>
+              <p className="font-bold text-slate-900 text-base">{triage.workflow.next_action}</p>
             </div>
 
             <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
               <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                Priority
+                Workflow Rationale
               </h4>
-              <p className="font-bold text-slate-900 text-base capitalize">{triage.routing.priority}</p>
+              <p className="text-slate-700 text-sm leading-relaxed">{triage.workflow.rationale}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Main Power Supply</h4>
+              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.main_power_supply)}</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Cable Condition</h4>
+              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.cable_condition)}</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Indicator / Error Code</h4>
+              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.indicator_or_error_code)}</p>
+              {checks.indicator_detail ? <p className="text-slate-500 text-sm mt-1">{checks.indicator_detail}</p> : null}
             </div>
           </div>
 
@@ -323,7 +323,7 @@ function ResultAssessment() {
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 9.33333 9.33333">
                   <path d={svgPaths.p2db3a360} fill="currentColor" />
                 </svg>
-                Run Diagnosis Again
+                Run Triage Again
               </a>
             </Button>
           </div>
@@ -335,7 +335,7 @@ function ResultAssessment() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 15 15">
             <path d={svgPaths.p15221b80} fill="currentColor" />
           </svg>
-          Analyzed live
+          Organizer tree applied
         </div>
         <div className="w-px h-4 bg-slate-300"></div>
         <div className="flex items-center gap-2">

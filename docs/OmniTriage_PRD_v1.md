@@ -1,5 +1,18 @@
 # OmniTriage PRD v1
 
+## Implementation Status Note
+This PRD reflects an earlier resolver-tier-first design phase.
+
+The current live implementation uses the organizer decision tree instead:
+- issue type: `no_power`, `tripping_mcb_rccb`, `charging_slow`, `not_responding`
+- shared checks: main power supply, cable condition, indicator/error code
+- final workflow outcome: `resolved` or `escalate`
+
+For the current implementation truth, prefer:
+- `README.md`
+- `docs/OmniTriage_Technical_Architecture.md`
+- `docs/progress_tracker.md`
+
 **Product:** OmniTriage  
 **Theme:** ESUM x RExharge Case Study Competition — Theme 2: EV Charger Troubleshooting  
 **Document Type:** Product Requirements Document  

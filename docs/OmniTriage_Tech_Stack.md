@@ -1,5 +1,14 @@
 # OmniTriage — Tech Stack Document
 
+## Implementation Status Note
+The current stack still remains valid, but the live application contract is now organizer-native rather than resolver-tier-first.
+
+Current primary fields exposed across the app:
+- `diagnosis.issue_type`
+- `diagnosis.basic_conditions`
+- `workflow.outcome`
+- `workflow.rationale`
+
 ## 1. Purpose
 This document captures the approved tech stack for OmniTriage and distinguishes between:
 - Locked decisions

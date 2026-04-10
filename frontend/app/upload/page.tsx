@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import svgPaths from "../../imports/2PhotoUpload/svg-cwyu35rr3g";
-import { fetchPreview, fetchScenarios, fetchSites, fetchTriage, type ScenarioOption, uploadIncidentPhoto } from "../../lib/api";
+import {
+  fetchPreview,
+  fetchScenarios,
+  fetchSites,
+  fetchTriage,
+  formatIssueType,
+  type ScenarioOption,
+  uploadIncidentPhoto,
+} from "../../lib/api";
 import { clearSession, writeSession } from "../../lib/triage-session";
 
 type UploadState = "idle" | "uploading" | "previewing" | "done" | "error";
@@ -171,17 +179,15 @@ export default function PhotoUpload() {
           : "";
 
   const selectedScenario = scenarios.find((item) => item.scenario_id === selectedScenarioId);
-  const tierColors: Record<string, string> = {
-    driver: "bg-green-50 border-green-300 text-green-800",
-    local_site_resolver: "bg-amber-50 border-amber-300 text-amber-800",
-    remote_ops: "bg-slate-100 border-slate-300 text-slate-700",
-    technician: "bg-red-50 border-red-300 text-red-700",
+  const issueColors: Record<string, string> = {
+    no_power: "bg-red-50 border-red-300 text-red-700",
+    tripping_mcb_rccb: "bg-amber-50 border-amber-300 text-amber-800",
+    charging_slow: "bg-green-50 border-green-300 text-green-800",
+    not_responding: "bg-slate-100 border-slate-300 text-slate-700",
   };
-  const tierLabels: Record<string, string> = {
-    driver: "Tier 1 - Driver",
-    local_site_resolver: "Tier 2 - Local Resolver",
-    remote_ops: "Tier 3 - Remote Ops",
-    technician: "Tier 4 - Technician",
+  const outcomeLabels: Record<string, string> = {
+    resolved: "Expected: Guidance",
+    escalate: "Expected: Escalation",
   };
 
   return (
@@ -246,10 +252,13 @@ export default function PhotoUpload() {
                         <p className="text-slate-600 text-sm">{scenario.headline}</p>
                         <p className="text-slate-500 text-xs mt-1 font-mono">ERR: {scenario.error_code}</p>
                       </div>
-                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${tierColors[scenario.expected_tier] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {tierLabels[scenario.expected_tier] ?? scenario.expected_tier}
+                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${issueColors[scenario.expected_issue_type] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                        {formatIssueType(scenario.expected_issue_type)}
                       </span>
                     </div>
+                    <p className="text-slate-500 text-xs mt-2">
+                      {outcomeLabels[scenario.expected_outcome] ?? scenario.expected_outcome}
+                    </p>
                   </button>
                 ))
               )}
@@ -355,7 +364,8 @@ export default function PhotoUpload() {
         {mode === "demo" && selectedScenario ? (
           <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-slate-50 border border-slate-200 text-slate-700">
             <span className="font-bold">Ready to run: </span>
-            {selectedScenario.headline} | Expected: {tierLabels[selectedScenario.expected_tier] ?? selectedScenario.expected_tier}
+            {selectedScenario.headline} | {formatIssueType(selectedScenario.expected_issue_type)} |{" "}
+            {outcomeLabels[selectedScenario.expected_outcome] ?? selectedScenario.expected_outcome}
           </div>
         ) : null}
 

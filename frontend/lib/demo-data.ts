@@ -1,4 +1,5 @@
-export type ResolverTier = "driver" | "local_site_resolver" | "remote_ops" | "technician";
+export type IssueType = "no_power" | "tripping_mcb_rccb" | "charging_slow" | "not_responding";
+export type WorkflowOutcome = "resolved" | "escalate";
 
 export type DemoScenario = {
   scenario_id: string;
@@ -9,7 +10,8 @@ export type DemoScenario = {
   symptom_text: string;
   error_code: string;
   follow_up_answers: Record<string, string>;
-  expected_tier: ResolverTier;
+  expected_issue_type: IssueType;
+  expected_outcome: WorkflowOutcome;
 };
 
 export const sites = [
@@ -33,47 +35,67 @@ export const sites = [
 
 export const scenarios: DemoScenario[] = [
   {
-    scenario_id: "demo-driver-connectivity",
-    name: "Driver-resolvable connectivity issue",
+    scenario_id: "demo-no-power",
+    name: "No power supply issue",
     site_id: "site-mall-01",
-    headline: "Charging never starts but charger appears powered",
-    photo_hint: "display on, no damage",
-    symptom_text: "Blinking blue LED, charging never starts.",
-    error_code: "NET-01",
-    follow_up_answers: { screen_on: "yes", visible_damage: "no", charging_state: "never_started" },
-    expected_tier: "driver",
+    headline: "Charger is dark and the customer reports no power at the bay",
+    photo_hint: "display off, no lights, breaker suspected off",
+    symptom_text: "Charger has no lights and the session cannot start because the unit appears unpowered.",
+    error_code: "",
+    follow_up_answers: {
+      main_power_supply: "Incoming voltage is missing at the charger.",
+      cable_condition: "Cable and connector look normal.",
+      indicator_or_error_code: "No screen or LED is visible.",
+    },
+    expected_issue_type: "no_power",
+    expected_outcome: "resolved",
   },
   {
-    scenario_id: "demo-remote-ops",
-    name: "Remote ops investigation case",
+    scenario_id: "demo-tripping-mcb",
+    name: "Tripping MCB/RCCB case",
+    site_id: "site-mall-01",
+    headline: "Breaker trips when charging starts",
+    photo_hint: "protector trips, no burn marks visible",
+    symptom_text: "The MCB trips shortly after charging begins and the connector feels slightly warm.",
+    error_code: "TRIP-02",
+    follow_up_answers: {
+      main_power_supply: "Power is available before the trip.",
+      cable_condition: "Loose connector and overheating observed.",
+      indicator_or_error_code: "Breaker trip recorded as TRIP-02.",
+    },
+    expected_issue_type: "tripping_mcb_rccb",
+    expected_outcome: "escalate",
+  },
+  {
+    scenario_id: "demo-charging-slow",
+    name: "Charging slow investigation",
     site_id: "site-condo-01",
-    headline: "Charger offline with no local resolver",
-    photo_hint: "screen dim, no visible damage",
-    symptom_text: "Screen is dim and LED blinks red intermittently.",
-    error_code: "OFF-12",
-    follow_up_answers: { screen_on: "dim", visible_damage: "no", charging_state: "stopped_suddenly" },
-    expected_tier: "remote_ops",
+    headline: "Charging is much slower than expected",
+    photo_hint: "display on, current limited, no visible damage",
+    symptom_text: "Charging starts but the current is much lower than usual for this vehicle.",
+    error_code: "SLOW-11",
+    follow_up_answers: {
+      main_power_supply: "Main supply is available.",
+      cable_condition: "Cable and connector are in good condition.",
+      indicator_or_error_code: "Display shows reduced output and SLOW-11.",
+    },
+    expected_issue_type: "charging_slow",
+    expected_outcome: "resolved",
   },
   {
-    scenario_id: "demo-local-resolver",
-    name: "Local resolver SOP check",
-    site_id: "site-mall-01",
-    headline: "Powered charger needs a safe on-site SOP restart",
-    photo_hint: "screen dim, no visible damage",
-    symptom_text: "Session stopped suddenly and LED blinks red intermittently.",
-    error_code: "OFF-12",
-    follow_up_answers: { screen_on: "yes", visible_damage: "no", charging_state: "stopped_suddenly" },
-    expected_tier: "local_site_resolver",
-  },
-  {
-    scenario_id: "demo-technician-hazard",
-    name: "Technician escalation for visible damage",
-    site_id: "site-mall-01",
-    headline: "Cable jacket damage with burn marks",
-    photo_hint: "visible connector damage and scorching",
-    symptom_text: "User reports a burnt smell near the connector.",
-    error_code: "SAFE-99",
-    follow_up_answers: { screen_on: "yes", visible_damage: "yes", charging_state: "stopped_suddenly" },
-    expected_tier: "technician",
+    scenario_id: "demo-not-responding",
+    name: "Not responding charger",
+    site_id: "site-condo-01",
+    headline: "Charger is powered but controls do not respond",
+    photo_hint: "screen frozen, buttons do nothing, no visible damage",
+    symptom_text: "The charger remains powered but the screen is frozen and the unit does not respond to input.",
+    error_code: "UI-09",
+    follow_up_answers: {
+      main_power_supply: "Main power is available.",
+      cable_condition: "Cable and connector are normal.",
+      indicator_or_error_code: "Display shows UI-09 and stays frozen.",
+    },
+    expected_issue_type: "not_responding",
+    expected_outcome: "resolved",
   },
 ];

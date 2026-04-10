@@ -72,7 +72,7 @@ Rules:
 - quality_notes is a short single sentence explaining the quality decision
 - follow_up_questions is a list (max 4 items) of objects with "question_id" and "prompt"
 - Only include questions whose question_id is NOT already answered
-- Available question_ids: "screen_on", "visible_damage", "charging_state", "led_behavior"
+- Available question_ids: "main_power_supply", "cable_condition", "indicator_or_error_code", "issue_type_detail"
 - If the photo is "usable" and most useful answers are clear from context, return zero follow-up questions
 
 Respond with ONLY a JSON object, no markdown.
@@ -245,10 +245,10 @@ def assess_image_quality(
 
 
 FOLLOW_UP_QUESTION_BANK = {
-    "screen_on": "Is the screen on?",
-    "visible_damage": "Is there visible physical damage?",
-    "charging_state": "Did charging stop suddenly or never start?",
-    "led_behavior": "What is the LED color or blink behavior?",
+    "main_power_supply": "Is the main power supply available at the charger right now?",
+    "cable_condition": "Does the cable and connector look good, or is there looseness, overheating, or visible damage?",
+    "indicator_or_error_code": "What indicator state or error code do you see on the charger?",
+    "issue_type_detail": "Which best matches the issue: no power, tripping MCB/RCCB, charging slow, or not responding?",
 }
 
 
@@ -269,15 +269,47 @@ def build_follow_up_questions(
             pass  # Fall through to heuristic
 
     # Heuristic fallback
+    from app.services.diagnosis import infer_basic_conditions, infer_issue_type
+
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
+    basic_conditions = infer_basic_conditions(incident)
+    inferred_issue_type = infer_issue_type(incident, basic_conditions)
 
-    if quality_status != "usable":
-        for question_id in ["screen_on", "visible_damage", "charging_state"]:
-            if question_id not in answered:
-                questions.append({"question_id": question_id, "prompt": FOLLOW_UP_QUESTION_BANK[question_id]})
+    check_sequence = [
+        ("main_power_supply", basic_conditions.main_power_supply),
+        ("cable_condition", basic_conditions.cable_condition),
+        ("indicator_or_error_code", basic_conditions.indicator_or_error_code),
+    ]
+    for question_id, status in check_sequence:
+        if question_id not in answered and (status == "unknown" or quality_status != "usable"):
+            questions.append({"question_id": question_id, "prompt": FOLLOW_UP_QUESTION_BANK[question_id]})
 
-    if incident.error_code is None and "led_behavior" not in answered:
-        questions.append({"question_id": "led_behavior", "prompt": FOLLOW_UP_QUESTION_BANK["led_behavior"]})
+    ambiguity_tokens = [
+        "unknown",
+        "issue",
+        "problem",
+        "fault",
+        "not sure",
+        "unclear",
+    ]
+    text = " ".join(
+        [
+            incident.photo_hint or "",
+            incident.symptom_text or "",
+            incident.error_code or "",
+        ]
+    ).lower()
+    if (
+        "issue_type_detail" not in answered
+        and len(questions) < 4
+        and (quality_status != "usable" or any(token in text for token in ambiguity_tokens))
+    ):
+        questions.append(
+            {
+                "question_id": "issue_type_detail",
+                "prompt": f"We currently infer '{inferred_issue_type.replace('_', ' ')}'. {FOLLOW_UP_QUESTION_BANK['issue_type_detail']}",
+            }
+        )
 
     return questions[:4]

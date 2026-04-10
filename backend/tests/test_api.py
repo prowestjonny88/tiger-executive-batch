@@ -33,15 +33,34 @@ def test_preview_rejects_unknown_site():
     assert response.status_code == 404
 
 
+def test_preview_generates_organizer_follow_up_questions():
+    preview = client.post(
+        "/api/v1/intake/preview",
+        json={
+            "site_id": "site-mall-01",
+            "charger_id": "rex-ac-01",
+            "photo_hint": "unclear, dark image",
+            "symptom_text": "Charger problem reported but details are limited.",
+            "error_code": "",
+        },
+    )
+
+    assert preview.status_code == 200
+    question_ids = {item["question_id"] for item in preview.json()["follow_up_questions"]}
+    assert "main_power_supply" in question_ids
+    assert "cable_condition" in question_ids
+    assert "indicator_or_error_code" in question_ids
+
+
 def test_preview_then_triage_reuses_same_incident_id():
     preview = client.post(
         "/api/v1/intake/preview",
         json={
             "site_id": "site-mall-01",
             "charger_id": "rex-ac-01",
-            "photo_hint": "screen dim, no visible damage",
-            "symptom_text": "Session stopped suddenly and LED blinks red intermittently.",
-            "error_code": "OFF-12",
+            "photo_hint": "screen frozen, buttons unresponsive",
+            "symptom_text": "The charger remains powered but does not respond to input.",
+            "error_code": "UI-09",
         },
     )
     assert preview.status_code == 200
@@ -53,20 +72,21 @@ def test_preview_then_triage_reuses_same_incident_id():
             "incident_id": preview_data["incident_id"],
             "site_id": "site-mall-01",
             "charger_id": "rex-ac-01",
-            "photo_hint": "screen dim, no visible damage",
-            "symptom_text": "Session stopped suddenly and LED blinks red intermittently.",
-            "error_code": "OFF-12",
+            "photo_hint": "screen frozen, buttons unresponsive",
+            "symptom_text": "The charger remains powered but does not respond to input.",
+            "error_code": "UI-09",
             "follow_up_answers": {
-                "screen_on": "yes",
-                "visible_damage": "no",
-                "charging_state": "stopped_suddenly",
+                "main_power_supply": "Power is available.",
+                "cable_condition": "Cable looks good.",
+                "indicator_or_error_code": "UI-09 is shown on the frozen display.",
             },
         },
     )
     assert triage.status_code == 200
     triage_data = triage.json()
     assert triage_data["incident_id"] == preview_data["incident_id"]
-    assert triage_data["routing"]["resolver_tier"] == "local_site_resolver"
+    assert triage_data["diagnosis"]["issue_type"] == "not_responding"
+    assert triage_data["workflow"]["outcome"] == "resolved"
 
 
 def test_sites_and_demo_scenarios_endpoints_return_seeded_contracts():
@@ -76,18 +96,18 @@ def test_sites_and_demo_scenarios_endpoints_return_seeded_contracts():
     assert sites.status_code == 200
     assert scenarios.status_code == 200
     assert any(site["site_id"] == "site-mall-01" for site in sites.json())
-    assert any(scenario["scenario_id"] == "demo-local-resolver" for scenario in scenarios.json())
+    assert any(scenario["scenario_id"] == "demo-no-power" for scenario in scenarios.json())
 
 
 def test_recent_incidents_endpoint_includes_latest_triage_summary():
     preview = client.post(
         "/api/v1/intake/preview",
         json={
-            "site_id": "site-mall-01",
-            "charger_id": "rex-ac-01",
-            "photo_hint": "screen dim, no visible damage",
-            "symptom_text": "Session stopped suddenly and LED blinks red intermittently.",
-            "error_code": "OFF-12",
+            "site_id": "site-condo-01",
+            "charger_id": "rex-ac-09",
+            "photo_hint": "display on, reduced output",
+            "symptom_text": "Charging is much slower than expected.",
+            "error_code": "SLOW-11",
         },
     )
     incident_id = preview.json()["incident_id"]
@@ -96,15 +116,15 @@ def test_recent_incidents_endpoint_includes_latest_triage_summary():
         "/api/v1/triage",
         json={
             "incident_id": incident_id,
-            "site_id": "site-mall-01",
-            "charger_id": "rex-ac-01",
-            "photo_hint": "screen dim, no visible damage",
-            "symptom_text": "Session stopped suddenly and LED blinks red intermittently.",
-            "error_code": "OFF-12",
+            "site_id": "site-condo-01",
+            "charger_id": "rex-ac-09",
+            "photo_hint": "display on, reduced output",
+            "symptom_text": "Charging is much slower than expected.",
+            "error_code": "SLOW-11",
             "follow_up_answers": {
-                "screen_on": "yes",
-                "visible_damage": "no",
-                "charging_state": "stopped_suddenly",
+                "main_power_supply": "Main supply is available.",
+                "cable_condition": "Cable is in good condition.",
+                "indicator_or_error_code": "Display shows SLOW-11 and reduced current.",
             },
         },
     )
@@ -115,9 +135,45 @@ def test_recent_incidents_endpoint_includes_latest_triage_summary():
     latest = incidents.json()[0]
     assert latest["id"] == incident_id
     assert latest["latest_stage"] == "triage_result"
-    assert latest["latest_resolver_tier"] == "local_site_resolver"
-    assert latest["latest_fault"] == "Charger offline or network disconnect"
-    assert latest["latest_confidence_band"] == "medium"
+    assert latest["latest_issue_type"] == "charging_slow"
+    assert latest["latest_outcome"] == "resolved"
+    assert latest["latest_fault"] == "Output setting or vehicle limitation"
+    assert latest["latest_confidence_band"] in {"high", "medium"}
+
+
+def test_incident_detail_replay_includes_normalized_triage_payload():
+    preview = client.post(
+        "/api/v1/intake/preview",
+        json={
+            "site_id": "site-mall-01",
+            "charger_id": "rex-ac-01",
+            "photo_hint": "display off, no lights",
+            "symptom_text": "Charger appears unpowered.",
+        },
+    )
+    incident_id = preview.json()["incident_id"]
+
+    client.post(
+        "/api/v1/triage",
+        json={
+            "incident_id": incident_id,
+            "site_id": "site-mall-01",
+            "charger_id": "rex-ac-01",
+            "photo_hint": "display off, no lights",
+            "symptom_text": "Charger appears unpowered.",
+            "follow_up_answers": {
+                "main_power_supply": "Supply is missing at the charger.",
+                "cable_condition": "Cable is normal.",
+                "indicator_or_error_code": "No indicator is visible.",
+            },
+        },
+    )
+
+    incident = client.get(f"/api/v1/incidents/{incident_id}")
+    assert incident.status_code == 200
+    payload = incident.json()["triage_payload"]
+    assert payload["diagnosis"]["issue_type"] == "no_power"
+    assert payload["workflow"]["outcome"] in {"resolved", "escalate"}
 
 
 def test_upload_endpoint_persists_photo_and_preview_uses_metadata():
