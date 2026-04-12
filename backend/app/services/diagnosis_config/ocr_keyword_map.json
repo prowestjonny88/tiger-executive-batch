@@ -1,0 +1,26 @@
+[
+  {
+    "name": "faulted_status",
+    "keywords": ["faulted"],
+    "issue_type": "not_responding",
+    "likely_fault": "Faulted charger status detected",
+    "confidence_score": 0.74,
+    "severity": "moderate",
+    "hazard_flags": [],
+    "resolver_hint_final": "remote_ops",
+    "next_question_hint": "Retrieve the detailed fault entry or backend status for the charger.",
+    "next_action_hint": "Confirm the fault detail and organizer basic checks before continuing."
+  },
+  {
+    "name": "over_voltage_fault",
+    "keywords": ["over-voltage", "fault"],
+    "issue_type": "no_power",
+    "likely_fault": "Over-voltage fault detected",
+    "confidence_score": 0.92,
+    "severity": "critical",
+    "hazard_flags": ["visible_hazard"],
+    "resolver_hint_final": "technician",
+    "next_question_hint": "Confirm the incoming voltage condition and whether protection devices tripped.",
+    "next_action_hint": "Disconnect supply, inspect incoming voltage path, and escalate for qualified inspection."
+  }
+]

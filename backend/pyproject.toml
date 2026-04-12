@@ -12,13 +12,20 @@ dependencies = [
   "uvicorn>=0.30.0",
   "pydantic>=2.8.0",
   "google-genai>=1.0.0",
-  "python-dotenv>=1.0.0"
+  "python-dotenv>=1.0.0",
+  "numpy>=1.26.0",
+  "pillow>=10.0.0",
+  "scikit-learn==1.6.1",
+  "torch>=2.2.0",
+  "torchvision>=0.20.0",
+  "transformers>=4.40.0"
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
-  "httpx>=0.27.0"
+  "httpx>=0.27.0",
+  "pyright>=1.1.390"
 ]
 
 [tool.pytest.ini_options]
@@ -28,3 +35,6 @@ addopts = "-p no:cacheprovider"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.services" = ["diagnosis_assets/*.json", "diagnosis_assets/*.csv", "diagnosis_assets/*.pkl", "diagnosis_config/*.json"]

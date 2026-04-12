@@ -194,6 +194,17 @@ export function buildFallbackTriage(input: IntakePayload) {
       unknown_flag: Object.values(basicConditions).slice(0, 3).includes("unknown"),
       severity: workflow.hazard_flags.length > 0 ? "critical" : workflow.outcome === "escalate" ? "high" : "moderate",
       hazard_flags: workflow.hazard_flags,
+      diagnosis_source: "frontend_demo_fallback",
+      branch_name: "heuristic_fallback",
+      next_action_hint: "Use the organizer branch SOP as the primary path.",
+      classifier_metadata: {
+        enabled: false,
+        used: false,
+        bypassed: true,
+        bypass_reason: "frontend_fallback_demo",
+        candidate_labels: [],
+      },
+      ocr_metadata: null,
     },
     confidence: {
       score: confidenceScore,

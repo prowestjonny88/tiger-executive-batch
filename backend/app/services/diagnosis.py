@@ -2,30 +2,37 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from typing import Callable
 
 from app.core.models import (
-    BasicCheckStatus,
-    BasicConditionsAssessment,
+    ClassifierMetadata,
     ConfidenceBand,
     DiagnosisResult,
     IncidentInput,
-    IssueType,
+    OcrMetadata,
     SeverityLevel,
 )
+from app.services.diagnosis_classifier import analyze_hardware_visual_branch
+from app.services.diagnosis_contracts import DiagnosisProviderResponse
+from app.services.diagnosis_ocr import analyze_ocr_branch
+from app.services.diagnosis_support import (
+    VALID_ISSUE_TYPES,
+    VALID_SEVERITIES,
+    clamp_score,
+    confidence_band,
+    extract_visible_hazard_flags,
+    infer_basic_conditions,
+    infer_issue_type,
+    is_probably_screenshot_evidence,
+    is_probably_symptom_heavy,
+    likely_fault_for,
+    make_basic_conditions,
+    normalize_status,
+    severity_for,
+    text_blob,
+)
+from app.services.diagnosis_symptom import analyze_symptom_branch
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
-
-
-@dataclass
-class DiagnosisProviderResponse:
-    provider_summary: str
-    issue_type: IssueType
-    likely_fault: str
-    confidence_score: float
-    raw_ocr_text: str
-    severity: SeverityLevel
-    basic_conditions: BasicConditionsAssessment
-    hazard_flags: list[str] = field(default_factory=list)
 
 
 class DiagnosisProvider:
@@ -68,10 +75,6 @@ Schema:
 }
 """
 
-_VALID_ISSUE_TYPES = {"no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"}
-_VALID_STATUSES = {"ok", "problem", "unknown"}
-_VALID_SEVERITIES = {severity.value for severity in SeverityLevel}
-
 
 def _build_diagnosis_prompt(incident: IncidentInput) -> str:
     parts: list[str] = ["## Incident observation"]
@@ -93,249 +96,32 @@ def _build_diagnosis_prompt(incident: IncidentInput) -> str:
     return "\n".join(parts)
 
 
-def _normalize_status(value: object) -> BasicCheckStatus:
-    normalized = str(value or "unknown").strip().lower().replace(" ", "_")
-    if normalized in _VALID_STATUSES:
-        return normalized  # type: ignore[return-value]
-    return "unknown"
-
-
-def _make_basic_conditions(
-    main_power_supply: BasicCheckStatus = "unknown",
-    cable_condition: BasicCheckStatus = "unknown",
-    indicator_or_error_code: BasicCheckStatus = "unknown",
-    indicator_detail: str | None = None,
-) -> BasicConditionsAssessment:
-    detail = indicator_detail.strip() if indicator_detail else None
-    return BasicConditionsAssessment(
-        main_power_supply=main_power_supply,
-        cable_condition=cable_condition,
-        indicator_or_error_code=indicator_or_error_code,
-        indicator_detail=detail or None,
-    )
-
-
-def _text_blob(incident: IncidentInput) -> str:
-    return " ".join(
-        filter(
-            None,
-            [
-                incident.photo_hint or "",
-                incident.symptom_text or "",
-                incident.error_code or "",
-                " ".join(f"{key}:{value}" for key, value in incident.follow_up_answers.items()),
-            ],
-        )
-    ).lower()
-
-
-def _has_any(text: str, tokens: list[str]) -> bool:
-    return any(token in text for token in tokens)
-
-
-def infer_basic_conditions(incident: IncidentInput) -> BasicConditionsAssessment:
-    text = _text_blob(incident)
-    power_answer = (incident.follow_up_answers.get("main_power_supply") or "").lower()
-    cable_answer = (incident.follow_up_answers.get("cable_condition") or "").lower()
-    indicator_answer = (incident.follow_up_answers.get("indicator_or_error_code") or "").lower()
-    main_power_supply: BasicCheckStatus = "unknown"
-    cable_condition: BasicCheckStatus = "unknown"
-    indicator_or_error_code: BasicCheckStatus = "unknown"
-
-    if _has_any(power_answer, ["available", "present", "stable", "healthy", "ok", "good", "on"]) or _has_any(
-        text,
-        [
-            "power available",
-            "display on",
-            "screen on",
-            "screen dim",
-            "indicator on",
-            "mains healthy",
-            "incoming voltage ok",
-            "main_power_supply:ok",
-            "main_power_supply:yes",
-        ],
-    ):
-        main_power_supply = "ok"
-    elif _has_any(power_answer, ["missing", "unavailable", "off", "low", "failed", "dead", "no power"]) or _has_any(
-        text,
-        [
-            "no power",
-            "power unavailable",
-            "incoming voltage low",
-            "incoming voltage missing",
-            "lights off",
-            "display off",
-            "main breaker off",
-            "mcb off",
-            "main_power_supply:no",
-            "main_power_supply:problem",
-        ],
-    ):
-        main_power_supply = "problem"
-
-    has_negative_damage_signal = _has_any(
-        cable_answer,
-        ["good", "normal", "looks normal", "secure", "no damage", "no visible damage"],
-    ) or _has_any(
-        text,
-        [
-            "no damage",
-            "no visible damage",
-            "without damage",
-            "cable condition good",
-            "cable_condition:ok",
-            "cable_condition:good",
-            "visible_damage:no",
-            "visible_damage:false",
-        ],
-    )
-    has_damage_signal = _has_any(
-        cable_answer,
-        ["loose", "hot", "warm", "damage", "overheat", "burn", "frayed"],
-    ) or _has_any(
-        text,
-        [
-            "burn",
-            "exposed",
-            "scorch",
-            "water",
-            "frayed",
-            "melt",
-            "loose cable",
-            "overheat",
-            "cable damage",
-            "connector damage",
-            "cable_condition:problem",
-        ],
-    ) or ("damage" in text and not has_negative_damage_signal)
-    if has_damage_signal:
-        cable_condition = "problem"
-    elif has_negative_damage_signal:
-        cable_condition = "ok"
-
-    indicator_detail = incident.error_code or incident.follow_up_answers.get("indicator_or_error_code_detail", "")
-    if _has_any(indicator_answer, ["no indicator", "none", "blank", "dead", "off"]) or _has_any(
-        text,
-        [
-            "blank screen",
-            "no indicator",
-            "no error code",
-            "indicator_or_error_code:problem",
-            "screen dead",
-            "display dead",
-        ],
-    ):
-        indicator_or_error_code = "problem"
-    elif indicator_answer or indicator_detail or _has_any(
-        text,
-        [
-            "error code",
-            "indicator",
-            "led",
-            "blink",
-            "display",
-            "screen",
-            "indicator_or_error_code:ok",
-        ],
-    ):
-        indicator_or_error_code = "ok"
-
-    return _make_basic_conditions(
-        main_power_supply=main_power_supply,
-        cable_condition=cable_condition,
-        indicator_or_error_code=indicator_or_error_code,
-        indicator_detail=indicator_detail or incident.error_code,
-    )
-
-
-def infer_issue_type(incident: IncidentInput, basic_conditions: BasicConditionsAssessment | None = None) -> IssueType:
-    text = _text_blob(incident)
-    conditions = basic_conditions or infer_basic_conditions(incident)
-
-    if _has_any(text, ["tripping", "trip", "breaker", "mcb", "rccb", "rcd"]):
-        return "tripping_mcb_rccb"
-    if _has_any(text, ["slow", "slower", "reduced output", "low current", "voltage drop", "vehicle limiting"]):
-        return "charging_slow"
-    if _has_any(text, ["not responding", "unresponsive", "frozen", "hung", "stuck", "blank screen", "reset system"]):
-        return "not_responding"
-    if _has_any(text, ["no power", "power off", "dead charger", "lights off", "incoming voltage", "no supply"]):
-        return "no_power"
-
-    if conditions.main_power_supply == "problem":
-        return "no_power"
-    if conditions.indicator_or_error_code == "problem":
-        return "not_responding"
-    if conditions.cable_condition == "problem":
-        return "tripping_mcb_rccb"
-
-    return "not_responding"
-
-
-def _likely_fault_for(issue_type: IssueType, conditions: BasicConditionsAssessment) -> str:
-    if issue_type == "no_power":
-        if conditions.main_power_supply == "problem":
-            return "Main supply or breaker issue"
-        return "Power supply not reaching charger"
-    if issue_type == "tripping_mcb_rccb":
-        if conditions.cable_condition == "problem":
-            return "Loose or overheated cable connection"
-        return "Breaker protection is tripping"
-    if issue_type == "charging_slow":
-        return "Output setting or vehicle limitation"
-    if conditions.indicator_or_error_code == "problem":
-        return "Control board or display not responding"
-    return "System needs a controlled reset"
-
-
-def _severity_for(
-    issue_type: IssueType,
-    basic_conditions: BasicConditionsAssessment,
-    hazard_flags: list[str],
-    confidence_score: float,
-) -> SeverityLevel:
-    if hazard_flags:
-        return SeverityLevel.CRITICAL
-    if basic_conditions.main_power_supply == "problem" or basic_conditions.cable_condition == "problem":
-        return SeverityLevel.HIGH
-    if issue_type in {"tripping_mcb_rccb", "not_responding"}:
-        return SeverityLevel.MODERATE
-    if confidence_score >= 0.8:
-        return SeverityLevel.LOW
-    return SeverityLevel.MODERATE
-
-
 def heuristic_provider_response(incident: IncidentInput) -> DiagnosisProviderResponse:
-    text = _text_blob(incident)
+    text = text_blob(incident)
     basic_conditions = infer_basic_conditions(incident)
-    hazard_flags: list[str] = []
-    has_visible_hazard = basic_conditions.cable_condition == "problem" and _has_any(
-        text,
-        ["burn", "exposed", "scorch", "water", "melt"],
-    )
-    if has_visible_hazard:
-        hazard_flags.append("visible_hazard")
-
+    hazard_flags = extract_visible_hazard_flags(text, basic_conditions)
     issue_type = infer_issue_type(incident, basic_conditions)
 
     if issue_type == "no_power":
         score = 0.9 if basic_conditions.main_power_supply == "problem" else 0.74
     elif issue_type == "tripping_mcb_rccb":
-        score = 0.91 if _has_any(text, ["mcb", "rccb", "breaker", "trip"]) else 0.78
+        score = 0.91 if any(token in text for token in ["mcb", "rccb", "breaker", "trip"]) else 0.78
     elif issue_type == "charging_slow":
-        score = 0.86 if _has_any(text, ["slow", "voltage drop", "vehicle limiting"]) else 0.72
+        score = 0.86 if any(token in text for token in ["slow", "voltage drop", "vehicle limiting"]) else 0.72
     else:
         score = 0.83 if basic_conditions.indicator_or_error_code != "unknown" else 0.68
 
     return DiagnosisProviderResponse(
         provider_summary="Organizer decision-tree heuristic applied to the available incident evidence.",
         issue_type=issue_type,
-        likely_fault=_likely_fault_for(issue_type, basic_conditions),
+        likely_fault=likely_fault_for(issue_type, basic_conditions),
         confidence_score=score,
         raw_ocr_text=incident.error_code or "",
-        severity=_severity_for(issue_type, basic_conditions, hazard_flags, score),
+        severity=severity_for(issue_type, basic_conditions, hazard_flags, score),
         basic_conditions=basic_conditions,
         hazard_flags=hazard_flags,
+        diagnosis_source="organizer_heuristic",
+        branch_name="heuristic_fallback",
     )
 
 
@@ -345,7 +131,7 @@ def _parse_gemini_diagnosis(raw: str) -> DiagnosisProviderResponse:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        fallback_conditions = _make_basic_conditions()
+        fallback_conditions = make_basic_conditions()
         return DiagnosisProviderResponse(
             provider_summary=raw[:300],
             issue_type="not_responding",
@@ -355,27 +141,28 @@ def _parse_gemini_diagnosis(raw: str) -> DiagnosisProviderResponse:
             severity=SeverityLevel.MODERATE,
             basic_conditions=fallback_conditions,
             hazard_flags=[],
+            diagnosis_source="gemini_parse_error",
+            branch_name="gemini_provider",
         )
 
     issue_type_raw = str(data.get("issue_type", "not_responding"))
-    issue_type = issue_type_raw if issue_type_raw in _VALID_ISSUE_TYPES else "not_responding"
+    issue_type = issue_type_raw if issue_type_raw in VALID_ISSUE_TYPES else "not_responding"
 
     severity_raw = data.get("severity", "moderate")
-    severity = SeverityLevel(severity_raw) if severity_raw in _VALID_SEVERITIES else SeverityLevel.MODERATE
+    severity = SeverityLevel(severity_raw) if severity_raw in VALID_SEVERITIES else SeverityLevel.MODERATE
 
     try:
-        score = float(data.get("confidence_score", 0.5))
-        score = max(0.0, min(1.0, score))
+        score = clamp_score(float(data.get("confidence_score", 0.5)))
     except (TypeError, ValueError):
         score = 0.5
 
     basic_raw = data.get("basic_conditions", {})
     if not isinstance(basic_raw, dict):
         basic_raw = {}
-    basic_conditions = _make_basic_conditions(
-        main_power_supply=_normalize_status(basic_raw.get("main_power_supply")),
-        cable_condition=_normalize_status(basic_raw.get("cable_condition")),
-        indicator_or_error_code=_normalize_status(basic_raw.get("indicator_or_error_code")),
+    basic_conditions = make_basic_conditions(
+        main_power_supply=normalize_status(basic_raw.get("main_power_supply")),
+        cable_condition=normalize_status(basic_raw.get("cable_condition")),
+        indicator_or_error_code=normalize_status(basic_raw.get("indicator_or_error_code")),
         indicator_detail=str(basic_raw.get("indicator_detail", "")),
     )
 
@@ -390,6 +177,8 @@ def _parse_gemini_diagnosis(raw: str) -> DiagnosisProviderResponse:
         severity=severity,
         basic_conditions=basic_conditions,
         hazard_flags=hazard_flags,
+        diagnosis_source="gemini_multimodal",
+        branch_name="gemini_provider",
     )
 
 
@@ -401,19 +190,14 @@ class GeminiDiagnosisProvider(DiagnosisProvider):
 
         try:
             from google.genai import types as genai_types  # type: ignore[import-untyped]
+            from app.services.diagnosis_classifier import _resolve_photo_path
 
             prompt_text = _build_diagnosis_prompt(incident)
             contents: list[object] = [prompt_text]
 
             if incident.photo_evidence and incident.photo_evidence.storage_path:
-                from pathlib import Path
-
-                from app.services.intake import UPLOAD_ROOT
-
-                photo_path = UPLOAD_ROOT / Path(incident.photo_evidence.storage_path).name
-                if not photo_path.exists():
-                    photo_path = Path(__file__).resolve().parents[2] / incident.photo_evidence.storage_path
-                if photo_path.exists():
+                photo_path = _resolve_photo_path(incident)
+                if photo_path is not None and photo_path.exists():
                     raw_bytes = photo_path.read_bytes()
                     contents.insert(
                         0,
@@ -433,7 +217,7 @@ class GeminiDiagnosisProvider(DiagnosisProvider):
                 ),
             )
             parsed = _parse_gemini_diagnosis(response.text or "")
-            if parsed.basic_conditions == _make_basic_conditions():
+            if parsed.basic_conditions == make_basic_conditions():
                 heuristic = heuristic_provider_response(incident)
                 parsed.basic_conditions = heuristic.basic_conditions
                 if parsed.likely_fault == "Unconfirmed charger issue":
@@ -444,6 +228,7 @@ class GeminiDiagnosisProvider(DiagnosisProvider):
             heuristic.provider_summary = (
                 f"Gemini call failed ({exc!s}); using heuristic fallback. {heuristic.provider_summary}"
             )[:500]
+            heuristic.diagnosis_source = "gemini_fallback_heuristic"
             return heuristic
 
 
@@ -452,17 +237,40 @@ class HeuristicDiagnosisProvider(DiagnosisProvider):
         return heuristic_provider_response(incident)
 
 
-def confidence_band(score: float) -> ConfidenceBand:
-    if score >= 0.85:
-        return ConfidenceBand.HIGH
-    if score >= 0.60:
-        return ConfidenceBand.MEDIUM
-    return ConfidenceBand.LOW
+class BranchOrchestratingDiagnosisProvider(DiagnosisProvider):
+    def analyze(self, incident: IncidentInput) -> DiagnosisProviderResponse:
+        providers: list[tuple[str, Callable[[IncidentInput], DiagnosisProviderResponse]]] = []
+        if is_probably_screenshot_evidence(incident):
+            providers.append(("ocr_text_branch", analyze_ocr_branch))
+        if is_probably_symptom_heavy(incident) or not incident.photo_evidence:
+            providers.append(("symptom_multimodal_branch", analyze_symptom_branch))
+        if incident.photo_evidence and not is_probably_screenshot_evidence(incident):
+            providers.append(("hardware_visual_branch", analyze_hardware_visual_branch))
+
+        if not providers:
+            providers.append(("symptom_multimodal_branch", analyze_symptom_branch))
+
+        errors: list[str] = []
+        for branch_name, provider in providers:
+            try:
+                return provider(incident)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{branch_name}: {exc!s}")
+
+        fallback_provider = GeminiDiagnosisProvider() if get_gemini_client() is not None else HeuristicDiagnosisProvider()
+        fallback = fallback_provider.analyze(incident)
+        if errors:
+            fallback.provider_summary = (
+                f"Branch providers unavailable ({'; '.join(errors)}). {fallback.provider_summary}"
+            )[:500]
+        if fallback.branch_name == "heuristic_fallback":
+            fallback.branch_name = "branch_orchestrator_fallback"
+        return fallback
 
 
 def run_diagnosis(incident: IncidentInput, provider: DiagnosisProvider | None = None) -> DiagnosisResult:
     if provider is None:
-        provider = GeminiDiagnosisProvider() if get_gemini_client() is not None else HeuristicDiagnosisProvider()
+        provider = BranchOrchestratingDiagnosisProvider()
     response = provider.analyze(incident)
     band = confidence_band(response.confidence_score)
     return DiagnosisResult(
@@ -487,4 +295,25 @@ def run_diagnosis(incident: IncidentInput, provider: DiagnosisProvider | None = 
         ),
         severity=response.severity,
         hazard_flags=response.hazard_flags,
+        diagnosis_source=response.diagnosis_source,
+        branch_name=response.branch_name,
+        resolver_hint_final=response.resolver_hint_final,
+        next_question_hint=response.next_question_hint,
+        next_action_hint=response.next_action_hint,
+        classifier_metadata=ClassifierMetadata.model_validate(response.classifier_metadata)
+        if response.classifier_metadata
+        else None,
+        ocr_metadata=OcrMetadata.model_validate(response.ocr_metadata) if response.ocr_metadata else None,
     )
+
+
+__all__ = [
+    "BranchOrchestratingDiagnosisProvider",
+    "DiagnosisProvider",
+    "GeminiDiagnosisProvider",
+    "HeuristicDiagnosisProvider",
+    "heuristic_provider_response",
+    "infer_basic_conditions",
+    "infer_issue_type",
+    "run_diagnosis",
+]

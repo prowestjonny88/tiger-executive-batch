@@ -1,117 +1,128 @@
 # OmniTriage PRD Task Breakdown
 
-_Last updated: 2026-04-10_
+_Last updated: 2026-04-11_
 
-## How to use this file
-- Completed items are shown as struck-through checklist items: `- [x] ~~like this~~`
-- Pending items stay as open checkboxes: `- [ ] like this`
-- Only mark something complete when it is evidenced by current code, tests, or `docs/progress_tracker.md`
-- If work progresses, **update this file and `docs/progress_tracker.md` in the same session**
+## How to Use This File
+- Completed items are shown as struck-through checklist items
+- Pending items stay as open checkboxes
+- Only mark something complete when it is evidenced by code, tests, or current repo artifacts
+- Update this file and [progress_tracker.md](/c:/Users/JON/OneDrive/Documents/tiger-executive-batch/docs/progress_tracker.md) in the same session
 
-## 0. Foundation / repo setup
-- [x] ~~Create `frontend/`, `backend/`, and `data/` repo structure~~
-- [x] ~~Bootstrap a Next.js frontend shell~~
-- [x] ~~Bootstrap a FastAPI backend shell with modular folders (`intake`, `diagnosis`, `confidence`, `routing`, `guidance`, `db`)~~
-- [x] ~~Add SQLite-backed persistence scaffold for incidents and triage audit logs~~
-- [x] ~~Add seeded site, KB, and demo scenario data~~
-- [x] ~~Create isolated backend venv at `backend/.venv`~~
-- [x] ~~Add local run helpers (`backend/run-backend.ps1`, `frontend/run-frontend.ps1`)~~
-- [x] ~~Create pre-dataset frontend/backend integration readiness PRD + test spec~~
-- [x] ~~Add real upload directory handling for stored image files~~
-- [x] ~~Realign the live frontend/backend contract around the organizer decision tree~~
+## 0. Direction and Foundation
+- [x] ~~Establish frontend/backend/data repo structure~~
+- [x] ~~Bootstrap Next.js frontend~~
+- [x] ~~Bootstrap FastAPI backend~~
+- [x] ~~Add SQLite-backed persistence scaffold~~
+- [x] ~~Add local upload handling~~
+- [x] ~~Create seeded sites, scenarios, and KB data~~
+- [x] ~~Create backend venv and local run helpers~~
+- [x] ~~Implement organizer decision-tree MVP backbone~~
+- [x] ~~Create and maintain direction-setting docs under `docs/`~~
 - [ ] Add explicit versioned shared contract docs between frontend and backend
 
-## 1. Feature 1 — Smart Incident Intake
-### 1.1 Entry
+## 1. Smart Incident Intake
+### Entry and flow
 - [ ] Add QR-triggered / deep-link launch flow
 - [x] ~~Keep first-use flow free of login requirements~~
-- [x] ~~Support seeded site / charger prefill for the current small-site scope~~
+- [x] ~~Support seeded site / charger prefill~~
 - [ ] Turn the web app into a true PWA installable flow
 
-### 1.2 Evidence capture
-- [x] ~~Replace text/photo hints with real photo capture/upload input~~
-- [x] ~~Support optional manual error code entry~~
-- [x] ~~Support optional short symptom text~~
+### Evidence capture
+- [x] ~~Support real photo upload~~
+- [x] ~~Support manual error-code input~~
+- [x] ~~Support short symptom text~~
 
-### 1.3 Input validation
-- [x] ~~Implement image quality heuristics scaffold (usable / weak / retake required)~~
-- [x] ~~Generate retake guidance / weak-image notes from backend preview~~
-- [x] ~~Run quality checks on actual uploaded image files instead of text hints~~
-- [ ] Render an explicit retake UX for rejected images
+### Validation and follow-up
+- [x] ~~Implement image quality heuristics scaffold~~
+- [x] ~~Generate weak/retake notes from backend preview~~
+- [x] ~~Persist and replay multi-step follow-up session state~~
+- [x] ~~Refocus follow-up questions onto organizer checks~~
+- [ ] Replace heuristic follow-up generation with real model-backed evidence questioning
+- [ ] Render explicit retake UX for rejected images
 
-### 1.4 Adaptive follow-up questions
-- [x] ~~Generate backend-driven follow-up questions in intake preview~~
-- [x] ~~Limit follow-up question generation to a small bounded set~~
-- [x] ~~Persist and replay multi-step follow-up question sessions end-to-end in the UI~~
-- [x] ~~Refocus follow-up questions onto organizer basic checks (main power supply, cable condition, indicator/error code)~~
-- [ ] Make follow-up questions depend on real model/image evidence instead of heuristics only
-
-## 2. Feature 2 — Progressive Hybrid Diagnosis Engine
-### 2.1 Pre-dataset baseline
-- [x] ~~Define an abstract diagnosis provider interface~~
-- [x] ~~Return structured diagnosis output (issue type, basic conditions, likely fault, evidence summary, confidence, unknown flag, severity)~~
-- [x] ~~Preserve a raw OCR/error-code field in the diagnosis contract~~
+## 2. Diagnosis Engine
+### Current baseline
+- [x] ~~Define diagnosis provider abstraction~~
+- [x] ~~Return structured diagnosis output~~
+- [x] ~~Preserve raw OCR/error-code field in diagnosis contract~~
 - [x] ~~Implement unknown-safe fallback behavior~~
-- [x] ~~Rebuild diagnosis around the organizer four-bucket taxonomy~~
-- [ ] Integrate a real multimodal VLM / API provider
-- [ ] Implement actual OCR / display-text extraction from charger images
-- [ ] Fuse follow-up answers into a true model-backed diagnosis path
+- [x] ~~Rebuild current diagnosis around organizer issue types~~
+- [x] ~~Integrate a branch orchestrator over hardware-visual, OCR/text, and symptom-heavy diagnosis paths~~
+- [x] ~~Integrate the Round 1 5-class hardware visual classifier bundle as an additive signal~~
+- [x] ~~Persist additive branch/classifier/OCR metadata in triage audit payloads~~
+- [x] ~~Expose additive branch metadata to frontend result/replay consumers~~
 
-### 2.2 Post-Round-1 extensions (deferred)
-- [ ] Add lightweight known-fault classifier
-- [ ] Normalize organizer labels into internal taxonomy mapping
-- [ ] Compare classifier output against zero-shot baseline
+### Real multimodal path
+- [ ] Integrate real multimodal VLM/API provider
+- [ ] Implement actual OCR/display-text extraction from charger images
+- [ ] Fuse follow-up answers into the real diagnosis path
 
-### 2.3 Optional later extensions (deferred)
-- [ ] Add anomaly / novelty support for unseen physical faults
-- [ ] Add evidence overlays for novel visual defects
+### Dataset-backed upgrade
+- [ ] Import Round 1 organizer dataset into repo
+- [ ] Build `data/round1/manifest.csv`
+- [ ] Build `data/round1/label_map.yaml`
+- [ ] Build cleaned internal taxonomy mapping from organizer labels
+- [ ] Add `issue_family`, `fault_type`, `evidence_type`, `hazard_level`, and `resolver_tier` contract migration plan
 
-## 3. Feature 3 — Confidence-Aware Safety Gate
-- [x] ~~Implement confidence bands (`high`, `medium`, `low`)~~
-- [x] ~~Implement visible hazard override rules~~
-- [x] ~~Expose rationale/audit fields for safety decisions~~
-- [x] ~~Block risky low-tier guidance on hazard cases~~
-- [x] ~~Complete the full medium-confidence confirmation loop in the UI and backend state flow~~
+## 3. Confidence and Safety
+- [x] ~~Implement confidence bands~~
+- [x] ~~Implement hazard override rules~~
+- [x] ~~Expose rationale/audit fields~~
+- [x] ~~Complete medium-confidence confirmation loop~~
 - [ ] Calibrate thresholds using real labeled data after Round 1
+- [ ] Add explicit abstain/unknown evaluation reporting
 
-## 4. Feature 4 — Organizer Decision Workflow
-- [x] ~~Implement deterministic organizer workflow logic with human-readable rationale~~
-- [x] ~~Replace resolver-tier-first behavior with `issue_type -> basic_checks -> branch_sop -> resolved/escalate`~~
-- [x] ~~Implement all four organizer branches (`no_power`, `tripping_mcb_rccb`, `charging_slow`, `not_responding`)~~
-- [x] ~~Implement a single generic escalation outcome for unresolved cases~~
-- [ ] Add richer branch-specific priority and fallback variations for more issue classes
+## 4. Routing and Workflow
+### Current implementation
+- [x] ~~Implement deterministic organizer workflow logic with rationale~~
+- [x] ~~Implement all four organizer branches~~
+- [x] ~~Implement generic unresolved escalation outcome~~
 
-## 5. Feature 5 — Guided Resolution & Escalation Output
-- [x] ~~Implement organizer branch SOP guidance output~~
-- [x] ~~Implement generic escalation output aligned to unresolved organizer cases~~
-- [x] ~~Implement curated KB snippet retrieval for artifact generation~~
-- [x] ~~Improve artifact formatting and presentation polish around organizer issue types and workflow outcomes~~
-- [ ] Add annotated evidence / evidence highlight output for escalated cases
+### Target direction from organizer updates
+- [ ] Reintroduce explicit resolver-tier decisioning as a first-class contract field on top of the organizer workflow
+- [ ] Implement `driver`, `local_site`, `remote_ops`, and `technician` routing outputs
+- [ ] Encode lowest-safe-resolver routing policy
+- [ ] Encode default routing posture for organizer classes and `unknown_mixed` cases
+- [ ] Verify site-capability override behavior under the new routing contract
 
-## 6. Demo / evaluation / submission support
-- [x] ~~Implement real in-product demo mode~~
-- [x] ~~Add organizer-aligned seeded demo scenarios~~
-- [x] ~~Persist incident / triage audit data to SQLite~~
-- [x] ~~Retrofit the existing frontend routes to match the approved premium prototype style~~
-- [x] ~~Verify frontend build passes~~
-- [x] ~~Verify frontend TS diagnostics are clean~~
-- [x] ~~Verify backend Pyright static checks pass~~
-- [x] ~~Verify backend pytest suite passes~~
-- [x] ~~Verify backend runtime smoke test passes~~
-- [x] ~~Add incident history UI from SQLite for judges / debugging~~
-- [x] ~~Normalize replay/history to support both organizer-native and legacy persisted triage records~~
+## 5. Guidance and Artifacts
+### Current implementation
+- [x] ~~Implement organizer branch SOP guidance~~
+- [x] ~~Implement generic escalation output~~
+- [x] ~~Implement curated KB snippet retrieval~~
+
+### Target direction
+- [ ] Evolve outputs into resolver-tier-specific artifacts
+- [ ] Build richer Remote Ops action pack
+- [ ] Build richer Technician dispatch packet
+- [ ] Add evidence highlight / annotation support for escalations
+- [ ] Build KB entries from Round 1 solved explanations
 - [ ] Add screenshot/export support for report/demo artifacts
-- [ ] Add richer automated integration/e2e coverage across the whole workflow
-- [x] ~~Align frontend/backend seeded data sources so demo scenarios and sites come from one canonical contract~~
 
-## 7. Dataset-arrival work (intentionally not done yet)
-- [ ] Import Round 1 organizer dataset
-- [ ] Build cleaned internal fault taxonomy from organizer labels
-- [ ] Enrich KB entries from solved explanations
-- [ ] Tune confidence thresholds using dataset evidence
-- [ ] Add classifier-based evaluation metrics for the technical report
-- [ ] Prepare fast-update path for Round 2 and late Round 3 changes
+## 6. UI and Demo Surfaces
+- [x] ~~Implement working upload/questions/result/history demo flow~~
+- [x] ~~Implement incident history and replay~~
+- [ ] Add stronger internal/ops desktop workspace framing
+- [ ] Split product story cleanly into driver intake surface and internal ops surface on one backend
+- [ ] Polish right-side context panel around evidence, metadata, confidence, and routing
 
-## 8. Session maintenance reminder
-- [x] ~~Create and maintain `docs/progress_tracker.md` as the execution-status companion to this file~~
-- [ ] Future session agents should treat `docs/prd_task_breakdown.md` + `docs/progress_tracker.md` as the source of truth for current execution status
+## 7. Model Baseline and Evaluation
+- [x] ~~Build and integrate first lightweight visual-classifier baseline~~
+- [ ] Use 5-fold cross-validation for the visual baseline
+- [ ] Compare classifier baseline against VLM/OCR baseline
+- [ ] Compare hybrid OmniTriage behavior against both
+- [ ] Generate confusion matrices and report-ready evaluation figures
+- [ ] Evaluate OCR/text-heavy cases separately
+- [ ] Evaluate symptom-heavy follow-up-dependent cases separately
+
+## 8. Reporting and Submission Support
+- [ ] Create `docs/round1_taxonomy.md`
+- [ ] Create `docs/evaluation_plan.md`
+- [ ] Generate report visuals and case-study artifacts
+- [ ] Prepare demo-video case flow for hazardous, OCR/text, and uncertain cases
+- [ ] Add broader integration/e2e coverage across the workflow
+
+## 9. Session Maintenance
+- [x] ~~Create and maintain `docs/progress_tracker.md`~~
+- [x] ~~Create and maintain `docs/OmniTriage_Comprehensive_Execution_Plan.md`~~
+- [ ] Treat the execution plan, progress tracker, and task breakdown as the primary execution docs in future sessions

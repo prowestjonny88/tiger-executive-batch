@@ -1,6 +1,6 @@
 ﻿# OmniTriage
 
-OmniTriage is a pre-dataset MVP for confidence-aware EV charger troubleshooting. It combines a Next.js frontend, a FastAPI backend, seeded demo data, SQLite-backed audit history, and an optional Gemini-powered diagnosis path.
+OmniTriage is a confidence-aware EV charger troubleshooting MVP. It combines a Next.js frontend, a FastAPI backend, seeded demo data, SQLite-backed audit history, and a hybrid diagnosis layer that can route between hardware-visual, OCR/text, and symptom-first branches.
 
 The current implementation is centered on the organizer decision tree:
 
@@ -9,10 +9,17 @@ The current implementation is centered on the organizer decision tree:
 - produce branch SOP guidance
 - finish with a single workflow outcome: `resolved` or `escalate`
 
+The current diagnosis path is additive, not routing-authoritative:
+
+- `hardware_visual_branch` for in-scope hardware photos using the Round 1 5-class classifier bundle
+- `ocr_text_branch` for screenshot / app-log / display-text evidence
+- `symptom_multimodal_branch` for symptom-heavy cases such as `Charger No Pulse`
+- fallback to Gemini or organizer heuristics if a branch is unavailable
+
 ## Repo Structure
 
 - `frontend/` - Next.js app for upload, questions, result, guidance, escalation, intake, history, and demo flows
-- `backend/` - FastAPI backend for intake preview, organizer-tree diagnosis, confidence, workflow decisioning, guidance, uploads, and persistence
+- `backend/` - FastAPI backend for intake preview, branch-orchestrated diagnosis, confidence, organizer workflow decisioning, guidance, uploads, and persistence
 - `data/` - Seeded sites, demo scenarios, and knowledge snippets
 - `docs/` - Product, architecture, planning, and setup documentation
 
@@ -25,6 +32,8 @@ The repo currently includes:
 - four seeded organizer-aligned demo scenarios and sites
 - frontend result/guidance/escalation flows wired to live backend data
 - organizer-native diagnosis fields: `issue_type`, `basic_conditions`, `workflow.outcome`, `workflow.rationale`
+- additive diagnosis metadata: `branch_name`, `diagnosis_source`, classifier metadata, and OCR metadata
+- integrated Round 1 classifier bundle and temporary classifier-use policy
 - Gemini client support with heuristic fallback when the VLM is unavailable or fails
 - replay/history support through persisted incident records
 
@@ -33,7 +42,7 @@ The repo currently includes:
 Latest local verification completed in this workspace:
 
 - `frontend`: `npm.cmd run build` -> PASS
-- `backend`: `pytest -q` -> 18 passed
+- `backend`: `pytest -q backend/tests` -> 24 passed
 - `backend`: `pyright` -> 0 errors
 
 ## Quick Start
@@ -86,6 +95,25 @@ cd backend
 ```
 
 If Gemini is unavailable, the backend falls back to the heuristic diagnosis path.
+
+## Visual Classifier Runtime
+
+The backend now ships with a hardware-visual classifier integration that expects:
+
+- `backend/app/services/diagnosis_assets/model_5class_logreg.pkl`
+- `backend/app/services/diagnosis_assets/label_encoder_5class.pkl`
+- `backend/app/services/diagnosis_assets/classifier_policy_temp.json`
+
+The DINOv2 embedding runtime uses `torch` and `transformers`. On first live hardware-branch use, Hugging Face weights may need to download unless they are already cached locally.
+
+Useful environment toggles:
+
+```env
+OMNITRIAGE_CLASSIFIER_ENABLED=true
+OMNITRIAGE_OCR_ENABLED=true
+OMNITRIAGE_OCR_GEMINI_ASSIST=false
+OMNITRIAGE_DINO_MODEL_NAME=facebook/dinov2-base
+```
 
 ## Frontend -> Backend Wiring
 

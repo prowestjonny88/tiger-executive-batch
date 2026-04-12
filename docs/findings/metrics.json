@@ -1,0 +1,27 @@
+{
+  "fold_results": [
+    {
+      "fold": 1,
+      "accuracy": 0.7142857142857143,
+      "macro_f1": 0.75
+    },
+    {
+      "fold": 2,
+      "accuracy": 0.5,
+      "macro_f1": 0.45
+    },
+    {
+      "fold": 3,
+      "accuracy": 0.8333333333333334,
+      "macro_f1": 0.8333333333333333
+    }
+  ],
+  "mean_accuracy": 0.6825396825396827,
+  "mean_macro_f1": 0.6777777777777777,
+  "classes": [
+    "burnt_mark",
+    "cable_termination_issue",
+    "mcb_tripped",
+    "tnb_fuse_blow"
+  ]
+}

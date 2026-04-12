@@ -87,6 +87,7 @@ def test_preview_then_triage_reuses_same_incident_id():
     assert triage_data["incident_id"] == preview_data["incident_id"]
     assert triage_data["diagnosis"]["issue_type"] == "not_responding"
     assert triage_data["workflow"]["outcome"] == "resolved"
+    assert triage_data["diagnosis"]["branch_name"] == "symptom_multimodal_branch"
 
 
 def test_sites_and_demo_scenarios_endpoints_return_seeded_contracts():
@@ -174,6 +175,27 @@ def test_incident_detail_replay_includes_normalized_triage_payload():
     payload = incident.json()["triage_payload"]
     assert payload["diagnosis"]["issue_type"] == "no_power"
     assert payload["workflow"]["outcome"] in {"resolved", "escalate"}
+    assert payload["diagnosis"]["branch_name"] in {"symptom_multimodal_branch", "branch_orchestrator_fallback"}
+
+
+def test_triage_api_preserves_branch_and_ocr_metadata():
+    triage = client.post(
+        "/api/v1/triage",
+        json={
+            "site_id": "site-mall-01",
+            "charger_id": "rex-ac-01",
+            "photo_hint": "WC Apps screenshot shows charger faulted status",
+            "symptom_text": "App screen captured after failed session.",
+            "error_code": "Faulted",
+        },
+    )
+
+    assert triage.status_code == 200
+    diagnosis = triage.json()["diagnosis"]
+    assert diagnosis["branch_name"] == "ocr_text_branch"
+    assert diagnosis["diagnosis_source"] == "ocr_text_interpretation"
+    assert diagnosis["classifier_metadata"]["bypassed"] is True
+    assert diagnosis["ocr_metadata"]["matched_rule"] == "faulted_status"
 
 
 def test_upload_endpoint_persists_photo_and_preview_uses_metadata():

@@ -1,6 +1,8 @@
 {
-  "include": ["app", "tests"],
-  "reportMissingImports": false,
   "venvPath": ".",
-  "typeCheckingMode": "basic"
+  "venv": ".venv",
+  "include": [
+    "app",
+    "tests"
+  ]
 }

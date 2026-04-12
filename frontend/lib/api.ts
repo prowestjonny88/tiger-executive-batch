@@ -37,6 +37,29 @@ export type ApiTriageResponse = {
     confidence_score: number;
     confidence_band: "high" | "medium" | "low";
     hazard_flags: string[];
+    diagnosis_source?: string;
+    branch_name?: string;
+    resolver_hint_final?: string | null;
+    next_question_hint?: string | null;
+    next_action_hint?: string | null;
+    classifier_metadata?: {
+      enabled: boolean;
+      used: boolean;
+      bypassed: boolean;
+      bypass_reason?: string | null;
+      model_name?: string | null;
+      predicted_label?: string | null;
+      predicted_probability?: number | null;
+      confidence_policy_action?: string | null;
+      candidate_labels: string[];
+      extra?: Record<string, unknown>;
+    } | null;
+    ocr_metadata?: {
+      extracted_text?: string | null;
+      matched_rule?: string | null;
+      matched_keywords: string[];
+      extra?: Record<string, unknown>;
+    } | null;
   };
   confidence: {
     score: number;

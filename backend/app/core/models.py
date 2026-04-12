@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -70,6 +70,26 @@ class BasicConditionsAssessment(BaseModel):
     indicator_detail: Optional[str] = None
 
 
+class ClassifierMetadata(BaseModel):
+    enabled: bool = False
+    used: bool = False
+    bypassed: bool = False
+    bypass_reason: Optional[str] = None
+    model_name: Optional[str] = None
+    predicted_label: Optional[str] = None
+    predicted_probability: Optional[float] = None
+    confidence_policy_action: Optional[str] = None
+    candidate_labels: List[str] = Field(default_factory=list)
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
+class OcrMetadata(BaseModel):
+    extracted_text: Optional[str] = None
+    matched_rule: Optional[str] = None
+    matched_keywords: List[str] = Field(default_factory=list)
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
     issue_type: IssueType
@@ -82,6 +102,13 @@ class DiagnosisResult(BaseModel):
     unknown_flag: bool = False
     severity: SeverityLevel
     hazard_flags: List[str] = Field(default_factory=list)
+    diagnosis_source: str = "heuristic"
+    branch_name: str = "heuristic_fallback"
+    resolver_hint_final: Optional[str] = None
+    next_question_hint: Optional[str] = None
+    next_action_hint: Optional[str] = None
+    classifier_metadata: Optional[ClassifierMetadata] = None
+    ocr_metadata: Optional[OcrMetadata] = None
 
 
 class ConfidenceAssessment(BaseModel):

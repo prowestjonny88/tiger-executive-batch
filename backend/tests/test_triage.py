@@ -1,5 +1,10 @@
-from app.core.models import IncidentInput
+from unittest.mock import patch
+
+from app.core.models import IncidentInput, StoredPhotoEvidence
+from app.core.models import SeverityLevel
 from app.services.diagnosis import run_diagnosis
+from app.services.diagnosis_contracts import DiagnosisProviderResponse
+from app.services.diagnosis_support import make_basic_conditions
 from app.services.triage import run_triage
 
 
@@ -107,3 +112,121 @@ def test_vlm_failure_falls_back_to_organizer_heuristic_classification():
         )
     )
     assert diagnosis.issue_type == "charging_slow"
+
+
+def test_ocr_branch_selected_for_screenshot_text_cases():
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-condo-01",
+            photo_hint="WC Apps screenshot shows charger faulted status",
+            symptom_text="App screen captured after failed session.",
+            error_code="Faulted",
+        )
+    )
+    assert diagnosis.branch_name == "ocr_text_branch"
+    assert diagnosis.diagnosis_source == "ocr_text_interpretation"
+    assert diagnosis.ocr_metadata is not None
+    assert diagnosis.ocr_metadata.matched_rule == "faulted_status"
+
+
+def test_symptom_branch_selected_for_no_pulse_cases():
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-condo-01",
+            symptom_text="Charger no pulse and charging never started.",
+            follow_up_answers={
+                "main_power_supply": "Power is available.",
+                "indicator_or_error_code": "No visible error code.",
+            },
+        )
+    )
+    assert diagnosis.branch_name == "symptom_multimodal_branch"
+    assert diagnosis.issue_type == "not_responding"
+    assert diagnosis.classifier_metadata is not None
+    assert diagnosis.classifier_metadata.bypassed is True
+
+
+def test_hardware_visual_branch_selected_for_in_scope_hardware_photos():
+    response = DiagnosisProviderResponse(
+        provider_summary="Mock hardware classifier response.",
+        issue_type="tripping_mcb_rccb",
+        likely_fault="MCB trip or upstream protective device issue",
+        confidence_score=0.97,
+        raw_ocr_text="",
+        severity=SeverityLevel.HIGH,
+        basic_conditions=make_basic_conditions(
+            main_power_supply="ok",
+            cable_condition="problem",
+            indicator_or_error_code="ok",
+        ),
+        branch_name="hardware_visual_branch",
+        diagnosis_source="hardware_visual_classifier",
+        classifier_metadata={
+            "enabled": True,
+            "used": True,
+            "bypassed": False,
+            "model_name": "facebook/dinov2-small",
+            "predicted_label": "mcb_tripped",
+            "predicted_probability": 0.97,
+            "confidence_policy_action": "strong_fault_hint",
+            "candidate_labels": ["mcb_tripped"],
+            "extra": {},
+        },
+    )
+
+    with patch("app.services.diagnosis.analyze_hardware_visual_branch", return_value=response):
+        diagnosis = run_diagnosis(
+            IncidentInput(
+                site_id="site-mall-01",
+                photo_evidence=StoredPhotoEvidence(
+                    filename="charger.jpg",
+                    media_type="image/jpeg",
+                    storage_path="uploads/incidents/charger.jpg",
+                    byte_size=128000,
+                ),
+                photo_hint="photo of breaker and charger hardware",
+                symptom_text="Customer reported visible breaker trip at charger.",
+            )
+        )
+
+    assert diagnosis.branch_name == "hardware_visual_branch"
+    assert diagnosis.classifier_metadata is not None
+    assert diagnosis.classifier_metadata.used is True
+    assert diagnosis.classifier_metadata.predicted_label == "mcb_tripped"
+
+
+def test_classifier_branch_failure_falls_back_safely():
+    with patch("app.services.diagnosis.analyze_hardware_visual_branch", side_effect=RuntimeError("classifier offline")), patch(
+        "app.services.diagnosis.get_gemini_client", return_value=None
+    ):
+        diagnosis = run_diagnosis(
+            IncidentInput(
+                site_id="site-mall-01",
+                photo_evidence=StoredPhotoEvidence(
+                    filename="charger.jpg",
+                    media_type="image/jpeg",
+                    storage_path="uploads/incidents/charger.jpg",
+                    byte_size=128000,
+                ),
+                photo_hint="no power at charger and hardware photo attached",
+                symptom_text="The charger has no power.",
+            )
+        )
+
+    assert diagnosis.branch_name == "branch_orchestrator_fallback"
+    assert diagnosis.issue_type == "no_power"
+
+
+def test_ocr_over_voltage_rule_sets_hazard_and_escalation_signal():
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="app screenshot with Over-Voltage Fault warning",
+            symptom_text="WC Apps Error Logs screenshot attached.",
+            error_code="Over-Voltage Fault",
+        )
+    )
+    assert diagnosis.branch_name == "ocr_text_branch"
+    assert "visible_hazard" in diagnosis.hazard_flags
+    assert diagnosis.ocr_metadata is not None
+    assert diagnosis.ocr_metadata.matched_rule == "over_voltage_fault"

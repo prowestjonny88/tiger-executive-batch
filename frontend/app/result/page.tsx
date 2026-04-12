@@ -266,6 +266,38 @@ function ResultAssessment() {
               </h4>
               <p className="text-slate-700 text-sm leading-relaxed">{triage.workflow.rationale}</p>
             </div>
+
+            {triage.diagnosis.branch_name ? (
+              <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
+                <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+                  Diagnosis Branch
+                </h4>
+                <p className="font-bold text-slate-900 text-base">{triage.diagnosis.branch_name}</p>
+                {triage.diagnosis.diagnosis_source ? (
+                  <p className="text-slate-600 text-sm mt-1">Source: {triage.diagnosis.diagnosis_source}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {triage.diagnosis.classifier_metadata?.used || triage.diagnosis.ocr_metadata?.matched_rule ? (
+              <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
+                <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+                  Branch Detail
+                </h4>
+                {triage.diagnosis.classifier_metadata?.used ? (
+                  <p className="text-slate-700 text-sm leading-relaxed">
+                    Visual label: {triage.diagnosis.classifier_metadata.predicted_label} (
+                    {Math.round((triage.diagnosis.classifier_metadata.predicted_probability ?? 0) * 100)}%) | Policy:{" "}
+                    {triage.diagnosis.classifier_metadata.confidence_policy_action}
+                  </p>
+                ) : null}
+                {triage.diagnosis.ocr_metadata?.matched_rule ? (
+                  <p className="text-slate-700 text-sm leading-relaxed">
+                    OCR rule: {triage.diagnosis.ocr_metadata.matched_rule}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">
