@@ -17,10 +17,10 @@ from app.services.diagnosis_support import (
     infer_basic_conditions,
     likely_fault_for,
     make_basic_conditions,
+    resolve_incident_photo_path,
     severity_for,
     text_blob,
 )
-from app.services.intake import UPLOAD_ROOT
 
 CLASSIFIER_MODEL_PATH = Path(
     os.getenv("OMNITRIAGE_CLASSIFIER_MODEL_PATH", DIAGNOSIS_ASSET_DIR / "model_5class_logreg.pkl")
@@ -42,17 +42,7 @@ DINO_MODEL_BY_FEATURE_DIM = {
 
 
 def _resolve_photo_path(incident: IncidentInput) -> Path | None:
-    if not incident.photo_evidence or not incident.photo_evidence.storage_path:
-        return None
-
-    candidate_paths = [
-        UPLOAD_ROOT / Path(incident.photo_evidence.storage_path).name,
-        Path(__file__).resolve().parents[2] / incident.photo_evidence.storage_path,
-    ]
-    for path in candidate_paths:
-        if path.exists():
-            return path
-    return None
+    return resolve_incident_photo_path(incident)
 
 
 @lru_cache(maxsize=1)

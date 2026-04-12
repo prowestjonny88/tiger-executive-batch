@@ -23,6 +23,7 @@ DIAGNOSIS_ASSET_DIR = Path(
 DIAGNOSIS_CONFIG_DIR = Path(
     os.getenv("OMNITRIAGE_DIAGNOSIS_CONFIG_DIR", Path(__file__).resolve().parent / "diagnosis_config")
 )
+UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", Path(__file__).resolve().parents[2] / "uploads"))
 
 
 def normalize_status(value: object) -> BasicCheckStatus:
@@ -261,6 +262,66 @@ def clamp_score(score: float) -> float:
     return max(0.0, min(1.0, score))
 
 
+def resolve_incident_photo_path(incident: IncidentInput) -> Path | None:
+    if not incident.photo_evidence or not incident.photo_evidence.storage_path:
+        return None
+
+    storage_name = Path(incident.photo_evidence.storage_path).name
+    candidate_paths = [
+        UPLOAD_ROOT / storage_name,
+        Path(__file__).resolve().parents[2] / incident.photo_evidence.storage_path,
+        Path(incident.photo_evidence.storage_path),
+    ]
+    for path in candidate_paths:
+        if path.exists():
+            return path
+    return None
+
+
+def _looks_like_mobile_app_screenshot(incident: IncidentInput) -> bool:
+    image_path = resolve_incident_photo_path(incident)
+    if image_path is None:
+        return False
+
+    try:
+        from PIL import Image
+
+        with Image.open(image_path) as image:
+            image = image.convert("RGB")
+            width, height = image.size
+            if width <= 0 or height <= 0:
+                return False
+
+            aspect_ratio = height / width
+            thumbnail = image.resize((64, 64))
+            pixels = list(thumbnail.getdata())
+    except Exception:  # noqa: BLE001
+        return False
+
+    light_pixels = 0
+    muted_pixels = 0
+    dark_pixels = 0
+    for red, green, blue in pixels:
+        if min(red, green, blue) >= 210:
+            light_pixels += 1
+        if max(red, green, blue) - min(red, green, blue) <= 35:
+            muted_pixels += 1
+        if max(red, green, blue) <= 70:
+            dark_pixels += 1
+
+    total_pixels = len(pixels) or 1
+    light_ratio = light_pixels / total_pixels
+    muted_ratio = muted_pixels / total_pixels
+    dark_ratio = dark_pixels / total_pixels
+
+    return (
+        aspect_ratio >= 1.65
+        and light_ratio >= 0.35
+        and muted_ratio >= 0.45
+        and dark_ratio <= 0.35
+    )
+
+
 def is_probably_screenshot_evidence(incident: IncidentInput) -> bool:
     text = text_blob(incident)
     if incident.photo_evidence and incident.photo_evidence.filename:
@@ -280,8 +341,13 @@ def is_probably_screenshot_evidence(incident: IncidentInput) -> bool:
         "app screen",
         "ui log",
         "log screenshot",
+        "paired charger",
+        "previous charging",
+        "welcome home",
+        "add charger",
+        "charging session",
     ]
-    return has_any(text, screenshot_tokens)
+    return has_any(text, screenshot_tokens) or _looks_like_mobile_app_screenshot(incident)
 
 
 def is_probably_symptom_heavy(incident: IncidentInput) -> bool:

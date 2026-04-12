@@ -129,6 +129,29 @@ def test_ocr_branch_selected_for_screenshot_text_cases():
     assert diagnosis.ocr_metadata.matched_rule == "faulted_status"
 
 
+def test_ocr_branch_selected_for_app_screenshot_image_even_without_text_hints():
+    with patch("app.services.diagnosis_support._looks_like_mobile_app_screenshot", return_value=True):
+        diagnosis = run_diagnosis(
+            IncidentInput(
+                site_id="site-condo-01",
+                photo_evidence=StoredPhotoEvidence(
+                    filename="568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
+                    media_type="image/jpeg",
+                    storage_path="uploads/incidents/568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
+                    byte_size=45678,
+                ),
+                photo_hint="Photo: 568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
+                symptom_text="",
+                error_code="",
+            )
+        )
+
+    assert diagnosis.branch_name == "ocr_text_branch"
+    assert diagnosis.diagnosis_source == "ocr_text_interpretation"
+    assert diagnosis.classifier_metadata is not None
+    assert diagnosis.classifier_metadata.bypassed is True
+
+
 def test_symptom_branch_selected_for_no_pulse_cases():
     diagnosis = run_diagnosis(
         IncidentInput(
