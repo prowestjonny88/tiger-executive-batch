@@ -7,18 +7,22 @@ from typing import List
 
 from app.core.models import DemoScenario, KnowledgeSnippet, SiteCapabilityProfile
 
+# -- Path Configuration -- 
+# Establishes the root directory of the project
+# Points to a data directory one level up from the backend
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT.parent / "data"
 
-
+# -- Core Utility Function -- 
+# Loads and parses JSON files from the data directory using UTF-8 encoding
 def _load_json(relative_path: str):
     return json.loads((DATA_DIR / relative_path).read_text(encoding="utf-8"))
 
-
+# -- Three Cached Data Loaders --
 @lru_cache(maxsize=1)
 def load_sites() -> List[SiteCapabilityProfile]:
-    return [SiteCapabilityProfile.model_validate(item) for item in _load_json("sites/sites.json")]
-
+    return [SiteCapabilityProfile.model_validate(item) for item in _load_json("sites/sites.json")] 
+# Loads site capability profiles from sites/sites.json
 
 @lru_cache(maxsize=1)
 def load_snippets() -> List[KnowledgeSnippet]:
