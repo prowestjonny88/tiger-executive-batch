@@ -24,11 +24,22 @@ def load_sites() -> List[SiteCapabilityProfile]:
     return [SiteCapabilityProfile.model_validate(item) for item in _load_json("sites/sites.json")] 
 # Loads site capability profiles from sites/sites.json
 
+
 @lru_cache(maxsize=1)
 def load_snippets() -> List[KnowledgeSnippet]:
     return [KnowledgeSnippet.model_validate(item) for item in _load_json("kb/snippets.json")]
+# Loads knowledge snippets from kb/snippets.json
 
 
 @lru_cache(maxsize=1)
 def load_demo_scenarios() -> List[DemoScenario]:
     return [DemoScenario.model_validate(item) for item in _load_json("demo/scenarios.json")]
+# Loads demo scenarios from demo/scenarios.json
+
+
+'''
+All three loader functions use @lru_cache decorator for performance optimization 
+(caching results with a max size of 1), 
+and they validate the JSON data against their respective Pydantic models 
+(SiteCapabilityProfile, KnowledgeSnippet, DemoScenario).
+'''
