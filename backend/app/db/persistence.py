@@ -1,3 +1,4 @@
+# || SQLite database persistence layer for an incident triage system || #
 from __future__ import annotations
 
 import json
@@ -14,7 +15,12 @@ def _connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
-
+# Database Setup (init_db): Creates two SQLite tables
+'''
+incidents: Stores incident reports with details like site ID, charger ID, photos, 
+           symptoms, error codes, and follow-up answers
+triage_audits: Logs each stage of the triage process with timestamps and audit payloads
+'''
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _connect() as conn:
@@ -48,6 +54,7 @@ def init_db() -> None:
             conn.execute("ALTER TABLE incidents ADD COLUMN photo_evidence_json TEXT")
 
 
+# Inserts new incidents into the database
 def save_incident(incident: dict[str, Any]) -> int:
     with _connect() as conn:
         cursor = conn.execute(
@@ -79,6 +86,7 @@ def save_incident(incident: dict[str, Any]) -> int:
         return 0 if row_id is None else int(row_id)
 
 
+# Updates existing incident records
 def update_incident(incident_id: int, incident: dict[str, Any]) -> bool:
     with _connect() as conn:
         cursor = conn.execute(
@@ -102,6 +110,7 @@ def update_incident(incident_id: int, incident: dict[str, Any]) -> bool:
         return cursor.rowcount > 0
 
 
+# Records triage workflow stages and decision payloads
 def save_audit(stage: str, payload: dict[str, Any], incident_id: int | None = None) -> int:
     with _connect() as conn:
         cursor = conn.execute(
@@ -112,6 +121,7 @@ def save_audit(stage: str, payload: dict[str, Any], incident_id: int | None = No
         return 0 if row_id is None else int(row_id)
 
 
+# Classifies issues (e.g., tripping MCB/RCCB, slow charging, no power, not responding) based on diagnostic text
 def _derive_legacy_issue_type(payload: dict[str, Any]) -> str:
     diagnosis = payload.get("diagnosis", {})
     text = " ".join(
@@ -133,6 +143,7 @@ def _derive_legacy_issue_type(payload: dict[str, Any]) -> str:
     return "not_responding"
 
 
+# Converts legacy triage formats to a standardized format with workflow, diagnosis, and artifact data
 def _normalize_triage_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if payload.get("workflow") and payload.get("diagnosis", {}).get("issue_type"):
         return payload
@@ -171,6 +182,7 @@ def _normalize_triage_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Enriches database rows with parsed JSON data and extracted diagnostic summaries
 def _extract_incident_history(row: sqlite3.Row) -> dict[str, Any]:
     summary: dict[str, Any] = dict(row)
     latest_triage_payload_raw = summary.pop("latest_triage_payload_json", None)
@@ -196,6 +208,7 @@ def _extract_incident_history(row: sqlite3.Row) -> dict[str, Any]:
     return summary
 
 
+# Returns the most recent incidents (default: last 20)
 def list_recent_incidents(limit: int = 20) -> list[dict[str, Any]]:
     with _connect() as conn:
         rows = conn.execute(
@@ -240,6 +253,7 @@ def list_recent_incidents(limit: int = 20) -> list[dict[str, Any]]:
     return [_extract_incident_history(row) for row in rows]
 
 
+# Retrieves a single incident with its full triage history
 def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
     """Return a single incident with its full triage audit for the replay endpoint."""
     with _connect() as conn:
@@ -295,3 +309,12 @@ def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
         result["triage_payload"] = _normalize_triage_payload(json.loads(triage_raw))
         
     return result
+
+
+"""
+Key Features:
+    + JSON serialization for complex data (photos, answers, payloads)
+    + Backward compatibility with legacy triage records
+    + Full audit trail with stage tracking
+    + Database connection pooling with row factory for dict-like access
+"""
