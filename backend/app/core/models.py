@@ -5,17 +5,23 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+# Categorizes faults (no_power, tripping_mcb_rccb, charging_slow, not_responding)
 IssueType = Literal["no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"]
+
+# Assessment results (ok, problem, unknown)
 BasicCheckStatus = Literal["ok", "problem", "unknown"]
+
+# Resolution paths (resolved, escalate)
 WorkflowOutcome = Literal["resolved", "escalate"]
 
-
+# Confidence levels (high, medium, low)
 class ConfidenceBand(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
-
+# --- Enums --- #
+# Issue severity (low, moderate, high, critical)
 class SeverityLevel(str, Enum):
     LOW = "low"
     MODERATE = "moderate"
@@ -31,7 +37,8 @@ class PhotoEvidence(BaseModel):
     quality_status: Literal["usable", "weak", "retake_required"]
     notes: List[str] = Field(default_factory=list)
 
-
+# --- Core Models --- #
+# Handles photo documentation with metadata
 class StoredPhotoEvidence(BaseModel):
     filename: str
     media_type: str = "image/jpeg"
@@ -50,7 +57,7 @@ class SymptomAnswer(BaseModel):
     prompt: str
     answer: str
 
-
+# Captures incident details (site/charger ID, symptoms, error codes, follow-up answers)
 class IncidentInput(BaseModel):
     incident_id: Optional[int] = None
     site_id: str
@@ -89,7 +96,7 @@ class OcrMetadata(BaseModel):
     matched_keywords: List[str] = Field(default_factory=list)
     extra: Dict[str, Any] = Field(default_factory=dict)
 
-
+# Main diagnostic output with issue type, confidence score, severity, and metadata
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
     issue_type: IssueType
@@ -128,7 +135,7 @@ class SiteCapabilityProfile(BaseModel):
     has_remote_ops: bool
     notes: Optional[str] = None
 
-
+# Determines next actions and outcomes based on diagnosis
 class WorkflowDecision(BaseModel):
     issue_type: IssueType
     branch_actions: List[str]
@@ -137,7 +144,7 @@ class WorkflowDecision(BaseModel):
     next_action: str
     fallback_action: str
 
-
+# Provides diagnostic steps, summaries, and safety notes
 class ActionArtifact(BaseModel):
     issue_type: IssueType
     title: str
@@ -154,7 +161,7 @@ class KnowledgeSnippet(BaseModel):
     title: str
     body: List[str]
 
-
+# Aggregates incident, diagnosis, confidence, workflow, and action into a complete result
 class TriageResult(BaseModel):
     incident: IncidentInput
     diagnosis: DiagnosisResult
@@ -162,7 +169,7 @@ class TriageResult(BaseModel):
     workflow: WorkflowDecision
     artifact: ActionArtifact
 
-
+# Test case data structure
 class DemoScenario(BaseModel):
     scenario_id: str
     name: str
@@ -174,3 +181,9 @@ class DemoScenario(BaseModel):
     follow_up_answers: Dict[str, str]
     expected_issue_type: IssueType
     expected_outcome: WorkflowOutcome
+
+'''
+The system appears to be a triage/diagnostic workflow for EV charging issues, 
+combining manual input (symptoms, photos, error codes) 
+with AI-powered classification and decision-making.
+'''
