@@ -69,6 +69,11 @@ function formatFlagLabel(value: string) {
     .join(" ");
 }
 
+function formatPercent(value?: number | null) {
+  if (value === undefined || value === null) return "n/a";
+  return `${Math.round(value * 100)}%`;
+}
+
 export default function ResultAssessmentPage() {
   return (
     <Suspense
@@ -317,9 +322,24 @@ function ResultAssessment() {
                   </div>
                 ) : null}
                 {triage.diagnosis.retrieval_metadata ? (
-                  <p className="text-slate-700 text-sm leading-relaxed">
-                    Provider: {triage.diagnosis.retrieval_metadata.provider_name} ({triage.diagnosis.retrieval_metadata.provider_mode})
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-slate-700 text-sm leading-relaxed">
+                      Provider: {triage.diagnosis.retrieval_metadata.provider_name} ({triage.diagnosis.retrieval_metadata.provider_mode})
+                    </p>
+                    <p className="text-slate-700 text-sm leading-relaxed">
+                      Match state: {formatDiagnosisMethod(triage.diagnosis.retrieval_metadata.match_state)} | Score:{" "}
+                      {formatPercent(triage.diagnosis.retrieval_metadata.selected_score)}
+                    </p>
+                    {triage.diagnosis.retrieval_metadata.match_state !== "accepted" &&
+                    triage.diagnosis.retrieval_metadata.match_state !== "exact_filename" ? (
+                      <p className="text-slate-700 text-sm leading-relaxed">
+                        Acceptance threshold: {formatPercent(triage.diagnosis.retrieval_metadata.rejection_threshold)}
+                        {typeof triage.diagnosis.retrieval_metadata.extra?.top_candidate === "string"
+                          ? ` | Top candidate: ${triage.diagnosis.retrieval_metadata.extra.top_candidate}`
+                          : ""}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}

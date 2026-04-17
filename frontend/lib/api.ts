@@ -5,9 +5,10 @@ export type UploadedPhotoEvidence = {
   byte_size: number;
 };
 
-export type IssueType = "no_power" | "tripping_mcb_rccb" | "charging_slow" | "not_responding";
-export type BasicCheckStatus = "ok" | "problem" | "unknown";
-export type WorkflowOutcome = "resolved" | "escalate";
+export type IssueFamily = "no_power" | "tripping" | "charging_slow" | "not_responding" | "unknown_mixed";
+export type ResolverTier = "driver" | "local_site" | "remote_ops" | "technician";
+export type HazardLevel = "low" | "medium" | "high";
+export type EvidenceType = "hardware_photo" | "screenshot" | "symptom_report" | "symptom_heavy_photo" | "mixed_photo" | "unknown";
 
 export type ApiTriageResponse = {
   incident_id: number;
@@ -23,61 +24,77 @@ export type ApiTriageResponse = {
     demo_scenario_id?: string;
   };
   diagnosis: {
-    issue_type: IssueType;
+    issue_family: IssueFamily;
+    fault_type: string;
+    evidence_type: EvidenceType;
+    hazard_level: HazardLevel;
+    resolver_tier: ResolverTier;
     likely_fault: string;
     evidence_summary: string;
-    basic_conditions: {
-      main_power_supply: BasicCheckStatus;
-      cable_condition: BasicCheckStatus;
-      indicator_or_error_code: BasicCheckStatus;
-      indicator_detail?: string | null;
-    };
+    required_proof_next?: string | null;
     raw_provider_output: string;
     raw_ocr_text?: string | null;
     confidence_score: number;
     confidence_band: "high" | "medium" | "low";
-    hazard_flags: string[];
+    unknown_flag: boolean;
+    requires_follow_up: boolean;
+    follow_up_prompts: Array<{ question_id: string; prompt: string }>;
     diagnosis_source?: string;
     branch_name?: string;
-    resolver_hint_final?: string | null;
-    next_question_hint?: string | null;
-    next_action_hint?: string | null;
-    classifier_metadata?: {
-      enabled: boolean;
-      used: boolean;
-      bypassed: boolean;
-      bypass_reason?: string | null;
-      model_name?: string | null;
-      predicted_label?: string | null;
-      predicted_probability?: number | null;
-      confidence_policy_action?: string | null;
-      candidate_labels: string[];
+    hazard_flags: string[];
+    known_case_hit?: {
+      canonical_file_name: string;
+      match_score: number;
+      fault_type: string;
+      issue_family: IssueFamily;
+      evidence_type: EvidenceType;
+      hazard_level: HazardLevel;
+      resolver_tier: ResolverTier;
+      recommended_next_step: string;
+      required_proof_next: string;
+      visual_observation: string;
+      engineering_rationale?: string | null;
+      match_reason: string;
+      component_primary?: string | null;
+      visible_abnormalities: string[];
+      retrieval_source: string;
+    } | null;
+    retrieval_metadata?: {
+      provider_name: string;
+      provider_mode: string;
+      query_text: string;
+      image_embedding_used: boolean;
+      text_embedding_used: boolean;
+      candidate_count: number;
+      match_state: "exact_filename" | "accepted" | "weak" | "rejected";
+      selected_case?: string | null;
+      selected_score?: number | null;
+      rejection_threshold?: number | null;
       extra?: Record<string, unknown>;
     } | null;
-    ocr_metadata?: {
-      extracted_text?: string | null;
-      matched_rule?: string | null;
-      matched_keywords: string[];
-      extra?: Record<string, unknown>;
-    } | null;
+    confidence_reasoning?: string | null;
   };
   confidence: {
     score: number;
     band: "high" | "medium" | "low";
-    requires_confirmation: boolean;
-    safety_override: boolean;
+    requires_follow_up: boolean;
+    novelty_detected: boolean;
     rationale: string;
   };
-  workflow: {
-    issue_type: IssueType;
-    branch_actions: string[];
-    outcome: WorkflowOutcome;
-    rationale: string;
-    next_action: string;
+  routing: {
+    issue_family: IssueFamily;
+    fault_type: string;
+    hazard_level: HazardLevel;
+    resolver_tier: ResolverTier;
+    routing_rationale: string;
+    recommended_next_step: string;
     fallback_action: string;
+    required_proof_next?: string | null;
+    escalation_required: boolean;
   };
   artifact: {
-    issue_type?: IssueType;
+    issue_family: IssueFamily;
+    resolver_tier: ResolverTier;
     title: string;
     summary?: string;
     steps: string[];
@@ -118,8 +135,8 @@ export type ScenarioOption = {
   symptom_text: string;
   error_code: string;
   follow_up_answers: Record<string, string>;
-  expected_issue_type: IssueType;
-  expected_outcome: WorkflowOutcome;
+  expected_issue_family: IssueFamily;
+  expected_resolver_tier: ResolverTier;
 };
 
 export type IncidentHistoryItem = {
@@ -134,10 +151,14 @@ export type IncidentHistoryItem = {
   created_at: string;
   latest_stage?: string | null;
   latest_stage_at?: string | null;
-  latest_issue_type?: IssueType | null;
-  latest_outcome?: WorkflowOutcome | null;
+  latest_issue_family?: IssueFamily | null;
+  latest_resolver_tier?: ResolverTier | null;
   latest_fault?: string | null;
   latest_confidence_band?: "high" | "medium" | "low" | null;
+  latest_hazard_level?: HazardLevel | null;
+  latest_diagnosis_source?: string | null;
+  latest_retrieval_provider?: string | null;
+  latest_known_case?: string | null;
 };
 
 export type IncidentHistoryDetailItem = IncidentHistoryItem & {
@@ -148,15 +169,9 @@ export type IncidentHistoryDetailItem = IncidentHistoryItem & {
 const backendAssetBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "";
 
 export function resolveEvidenceUrl(storagePath?: string | null) {
-  if (!storagePath) {
-    return "";
-  }
-
+  if (!storagePath) return "";
   const normalizedPath = storagePath.startsWith("/") ? storagePath : `/${storagePath}`;
-  if (!backendAssetBase) {
-    return normalizedPath;
-  }
-
+  if (!backendAssetBase) return normalizedPath;
   return `${backendAssetBase.replace(/\/$/, "")}${normalizedPath}`;
 }
 
@@ -166,36 +181,13 @@ async function postJson<T>(url: string, payload: object): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
-
-async function postForm<T>(url: string, payload: FormData): Promise<T> {
-  const response = await fetch(url, {
-    method: "POST",
-    body: payload,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return (await response.json()) as T;
 }
 
 async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
-  }
-
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return (await response.json()) as T;
 }
 
@@ -244,34 +236,58 @@ export async function fetchTriage(payload: {
 }
 
 export async function uploadIncidentPhoto(file: File) {
-  const payload = new FormData();
-  payload.append("file", file);
-  return postForm<UploadedPhotoEvidence>("/api/uploads", payload);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return postJson<UploadedPhotoEvidence>("/api/uploads", {
+    filename: file.name,
+    media_type: file.type,
+    content_base64: btoa(binary),
+  });
 }
 
-export function formatIssueType(issueType?: string | null) {
-  switch (issueType) {
+export function formatIssueType(issueFamily?: string | null) {
+  switch (issueFamily) {
     case "no_power":
       return "No Power";
-    case "tripping_mcb_rccb":
-      return "Tripping MCB/RCCB";
+    case "tripping":
+      return "Tripping";
     case "charging_slow":
       return "Charging Slow";
     case "not_responding":
       return "Not Responding";
+    case "unknown_mixed":
+      return "Unknown / Mixed";
     default:
       return "Unknown";
   }
 }
 
-export function formatBasicCheckStatus(status?: string | null) {
-  switch (status) {
-    case "ok":
-      return "OK";
-    case "problem":
-      return "Problem";
-    case "unknown":
+export function formatResolverTier(resolverTier?: string | null) {
+  switch (resolverTier) {
+    case "driver":
+      return "Driver";
+    case "local_site":
+      return "Local Site";
+    case "remote_ops":
+      return "Remote Ops";
+    case "technician":
+      return "Technician";
+    default:
       return "Unknown";
+  }
+}
+
+export function formatHazardLevel(hazardLevel?: string | null) {
+  switch (hazardLevel) {
+    case "low":
+      return "Low";
+    case "medium":
+      return "Medium";
+    case "high":
+      return "High";
     default:
       return "Unknown";
   }

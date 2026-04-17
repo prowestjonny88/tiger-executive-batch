@@ -13,7 +13,9 @@ from app.core.models import (
     EvidenceType,
     HazardLevel,
     IncidentInput,
+    KnownCaseHit,
     ResolverTier,
+    RetrievalMetadata,
 )
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.known_case_retrieval import RetrievalQuery, retrieve_known_case
@@ -136,6 +138,56 @@ def _fallback_resolver(issue_family: str, hazard_level: HazardLevel) -> Resolver
     return "remote_ops"
 
 
+_HAZARD_RANK: dict[HazardLevel, int] = {"low": 0, "medium": 1, "high": 2}
+
+
+def _max_hazard_level(*levels: str | None) -> HazardLevel:
+    best: HazardLevel = "low"
+    for level in levels:
+        normalized = str(level or "").strip().lower()
+        if normalized in _HAZARD_RANK and _HAZARD_RANK[normalized] > _HAZARD_RANK[best]:
+            best = normalized  # type: ignore[assignment]
+    return best
+
+
+def _retrieval_is_strong(known_case_hit: KnownCaseHit | None, retrieval_metadata: RetrievalMetadata | None) -> bool:
+    if known_case_hit is None or retrieval_metadata is None:
+        return False
+    return retrieval_metadata.match_state in {"exact_filename", "accepted"} and known_case_hit.match_score >= 0.75
+
+
+def _build_confidence_reasoning(
+    diagnosis_source: str,
+    retrieval_metadata: RetrievalMetadata | None,
+    known_case_hit: KnownCaseHit | None,
+    used_gemini: bool,
+) -> str:
+    parts: list[str] = []
+    if known_case_hit is not None:
+        parts.append(
+            f"Accepted known-case match {known_case_hit.canonical_file_name} "
+            f"at {known_case_hit.match_score:.2f} via {known_case_hit.match_reason}."
+        )
+    elif retrieval_metadata and retrieval_metadata.selected_score is not None:
+        threshold = f"{retrieval_metadata.rejection_threshold:.2f}" if retrieval_metadata.rejection_threshold is not None else "n/a"
+        parts.append(
+            "No known case was accepted; "
+            f"best retrieval score was {retrieval_metadata.selected_score:.2f} "
+            f"with state {retrieval_metadata.match_state} against threshold {threshold}."
+        )
+    else:
+        parts.append("No known-case retrieval signal was available.")
+
+    if used_gemini:
+        if diagnosis_source == "gemini_vlm_primary":
+            parts.append("Gemini provided the primary structured diagnosis.")
+        else:
+            parts.append("Gemini was used to enrich the accepted retrieval result.")
+    else:
+        parts.append("Deterministic retrieval and fallback policy determined the diagnosis.")
+    return " ".join(parts)
+
+
 class GeminiDiagnosisProvider:
     def analyze(self, incident: IncidentInput) -> dict[str, Any]:
         client = get_gemini_client()
@@ -228,38 +280,71 @@ def run_diagnosis_with_debug(
         gemini_error = str(exc)
         raw_provider_output = f"Gemini unavailable or failed; using Round 1 retrieval fallback. Error: {exc}"
 
-    issue_family = (vlm_payload or {}).get("issue_family") or (known_case_hit.issue_family if known_case_hit else inferred_issue_family)
-    fault_type = (vlm_payload or {}).get("fault_type") or (known_case_hit.fault_type if known_case_hit else "unknown_fault")
-    evidence_summary = (vlm_payload or {}).get("evidence_summary") or (
-        known_case_hit.visual_observation if known_case_hit else (incident.symptom_text or incident.photo_hint or "Limited evidence provided.")
-    )
-    hazard_level = (vlm_payload or {}).get("hazard_level") or (known_case_hit.hazard_level if known_case_hit else "medium")
-    resolver_tier = (vlm_payload or {}).get("resolver_tier_hint") or (known_case_hit.resolver_tier if known_case_hit else _fallback_resolver(issue_family, hazard_level))
-    required_proof_next = (vlm_payload or {}).get("required_proof_next") or (known_case_hit.required_proof_next if known_case_hit else None)
+    strong_retrieval = _retrieval_is_strong(known_case_hit, retrieval_metadata)
+    default_summary = incident.symptom_text or incident.photo_hint or "Limited evidence provided."
+
+    if strong_retrieval and known_case_hit is not None:
+        issue_family = known_case_hit.issue_family
+        fault_type = known_case_hit.fault_type
+        evidence_summary = known_case_hit.visual_observation or default_summary
+        hazard_level = known_case_hit.hazard_level
+        resolver_tier = known_case_hit.resolver_tier
+        required_proof_next = known_case_hit.required_proof_next
+        diagnosis_source = "round1_package_retrieval"
+        branch_name = "round1_package_retrieval"
+
+        if vlm_payload:
+            vlm_issue_family = str(vlm_payload.get("issue_family") or "").strip()
+            if vlm_issue_family == issue_family:
+                if fault_type == "unknown_fault" and vlm_payload.get("fault_type"):
+                    fault_type = str(vlm_payload["fault_type"])
+                evidence_summary = str(vlm_payload.get("evidence_summary") or evidence_summary)
+                hazard_level = _max_hazard_level(hazard_level, str(vlm_payload.get("hazard_level") or ""))
+                if not required_proof_next:
+                    required_proof_next = vlm_payload.get("required_proof_next") or required_proof_next
+                branch_name = "retrieval_enriched_by_gemini"
+    elif vlm_payload:
+        issue_family = str(vlm_payload.get("issue_family") or inferred_issue_family)
+        fault_type = str(vlm_payload.get("fault_type") or (known_case_hit.fault_type if known_case_hit else "unknown_fault"))
+        evidence_summary = str(vlm_payload.get("evidence_summary") or (known_case_hit.visual_observation if known_case_hit else default_summary))
+        hazard_level = _max_hazard_level(
+            str(vlm_payload.get("hazard_level") or ""),
+            known_case_hit.hazard_level if known_case_hit else None,
+        )
+        resolver_tier = str(vlm_payload.get("resolver_tier_hint") or _fallback_resolver(issue_family, hazard_level))
+        required_proof_next = vlm_payload.get("required_proof_next") or (known_case_hit.required_proof_next if known_case_hit else None)
+        diagnosis_source = "gemini_vlm_primary"
+        branch_name = "gemini_vlm_primary"
+    elif known_case_hit is not None:
+        issue_family = known_case_hit.issue_family
+        fault_type = known_case_hit.fault_type
+        evidence_summary = known_case_hit.visual_observation or default_summary
+        hazard_level = known_case_hit.hazard_level
+        resolver_tier = known_case_hit.resolver_tier
+        required_proof_next = known_case_hit.required_proof_next
+        diagnosis_source = "round1_package_retrieval"
+        branch_name = "round1_package_retrieval"
+    else:
+        issue_family = inferred_issue_family
+        fault_type = "unknown_fault"
+        evidence_summary = default_summary
+        hazard_level = "medium"
+        resolver_tier = _fallback_resolver(issue_family, hazard_level)
+        required_proof_next = None
+        diagnosis_source = "heuristic_policy_fallback"
+        branch_name = "heuristic_policy_fallback"
 
     match_score = known_case_hit.match_score if known_case_hit else 0.35
-    if known_case_hit and known_case_hit.issue_family == "unknown_mixed" and inferred_issue_family != "unknown_mixed" and (
-        evidence_type in {"symptom_report", "hardware_photo", "symptom_heavy_photo"} or match_score < 0.9
-    ):
-        issue_family = inferred_issue_family
-        if hazard_level != "high":
-            resolver_tier = _fallback_resolver(issue_family, hazard_level)
-    if (
-        known_case_hit
-        and evidence_type == "symptom_report"
-        and known_case_hit.evidence_type not in {"symptom_report", "screenshot"}
-        and inferred_issue_family != "unknown_mixed"
-        and match_score < 0.9
-    ):
-        issue_family = inferred_issue_family
-        fault_type = "unknown_fault" if fault_type == known_case_hit.fault_type else fault_type
-        resolver_tier = _fallback_resolver(issue_family, hazard_level)
     score = max(match_score, 0.42 if vlm_payload else 0.32)
     if _looks_ambiguous(query_text.lower()) and evidence_type in {"symptom_report", "unknown"}:
         issue_family = "unknown_mixed"
         known_case_hit = None
         hazard_level = "medium"
         score = min(score, 0.48)
+        diagnosis_source = "heuristic_policy_fallback"
+        branch_name = "heuristic_policy_fallback"
+    elif diagnosis_source == "heuristic_policy_fallback" and inferred_issue_family != "unknown_mixed":
+        score = max(score, 0.56)
     if _has_explicit_visual_hazard(incident):
         hazard_level = "high"
         score = max(score, 0.78)
@@ -283,8 +368,6 @@ def run_diagnosis_with_debug(
     elif hazard_level == "high":
         resolver_tier = "technician"
 
-    branch_name = "gemini_vlm_retrieval" if vlm_payload else "round1_package_retrieval"
-
     diagnosis = DiagnosisResult(
         raw_provider_output=raw_provider_output,
         issue_family=issue_family,  # type: ignore[arg-type]
@@ -306,13 +389,7 @@ def run_diagnosis_with_debug(
         hazard_flags=hazard_flags,
         known_case_hit=known_case_hit,
         retrieval_metadata=retrieval_metadata,
-        confidence_reasoning=(
-            "Known-case retrieval and VLM context aligned."
-            if vlm_payload and known_case_hit
-            else "Known-case retrieval provided the primary diagnosis signal."
-            if known_case_hit
-            else "Evidence did not strongly match a known case; using taxonomy-safe fallback."
-        ),
+        confidence_reasoning=_build_confidence_reasoning(diagnosis_source, retrieval_metadata, known_case_hit, vlm_payload is not None),
     )
 
     gemini_attempt = {

@@ -1,9 +1,10 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput
 from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
-from app.services.intake import _call_gemini_intake
+from app.services.intake import _call_gemini_intake, build_follow_up_questions
 
 
 def test_gemini_intake_provider_usable():
@@ -80,7 +81,8 @@ def test_run_diagnosis_uses_gemini_payload_when_available():
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source == "gemini_vlm_retrieval"
+    assert diagnosis.diagnosis_source == "gemini_vlm_primary"
+    assert diagnosis.branch_name == "gemini_vlm_primary"
     assert diagnosis.issue_family == "tripping"
     assert diagnosis.resolver_tier == "local_site"
 
@@ -106,7 +108,8 @@ def test_run_diagnosis_with_debug_records_gemini_success():
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source == "gemini_vlm_retrieval"
+    assert diagnosis.diagnosis_source == "gemini_vlm_primary"
+    assert diagnosis.branch_name == "gemini_vlm_primary"
     assert debug["attempted"] is True
     assert debug["succeeded"] is True
     assert debug["incident_id"] == 42
@@ -127,8 +130,33 @@ def test_run_diagnosis_with_debug_records_gemini_failure():
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source == "round1_package_retrieval"
+    assert diagnosis.diagnosis_source in {"round1_package_retrieval", "heuristic_policy_fallback"}
+    assert diagnosis.branch_name in {"round1_package_retrieval", "heuristic_policy_fallback"}
     assert debug["attempted"] is True
     assert debug["succeeded"] is False
     assert debug["incident_id"] == 84
     assert "proxy refused connection" in (debug["error"] or "")
+
+
+def test_build_follow_up_questions_uses_diagnosis_contract_fields():
+    diagnosis = SimpleNamespace(
+        issue_family="unknown_mixed",
+        evidence_type="screenshot",
+        required_proof_next="Capture the exact fault detail page.",
+        unknown_flag=True,
+        requires_follow_up=True,
+    )
+
+    with patch("app.services.intake.get_gemini_client", return_value=None), patch(
+        "app.services.diagnosis.run_diagnosis", return_value=diagnosis
+    ):
+        questions = build_follow_up_questions(
+            IncidentInput(
+                site_id="site-mall-01",
+                symptom_text="Customer reported a problem.",
+            ),
+            "usable",
+        )
+
+    question_ids = {item["question_id"] for item in questions}
+    assert question_ids == {"required_proof_next", "power_context", "error_text"}

@@ -9,9 +9,12 @@ app/db/persistence.py
 app/services/__init__.py
 app/services/confidence.py
 app/services/diagnosis.py
+app/services/embeddings.py
 app/services/gemini_client.py
 app/services/guidance.py
 app/services/intake.py
+app/services/known_case_retrieval.py
+app/services/round1_dataset.py
 app/services/routing.py
 app/services/triage.py
 omnitriage_backend.egg-info/PKG-INFO

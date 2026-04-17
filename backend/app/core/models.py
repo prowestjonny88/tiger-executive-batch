@@ -5,41 +5,27 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# Categorizes faults (no_power, tripping_mcb_rccb, charging_slow, not_responding)
-IssueType = Literal["no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"]
+IssueFamily = Literal["no_power", "tripping", "charging_slow", "not_responding", "unknown_mixed"]
+HazardLevel = Literal["low", "medium", "high"]
+ResolverTier = Literal["driver", "local_site", "remote_ops", "technician"]
+EvidenceType = Literal["hardware_photo", "screenshot", "symptom_report", "symptom_heavy_photo", "mixed_photo", "unknown"]
 
-# Assessment results (ok, problem, unknown)
-BasicCheckStatus = Literal["ok", "problem", "unknown"]
 
-# Resolution paths (resolved, escalate)
-WorkflowOutcome = Literal["resolved", "escalate"]
-
-# Confidence levels (high, medium, low)
 class ConfidenceBand(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
-# --- Enums --- #
-# Issue severity (low, moderate, high, critical)
-class SeverityLevel(str, Enum):
-    LOW = "low"
-    MODERATE = "moderate"
-    HIGH = "high"
-    CRITICAL = "critical"
 
-
-# Captures evidence photos attached to EV charger fault reports. 
 class PhotoEvidence(BaseModel):
     filename: str
     media_type: str = "image/jpeg"
-    storage_path: str  # Retrieve the image for OCR or ML classification
+    storage_path: str
     byte_size: int = Field(ge=0)
-    quality_status: Literal["usable", "weak", "retake_required"]   # Decide whether to process the image or request a retake
+    quality_status: Literal["usable", "weak", "retake_required"]
     notes: List[str] = Field(default_factory=list)
 
-# --- Core Models --- #
-# Handles photo documentation with metadata
+
 class StoredPhotoEvidence(BaseModel):
     filename: str
     media_type: str = "image/jpeg"
@@ -47,40 +33,12 @@ class StoredPhotoEvidence(BaseModel):
     byte_size: int = Field(ge=0)
 
 
-# The incoming payload when a user uploads a photo
-'''
-The Base64 encoding allows binary image data to be safely transmitted as JSON. 
-Once received by the backend, this data would typically be:
-    1. Decoded from Base64
-    2. Validated (format, size)
-    3. Stored using the storage_path mechanism from StoredPhotoEvidence
-    4. Used for OCR or ML classification to diagnose EV charger faults
-'''
 class UploadedPhotoPayload(BaseModel):
     filename: str
     media_type: str
     content_base64: str
 
 
-# Captures follow-up diagnostic questions in the EV charger triage system.
-'''
-Example flow:
-    1. User reports a charger fault
-    2. System asks: "Is the main power supply on?" → stored in prompt
-    3. User answers: "no" → stored in answer
-    4. This exchange gets wrapped in SymptomAnswer with a question_id like "power_check"
-    5. Multiple SymptomAnswer objects are collected in the follow_up_answers dictionary within IncidentInput
-
-    Purpose: These answers help the system refine its diagnosis by gathering more specific information 
-             about the charger's state, leading to more accurate fault classification.
-'''
-class SymptomAnswer(BaseModel):
-    question_id: str
-    prompt: str
-    answer: str
-
-
-# Captures incident details (site/charger ID, symptoms, error codes, follow-up answers)
 class IncidentInput(BaseModel):
     incident_id: Optional[int] = None
     site_id: str
@@ -93,91 +51,76 @@ class IncidentInput(BaseModel):
     demo_scenario_id: Optional[str] = None
 
 
-'''
-Represents the initial troubleshooting checklist before running advanced diagnostics. 
-It captures basic manual observations about the charger's state.
-
-Purpose: These basic checks help narrow down the fault quickly before invoking expensive 
-         ML classifiers or OCR processing. 
-         It's included in DiagnosisResult to document the physical condition assessment.
-'''
-class BasicConditionsAssessment(BaseModel):
-    main_power_supply: BasicCheckStatus = "unknown"
-    cable_condition: BasicCheckStatus = "unknown"
-    indicator_or_error_code: BasicCheckStatus = "unknown"
-    indicator_detail: Optional[str] = None
+class DatasetEvidencePoint(BaseModel):
+    label: str
+    role: str
+    notes: Optional[str] = None
 
 
-# Tracks the ML classifier's decision-making process for transparency and auditing
-# It answers questions like:
-'''
-    a. Was a machine learning model used?
-    b. What did it predict and with what confidence?
-    c. Was it overridden? Why?
-    d. What were the alternatives?
-'''
-class ClassifierMetadata(BaseModel):
-    enabled: bool = False
-    used: bool = False
-    bypassed: bool = False
-    bypass_reason: Optional[str] = None
-    model_name: Optional[str] = None
-    predicted_label: Optional[str] = None
-    predicted_probability: Optional[float] = None
-    confidence_policy_action: Optional[str] = None
-    candidate_labels: List[str] = Field(default_factory=list)
+class KnownCaseHit(BaseModel):
+    canonical_file_name: str
+    match_score: float = Field(ge=0.0, le=1.0)
+    fault_type: str
+    issue_family: IssueFamily
+    evidence_type: EvidenceType
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
+    recommended_next_step: str
+    required_proof_next: str
+    visual_observation: str
+    engineering_rationale: Optional[str] = None
+    match_reason: str
+    component_primary: Optional[str] = None
+    visible_abnormalities: List[str] = Field(default_factory=list)
+    retrieval_source: str = "package_seed"
+
+
+class RetrievalMetadata(BaseModel):
+    provider_name: str
+    provider_mode: str
+    query_text: str
+    image_embedding_used: bool = False
+    text_embedding_used: bool = False
+    candidate_count: int = 0
+    match_state: Literal["exact_filename", "accepted", "weak", "rejected"] = "rejected"
+    selected_case: Optional[str] = None
+    selected_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    rejection_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 
-'''
-When a user uploads a photo of a faulty charger, 
-the system uses OCR to read any visible text/error codes on the charger's display. 
-This metadata captures what was found.
-'''
-class OcrMetadata(BaseModel):
-    extracted_text: Optional[str] = None
-    matched_rule: Optional[str] = None
-    matched_keywords: List[str] = Field(default_factory=list)
-    extra: Dict[str, Any] = Field(default_factory=dict)
-
-
-# Main diagnostic output with issue type, confidence score, severity, and metadata
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
-    issue_type: IssueType
+    issue_family: IssueFamily
+    fault_type: str
+    evidence_type: EvidenceType
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
     likely_fault: str
     evidence_summary: str
-    basic_conditions: BasicConditionsAssessment
+    required_proof_next: Optional[str] = None
     raw_ocr_text: Optional[str] = None
     confidence_score: float = Field(ge=0.0, le=1.0)
     confidence_band: ConfidenceBand
     unknown_flag: bool = False
-    severity: SeverityLevel
-    hazard_flags: List[str] = Field(default_factory=list)
+    requires_follow_up: bool = False
+    follow_up_prompts: List[Dict[str, str]] = Field(default_factory=list)
     diagnosis_source: str = "heuristic"
-    branch_name: str = "heuristic_fallback"
-    resolver_hint_final: Optional[str] = None
-    next_question_hint: Optional[str] = None
-    next_action_hint: Optional[str] = None
-    classifier_metadata: Optional[ClassifierMetadata] = None
-    ocr_metadata: Optional[OcrMetadata] = None
+    branch_name: str = "round1_live_path"
+    hazard_flags: List[str] = Field(default_factory=list)
+    known_case_hit: Optional[KnownCaseHit] = None
+    retrieval_metadata: Optional[RetrievalMetadata] = None
+    confidence_reasoning: Optional[str] = None
 
 
-''' 
-Captures the system's uncertainty and risk assessment for each diagnosis in the EV charger triage workflow.
-
-Purpose: Helps the system decide whether to auto-resolve issues or 
-         escalate to human operators for safety-critical decisions.
-'''
 class ConfidenceAssessment(BaseModel):
     score: float = Field(ge=0.0, le=1.0)
     band: ConfidenceBand
-    requires_confirmation: bool
-    safety_override: bool
+    requires_follow_up: bool
+    novelty_detected: bool
     rationale: str
 
 
-# Describes the infrastructure and support capabilities available at each charging location
 class SiteCapabilityProfile(BaseModel):
     site_id: str
     site_name: str
@@ -187,42 +130,46 @@ class SiteCapabilityProfile(BaseModel):
     has_remote_ops: bool
     notes: Optional[str] = None
 
-# Determines next actions and outcomes based on diagnosis
-class WorkflowDecision(BaseModel):
-    issue_type: IssueType
-    branch_actions: List[str]
-    outcome: WorkflowOutcome
-    rationale: str
-    next_action: str
-    fallback_action: str
 
-# Provides diagnostic steps, summaries, and safety notes
+class RoutingDecision(BaseModel):
+    issue_family: IssueFamily
+    fault_type: str
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
+    routing_rationale: str
+    recommended_next_step: str
+    fallback_action: str
+    required_proof_next: Optional[str] = None
+    escalation_required: bool = False
+
+
 class ActionArtifact(BaseModel):
-    issue_type: IssueType
+    issue_family: IssueFamily
+    resolver_tier: ResolverTier
     title: str
     summary: str
     steps: List[str]
     safety_note: str
     evidence_focus: List[str] = Field(default_factory=list)
 
-# Stores reusable diagnostic knowledge that can be retrieved and presented to users or 
-# used to guide the system's decision-making.
+
 class KnowledgeSnippet(BaseModel):
     snippet_id: str
-    issue_type: IssueType
+    issue_family: IssueFamily
+    resolver_tier: Optional[ResolverTier] = None
     keywords: List[str]
     title: str
     body: List[str]
 
-# Aggregates incident, diagnosis, confidence, workflow, and action into a complete result
+
 class TriageResult(BaseModel):
     incident: IncidentInput
     diagnosis: DiagnosisResult
     confidence: ConfidenceAssessment
-    workflow: WorkflowDecision
+    routing: RoutingDecision
     artifact: ActionArtifact
 
-# Test case data structure
+
 class DemoScenario(BaseModel):
     scenario_id: str
     name: str
@@ -232,11 +179,5 @@ class DemoScenario(BaseModel):
     symptom_text: str
     error_code: str
     follow_up_answers: Dict[str, str]
-    expected_issue_type: IssueType
-    expected_outcome: WorkflowOutcome
-
-'''
-The system appears to be a triage/diagnostic workflow for EV charging issues, 
-combining manual input (symptoms, photos, error codes) 
-with AI-powered classification and decision-making.
-'''
+    expected_issue_family: IssueFamily
+    expected_resolver_tier: ResolverTier

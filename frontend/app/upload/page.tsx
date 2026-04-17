@@ -181,13 +181,16 @@ export default function PhotoUpload() {
   const selectedScenario = scenarios.find((item) => item.scenario_id === selectedScenarioId);
   const issueColors: Record<string, string> = {
     no_power: "bg-red-50 border-red-300 text-red-700",
-    tripping_mcb_rccb: "bg-amber-50 border-amber-300 text-amber-800",
+    tripping: "bg-amber-50 border-amber-300 text-amber-800",
     charging_slow: "bg-green-50 border-green-300 text-green-800",
     not_responding: "bg-slate-100 border-slate-300 text-slate-700",
+    unknown_mixed: "bg-slate-100 border-slate-300 text-slate-700",
   };
   const outcomeLabels: Record<string, string> = {
-    resolved: "Expected: Guidance",
-    escalate: "Expected: Escalation",
+    driver: "Expected: Driver",
+    local_site: "Expected: Local Site",
+    remote_ops: "Expected: Remote Ops",
+    technician: "Expected: Technician",
   };
 
   return (
@@ -252,12 +255,12 @@ export default function PhotoUpload() {
                         <p className="text-slate-600 text-sm">{scenario.headline}</p>
                         <p className="text-slate-500 text-xs mt-1 font-mono">ERR: {scenario.error_code}</p>
                       </div>
-                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${issueColors[scenario.expected_issue_type] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {formatIssueType(scenario.expected_issue_type)}
+                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${issueColors[scenario.expected_issue_family] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                        {formatIssueType(scenario.expected_issue_family)}
                       </span>
                     </div>
                     <p className="text-slate-500 text-xs mt-2">
-                      {outcomeLabels[scenario.expected_outcome] ?? scenario.expected_outcome}
+                      {outcomeLabels[scenario.expected_resolver_tier] ?? scenario.expected_resolver_tier}
                     </p>
                   </button>
                 ))
@@ -364,8 +367,8 @@ export default function PhotoUpload() {
         {mode === "demo" && selectedScenario ? (
           <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-slate-50 border border-slate-200 text-slate-700">
             <span className="font-bold">Ready to run: </span>
-            {selectedScenario.headline} | {formatIssueType(selectedScenario.expected_issue_type)} |{" "}
-            {outcomeLabels[selectedScenario.expected_outcome] ?? selectedScenario.expected_outcome}
+            {selectedScenario.headline} | {formatIssueType(selectedScenario.expected_issue_family)} |{" "}
+            {outcomeLabels[selectedScenario.expected_resolver_tier] ?? selectedScenario.expected_resolver_tier}
           </div>
         ) : null}
 

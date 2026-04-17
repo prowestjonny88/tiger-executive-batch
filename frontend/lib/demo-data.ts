@@ -1,5 +1,5 @@
-export type IssueType = "no_power" | "tripping_mcb_rccb" | "charging_slow" | "not_responding";
-export type WorkflowOutcome = "resolved" | "escalate";
+export type IssueFamily = "no_power" | "tripping" | "charging_slow" | "not_responding" | "unknown_mixed";
+export type ResolverTier = "driver" | "local_site" | "remote_ops" | "technician";
 
 export type DemoScenario = {
   scenario_id: string;
@@ -10,8 +10,8 @@ export type DemoScenario = {
   symptom_text: string;
   error_code: string;
   follow_up_answers: Record<string, string>;
-  expected_issue_type: IssueType;
-  expected_outcome: WorkflowOutcome;
+  expected_issue_family: IssueFamily;
+  expected_resolver_tier: ResolverTier;
 };
 
 export const sites = [
@@ -43,28 +43,24 @@ export const scenarios: DemoScenario[] = [
     symptom_text: "Charger has no lights and the session cannot start because the unit appears unpowered.",
     error_code: "",
     follow_up_answers: {
-      main_power_supply: "Incoming voltage is missing at the charger.",
-      cable_condition: "Cable and connector look normal.",
-      indicator_or_error_code: "No screen or LED is visible.",
+      power_context: "Incoming voltage is missing at the charger.",
     },
-    expected_issue_type: "no_power",
-    expected_outcome: "resolved",
+    expected_issue_family: "no_power",
+    expected_resolver_tier: "driver",
   },
   {
-    scenario_id: "demo-tripping-mcb",
-    name: "Tripping MCB/RCCB case",
+    scenario_id: "demo-tripping",
+    name: "Tripping case",
     site_id: "site-mall-01",
     headline: "Breaker trips when charging starts",
     photo_hint: "protector trips, no burn marks visible",
     symptom_text: "The MCB trips shortly after charging begins and the connector feels slightly warm.",
     error_code: "TRIP-02",
     follow_up_answers: {
-      main_power_supply: "Power is available before the trip.",
-      cable_condition: "Loose connector and overheating observed.",
-      indicator_or_error_code: "Breaker trip recorded as TRIP-02.",
+      required_proof_next: "Photo of the DB with the breaker reset to ON position.",
     },
-    expected_issue_type: "tripping_mcb_rccb",
-    expected_outcome: "escalate",
+    expected_issue_family: "tripping",
+    expected_resolver_tier: "local_site",
   },
   {
     scenario_id: "demo-charging-slow",
@@ -75,27 +71,24 @@ export const scenarios: DemoScenario[] = [
     symptom_text: "Charging starts but the current is much lower than usual for this vehicle.",
     error_code: "SLOW-11",
     follow_up_answers: {
-      main_power_supply: "Main supply is available.",
-      cable_condition: "Cable and connector are in good condition.",
-      indicator_or_error_code: "Display shows reduced output and SLOW-11.",
+      required_proof_next: "Photo or screenshot showing the configured current output.",
     },
-    expected_issue_type: "charging_slow",
-    expected_outcome: "resolved",
+    expected_issue_family: "charging_slow",
+    expected_resolver_tier: "remote_ops",
   },
   {
     scenario_id: "demo-not-responding",
     name: "Not responding charger",
     site_id: "site-condo-01",
     headline: "Charger is powered but controls do not respond",
-    photo_hint: "screen frozen, buttons do nothing, no visible damage",
-    symptom_text: "The charger remains powered but the screen is frozen and the unit does not respond to input.",
-    error_code: "UI-09",
+    photo_hint: "WC Apps screenshot shows charger faulted status",
+    symptom_text: "App screen captured after failed session.",
+    error_code: "Faulted",
     follow_up_answers: {
-      main_power_supply: "Main power is available.",
-      cable_condition: "Cable and connector are normal.",
-      indicator_or_error_code: "Display shows UI-09 and stays frozen.",
+      error_text: "Provide a clear screenshot of the error text.",
     },
-    expected_issue_type: "not_responding",
-    expected_outcome: "resolved",
+    expected_issue_family: "not_responding",
+    expected_resolver_tier: "remote_ops",
   },
 ];
+

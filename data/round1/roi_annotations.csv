@@ -1,0 +1,108 @@
+roi_id,coco_annotation_id,coco_image_id,canonical_file_name,category_id,category_name,bbox_x,bbox_y,bbox_w,bbox_h,segmentation_json,iscrowd
+roi_1,1,1,Burnt Mark Issue (1).jpg,26,burn_mark,353.09,622.84,53.22,85.16,[],0
+roi_2,2,1,Burnt Mark Issue (1).jpg,43,abnormal_connection_layout,230.04,871.29,221.63,156.62,[],0
+roi_3,3,1,Burnt Mark Issue (1).jpg,5,isolator,182.15,85.0,443.05,852.56,[],0
+roi_4,4,1,Burnt Mark Issue (1).jpg,29,loose_termination,233.44,871.15,205.38,147.75,[],0
+roi_5,5,2,Burnt Mark Issue (2).jpg,5,isolator,289.0,11.27,1631.0,2522.58,[],0
+roi_6,6,2,Burnt Mark Issue (2).jpg,26,burn_mark,999.38,503.75,230.64,411.52,[],0
+roi_7,7,3,Burnt Mark Issue (3).jpg,5,isolator,153.2,0.0,644.7,1034.65,[],0
+roi_8,8,3,Burnt Mark Issue (3).jpg,43,abnormal_connection_layout,259.26,602.1,494.35,476.04,[],0
+roi_9,9,3,Burnt Mark Issue (3).jpg,26,burn_mark,434.46,335.2,61.84,98.11,[],0
+roi_10,10,3,Burnt Mark Issue (3).jpg,29,loose_termination,284.44,682.2,460.02,391.36,[],0
+roi_11,11,4,Burnt Mark Issue (4).jpg,26,burn_mark,550.16,437.67,45.44,40.3,[],0
+roi_12,12,4,Burnt Mark Issue (4).jpg,34,tripped_switch,692.93,204.94,296.9,371.13,[],0
+roi_13,13,4,Burnt Mark Issue (4).jpg,3,mcb,435.34,215.3,540.99,411.82,[],0
+roi_14,14,4,Burnt Mark Issue (4).jpg,35,damaged_internal_part,459.65,336.43,271.45,256.61,[],0
+roi_15,15,5,Cable termination - connection (1).jpg,30,exposed_conductor,443.43,493.85,44.95,231.58,[],0
+roi_16,16,5,Cable termination - connection (1).jpg,29,loose_termination,447.24,498.15,39.09,221.81,[],0
+roi_17,17,5,Cable termination - connection (1).jpg,43,abnormal_connection_layout,416.7,146.3,84.6,1110.7,[],0
+roi_18,18,5,Cable termination - connection (1).jpg,11,earth_wire,407.26,165.31,105.09,1072.87,[],0
+roi_19,19,6,Cable termination - connection (2).jpg,30,exposed_conductor,409.6,706.23,85.89,127.77,"[[466.1, 706.23, 495.49, 723.19, 445.8, 834.0, 409.6, 809.1]]",0
+roi_20,20,6,Cable termination - connection (2).jpg,3,mcb,38.51,30.63,439.54,513.07,[],0
+roi_21,21,6,Cable termination - connection (2).jpg,4,rccb,523.58,28.88,380.01,495.58,[],0
+roi_22,22,6,Cable termination - connection (2).jpg,29,loose_termination,413.0,702.8,84.8,132.3,"[[470.6, 702.8, 497.8, 719.8, 449.1, 835.1, 413.0, 811.4]]",0
+roi_23,23,7,Cable termination - connection (3).jpg,32,wrong_wire_routing,539.48,448.82,62.04,110.95,[],0
+roi_24,24,7,Cable termination - connection (3).jpg,30,exposed_conductor,734.87,317.22,29.02,52.99,[],0
+roi_25,25,7,Cable termination - connection (3).jpg,30,exposed_conductor,670.92,305.55,33.38,62.75,[],0
+roi_26,26,7,Cable termination - connection (3).jpg,31,double_landed_wire,225.43,852.12,226.93,131.7,[],0
+roi_27,27,7,Cable termination - connection (3).jpg,31,double_landed_wire,519.2,412.03,202.67,131.7,[],0
+roi_28,28,7,Cable termination - connection (3).jpg,43,abnormal_connection_layout,53.01,380.43,763.86,634.19,[],0
+roi_29,29,7,Cable termination - connection (3).jpg,29,loose_termination,730.2,314.9,38.5,60.6,[],0
+roi_30,30,7,Cable termination - connection (3).jpg,32,wrong_wire_routing,634.03,455.4,62.04,110.94,[],0
+roi_31,31,8,Cable termination - connection (4).jpg,29,loose_termination,421.25,576.6,131.75,129.1,[],0
+roi_32,32,8,Cable termination - connection (4).jpg,28,melted_plastic,430.54,598.77,41.39,65.03,[],0
+roi_33,33,8,Cable termination - connection (4).jpg,30,exposed_conductor,486.28,627.48,46.42,57.43,[],0
+roi_34,34,9,Cable termination - connection (5).jpg,29,loose_termination,428.2,269.3,176.3,181.5,"[[557.4, 269.3, 510.1, 293.9, 454.2, 362.3, 428.2, 429.8, 464.0, 445.6, 508.2, 450.8, 560.1, 385.5, 604.5, 328.5]]",0
+roi_35,35,9,Cable termination - connection (5).jpg,5,isolator,134.42,73.39,653.7,1079.55,[],0
+roi_36,36,9,Cable termination - connection (5).jpg,29,loose_termination,288.4,991.1,65.0,85.3,[],0
+roi_37,37,10,Charger No Pulse (1).jpg,1,charger_exterior,7.28,5.46,697.19,1256.4,[],0
+roi_38,38,10,Charger No Pulse (1).jpg,36,missing_or_no_indicator,182.4,117.3,282.1,759.5,[],0
+roi_39,39,10,Charger No Pulse (1).jpg,23,charger_led,262.31,401.51,145.88,466.01,[],0
+roi_40,40,11,Charger No Pulse (2).jpg,36,missing_or_no_indicator,172.0,176.85,318.7,852.85,[],0
+roi_41,41,11,Charger No Pulse (2).jpg,1,charger_exterior,153.4,472.39,358.05,577.75,[],0
+roi_42,42,12,Charger No Pulse (3).jpg,23,charger_led,193.17,282.91,62.67,41.39,[],0
+roi_43,43,12,Charger No Pulse (3).jpg,1,charger_exterior,3.85,233.57,438.66,608.18,[],0
+roi_44,44,12,Charger No Pulse (3).jpg,36,missing_or_no_indicator,8.7,247.76,417.5,582.74,[],0
+roi_45,45,13,Charger No Pulse (4).jpg,1,charger_exterior,6.37,256.75,526.39,530.96,[],0
+roi_46,46,13,Charger No Pulse (4).jpg,5,isolator,568.0,413.98,183.09,292.94,[],0
+roi_47,47,13,Charger No Pulse (4).jpg,36,missing_or_no_indicator,20.79,230.9,698.03,576.72,[],0
+roi_48,48,14,Charger No Pulse (5).jpg,36,missing_or_no_indicator,103.22,333.24,667.27,827.3,[],0
+roi_49,49,14,Charger No Pulse (5).jpg,5,isolator,114.62,580.07,162.74,287.52,[],0
+roi_50,50,14,Charger No Pulse (5).jpg,1,charger_exterior,417.05,334.05,358.05,577.76,[],0
+roi_51,51,15,Charger No Pulse (6).jpg,36,missing_or_no_indicator,78.27,159.64,564.19,971.06,[],0
+roi_52,52,15,Charger No Pulse (6).jpg,1,charger_exterior,74.74,152.32,387.88,659.12,[],0
+roi_53,53,15,Charger No Pulse (6).jpg,5,isolator,493.54,433.6,168.18,217.0,[],0
+roi_54,54,16,Charger Red Indicator.png,37,red_indicator,207.13,255.13,33.78,297.07,[],0
+roi_55,55,16,Charger Red Indicator.png,5,isolator,4.41,297.07,104.86,242.32,"[[104.61, 299.4, 4.41, 297.07, 5.58, 538.22, 70.82, 539.39, 75.48, 440.36, 109.27, 379.78]]",0
+roi_56,56,17,Isolator Issue.png,48,faulty_isolator,273.93,256.32,125.79,247.99,[],0
+roi_57,57,17,Isolator Issue.png,5,isolator,266.74,245.54,143.76,261.16,[],0
+roi_58,58,18,MCB Tripped (1).jpg,3,mcb,445.51,479.88,188.34,219.85,[],0
+roi_59,59,18,MCB Tripped (1).jpg,4,rccb,643.38,476.22,192.0,224.98,[],0
+roi_60,60,18,MCB Tripped (1).jpg,34,tripped_switch,452.84,484.1,387.44,218.02,[],0
+roi_61,61,19,MCB Tripped (2).jpg,34,tripped_switch,340.54,595.77,289.23,154.38,[],0
+roi_62,62,19,MCB Tripped (2).jpg,4,rccb,345.62,592.44,130.94,160.25,[],0
+roi_63,63,19,MCB Tripped (2).jpg,3,mcb,484.37,585.6,155.37,165.14,[],0
+roi_64,64,20,MCB Tripped (3).jpg,34,tripped_switch,614.74,249.59,316.2,183.22,[],0
+roi_65,65,20,MCB Tripped (3).jpg,4,rccb,294.53,249.24,294.57,199.21,[],0
+roi_66,66,20,MCB Tripped (3).jpg,3,mcb,610.38,250.09,326.06,187.3,[],0
+roi_67,67,21,MCB Tripped (4).jpg,4,rccb,359.83,511.29,97.59,118.85,[],0
+roi_68,68,21,MCB Tripped (4).jpg,3,mcb,459.05,517.83,97.6,110.13,[],0
+roi_69,69,21,MCB Tripped (4).jpg,34,tripped_switch,359.15,513.24,198.98,116.45,[],0
+roi_70,70,22,TNB Fuse Blow Issue (1).jpg,47,fuse_blow,146.63,520.92,641.27,526.38,[],0
+roi_71,71,22,TNB Fuse Blow Issue (1).jpg,7,tnb_fuse_area,112.11,295.2,697.89,782.5,[],0
+roi_72,72,23,TNB Fuse Blow Issue (2).jpg,8,tnb_meter,433.19,895.5,400.88,384.5,[],0
+roi_73,73,23,TNB Fuse Blow Issue (2).jpg,47,fuse_blow,424.72,353.61,137.93,357.26,[],0
+roi_74,74,23,TNB Fuse Blow Issue (2).jpg,7,tnb_fuse_area,415.73,348.53,151.35,376.87,[],0
+roi_75,75,24,TNB Fuse Blow Issue (3).jpg,7,tnb_fuse_area,145.67,253.09,517.14,559.99,[],0
+roi_76,76,24,TNB Fuse Blow Issue (3).jpg,47,fuse_blow,156.01,282.94,494.98,521.57,[],0
+roi_77,77,25,TNB Fuse Blow Issue (4).jpg,8,tnb_meter,409.3,616.77,195.45,464.13,"[[409.3, 629.5, 464.05, 684.19, 432.78, 729.14, 471.87, 1035.96, 456.23, 1080.9, 585.21, 1079.93, 604.75, 735.0, 584.24, 616.77]]",0
+roi_78,78,25,TNB Fuse Blow Issue (4).jpg,7,tnb_fuse_area,420.09,100.9,206.51,425.91,[],0
+roi_79,79,25,TNB Fuse Blow Issue (4).jpg,47,fuse_blow,432.52,158.9,165.06,577.52,[],0
+roi_80,80,25,TNB Fuse Blow Issue (4).jpg,18,multimeter_reading_region,246.07,657.74,207.35,444.97,[],0
+roi_81,81,26,TNB Fuse Blow Issue (5).jpg,7,tnb_fuse_area,25.65,0.0,596.74,966.33,[],0
+roi_82,82,26,TNB Fuse Blow Issue (5).jpg,47,fuse_blow,90.92,214.93,429.01,691.58,[],0
+roi_83,83,26,TNB Fuse Blow Issue (5).jpg,28,melted_plastic,370.13,331.61,149.18,561.48,[],0
+roi_84,84,27,TNB Fuse Blow Issue (6).jpg,28,melted_plastic,345.72,566.78,162.74,154.61,[],0
+roi_85,85,27,TNB Fuse Blow Issue (6).jpg,47,fuse_blow,6.79,538.02,525.18,576.65,[],0
+roi_86,86,27,TNB Fuse Blow Issue (6).jpg,7,tnb_fuse_area,0.0,507.11,858.37,772.89,[],0
+roi_87,87,28,Tapping TNB Meter (1).jpg,7,tnb_fuse_area,484.34,0.0,283.66,591.9,[],0
+roi_88,88,28,Tapping TNB Meter (1).jpg,44,suspected_tapping_layout,206.9,447.02,208.74,78.45,[],0
+roi_89,89,28,Tapping TNB Meter (1).jpg,11,earth_wire,0.0,427.64,367.0,117.26,[],0
+roi_90,90,29,Tapping TNB Meter (2).jpg,11,earth_wire,468.5,140.16,223.86,610.44,[],0
+roi_91,91,29,Tapping TNB Meter (2).jpg,44,suspected_tapping_layout,486.0,146.04,200.8,219.86,[],0
+roi_92,92,29,Tapping TNB Meter (2).jpg,43,abnormal_connection_layout,486.02,195.8,112.18,220.67,[],0
+roi_93,93,29,Tapping TNB Meter (2).jpg,32,wrong_wire_routing,442.0,128.3,314.8,600.7,[],0
+roi_94,94,29,Tapping TNB Meter (2).jpg,18,multimeter_reading_region,138.15,882.58,195.84,140.6,[],0
+roi_95,95,30,Tapping TNB Meter (3).jpg,43,abnormal_connection_layout,162.0,280.8,166.7,225.5,[],0
+roi_96,96,30,Tapping TNB Meter (3).jpg,8,tnb_meter,385.66,382.2,220.8,395.57,[],0
+roi_97,97,30,Tapping TNB Meter (3).jpg,32,wrong_wire_routing,156.35,276.1,205.75,577.6,[],0
+roi_98,98,30,Tapping TNB Meter (3).jpg,11,earth_wire,155.2,275.1,146.04,590.02,[],0
+roi_99,99,30,Tapping TNB Meter (3).jpg,44,suspected_tapping_layout,157.72,304.76,170.53,218.64,[],0
+roi_100,100,31,WC Apps Error Logs (1).jpg,25,app_screen,12.64,37.76,458.9,880.22,[],0
+roi_101,101,31,WC Apps Error Logs (1).jpg,37,red_indicator,138.9,277.38,225.67,256.43,[],0
+roi_102,102,31,WC Apps Error Logs (1).jpg,35,damaged_internal_part,36.3,614.2,403.5,276.91,[],0
+roi_103,103,31,WC Apps Error Logs (1).jpg,45,text_proof_required,22.65,559.46,184.64,46.15,[],0
+roi_104,104,31,WC Apps Error Logs (1).jpg,40,serial_number_visible,58.55,46.59,225.67,46.15,[],0
+roi_105,105,32,WC Apps Error Logs (2).jpg,25,app_screen,4.72,10.07,484.62,1046.37,[],0
+roi_106,106,32,WC Apps Error Logs (2).jpg,37,red_indicator,55.84,648.63,395.98,113.77,[],0
+roi_107,107,32,WC Apps Error Logs (2).jpg,40,serial_number_visible,134.15,657.49,158.09,31.03,[],0

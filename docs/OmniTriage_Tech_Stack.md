@@ -1,25 +1,26 @@
-# OmniTriage — Tech Stack Document
+# OmniTriage - Tech Stack Document
 
 ## Implementation Status Note
-The current stack still remains valid, but the live application contract is now organizer-native rather than resolver-tier-first.
+This document is updated to match the current live runtime, not the retired organizer/classifier-first stack.
 
-Current primary fields exposed across the app:
-- `diagnosis.issue_type`
-- `diagnosis.basic_conditions`
-- `workflow.outcome`
-- `workflow.rationale`
+Current live shape:
+- frontend: Next.js + TypeScript
+- backend: FastAPI + Python
+- dataset intelligence: `data/round1/`
+- diagnosis: retrieval-first with optional Gemini VLM assist
+- persistence: Postgres + pgvector
+- compatibility: legacy SQLite replay/history reads only
 
 ## 1. Purpose
-This document captures the approved tech stack for OmniTriage and distinguishes between:
-- Locked decisions
-- Recommended additions
-- Deferred / later-stage choices
-
-This keeps the stack honest and prevents accidental overclaiming.
+This document captures the approved current stack for the shipped Round 1 runtime and distinguishes between:
+- locked current choices
+- supporting libraries
+- deferred choices
 
 ## 2. Locked stack decisions
+
 ### 2.1 System shape
-- Architecture style: Modular monolith
+- Architecture style: modular monolith
 
 ### 2.2 Frontend
 - Framework: Next.js
@@ -29,244 +30,181 @@ This keeps the stack honest and prevents accidental overclaiming.
 - Framework: FastAPI
 - Language: Python
 
-### 2.4 AI diagnosis stack
-- Current baseline: Multimodal VLM / API-first diagnosis
-- Later addition: Known-fault classifier after Round 1 dataset arrives
-- Optional later addition: Anomaly support for novel physical faults
+### 2.4 Intelligence layer
+- Dataset-backed case intelligence from `data/round1/`
+- Retrieval-first diagnosis path
+- OCR/text extraction support
+- Optional Gemini VLM synthesis
+- Embedding abstraction layer
 
 ### 2.5 Database / persistence
-- MVP database: SQLite
-- Later production path: PostgreSQL
+- Primary runtime database: PostgreSQL
+- Vector extension: pgvector
+- Legacy compatibility source: SQLite read-only replay/history normalization
 
 ### 2.6 File handling
-- MVP file storage: local filesystem
-- DB stores: file metadata + path references
-- Later production path: object/cloud storage if needed
+- local filesystem uploads
+- backend serves stored evidence files directly
 
-### 2.7 Guidance / retrieval layer
-- Strategy: Curated knowledge base + retrieval-backed templates
-- KB format for MVP: JSON / YAML structured entries
-- Retrieval matching: fault type + tier + evidence keywords + symptoms
-
-### 2.8 Development posture
-- Run mode: separate frontend/backend processes
-- Primary dev environment: local-first
-- Docker: not required for MVP
-- Deployment: local first, cloud later if needed
+### 2.7 Development posture
+- separate frontend/backend processes
+- Dockerized Postgres for local development
+- local-first development
 
 ## 3. Locked stack by layer
 
 | Layer | Locked choice | Why it was chosen |
 |---|---|---|
-| System architecture | Modular monolith | Clean boundaries without microservice overhead |
-| Frontend | Next.js + TypeScript | Strong app workflow fit, mobile web friendly, separate from backend |
-| Backend | FastAPI + Python | Best fit for AI-heavy orchestration and file handling |
-| Diagnosis baseline | VLM / API-first | Works before dataset arrives |
-| Accuracy improvement layer | Later known-fault classifier | Improves accuracy after Round 1 without blocking MVP |
-| Database | SQLite | Fast, cheap, local-first MVP |
-| Upload storage | Local filesystem | Easy to debug and cheap for MVP |
-| Guidance layer | Curated KB + retrieval-backed templates | Safer than full RAG, richer than static templates |
-| Config | Separate `.env` files | Clean separation between frontend and backend settings |
+| System architecture | Modular monolith | Keeps the replacement manageable without microservice overhead |
+| Frontend | Next.js + TypeScript | Good fit for multi-surface workflow UI |
+| Backend | FastAPI + Python | Good fit for API orchestration and AI-facing logic |
+| Dataset intelligence | Round 1 package in `data/round1/` | Gives a stable local source of truth for case semantics |
+| Retrieval layer | Embedding-backed known-case retrieval | Supports package-backed reasoning from the first pass |
+| Embedding abstraction | Provider interface with Gemini-capable implementation | Avoids hard vendor lock-in |
+| Primary database | Postgres + pgvector | Matches the hard-replacement storage target |
+| Upload storage | Local filesystem | Keeps evidence handling simple during MVP/demo stage |
+| Guidance layer | Structured KB + resolver-tier artifacts | Keeps outputs deterministic and explainable |
+| Config | `.env` per app plus Docker Compose | Practical local reproducibility |
 
 ## 4. Frontend stack details
-### 4.1 Locked
-- Next.js
+
+### Locked
+- Next.js App Router
 - TypeScript
 
-### 4.2 Recommended but not separately debated
-These are reasonable defaults, but should be treated as working recommendations, not hard locks:
-- Tailwind CSS for fast UI styling
-- component-based UI architecture
-- `lib/` folder for API client + UI helpers
-
-### 4.3 Frontend responsibilities
+### Responsibilities
 The frontend owns:
-- QR-triggered entry flow
-- photo upload UI
-- image quality feedback
-- adaptive follow-up questions
-- confidence + routing display
-- resolver-specific output display
+- intake flow
+- upload flow
+- follow-up question flow
+- result view
+- guidance view
+- escalation view
+- history/replay rendering
 
 The frontend does not own:
-- AI inference
-- safety routing logic
-- retrieval decisions
+- dataset interpretation
+- retrieval logic
+- routing logic
 - persistence
 
+### Current contract expectations
+Frontend pages now expect:
+- `diagnosis.issue_family`
+- `diagnosis.fault_type`
+- `diagnosis.evidence_type`
+- `diagnosis.hazard_level`
+- `routing.resolver_tier`
+- `routing.routing_rationale`
+- `routing.recommended_next_step`
+
 ## 5. Backend stack details
-### 5.1 Locked
+
+### Locked
 - FastAPI
-- Python
+- Pydantic
+- psycopg
+- pgvector
+- PyYAML
 
-### 5.2 Recommended backend support libraries
-These are not hard-locked but are the most practical complements:
-- Pydantic for request/response schemas (naturally aligned with FastAPI)
-- `python-multipart` for file uploads
-- a lightweight DB access layer
-- image-processing/helper libraries if needed for preprocessing or annotation
+### Runtime support libraries
+- `google-genai` for Gemini client access
+- `python-dotenv` for local env loading
+- `pillow` for image handling
 
-### 5.3 Not yet locked
-We did not fully lock:
-- ORM choice (`SQLAlchemy` / `SQLModel` / other)
-- migration tooling (`Alembic` later is likely, but not required immediately)
-- background task queue
+### Not locked
+- ORM choice
+- migration tool choice
 - async worker stack
+- long-term hosted deployment target
 
-For MVP, avoid adding more infrastructure than necessary.
+## 6. Intelligence stack details
 
-## 6. AI stack details
-### 6.1 Locked high-level AI strategy
-#### Staged hybrid
-- Now: VLM/API-first diagnosis
-- After Round 1: add known-fault classifier
-- Later if needed: anomaly support
+### Active diagnosis strategy
+- package-backed retrieval is first-class
+- Gemini VLM can add synthesis when available
+- OCR/text extraction remains part of the diagnosis signal
+- the active runtime no longer depends on the previous classifier path
 
-### 6.2 Current baseline
-Use a multimodal vision model/API for:
-- OCR / display reading
-- visible issue interpretation
-- issue-category suggestion
-- evidence summary generation
+### Embedding strategy
+- use an embedding provider interface
+- current implementation supports:
+  - Gemini-backed embedding provider
+  - deterministic fallback/hash embedding provider for local verification
 
-### 6.3 Later classifier layer
-Add a lightweight classifier after Round 1 arrives for:
-- repeated/common classes
-- measurable accuracy improvement
-- stronger known-fault performance
+### Important runtime rule
+The old classifier code is archival only. It is not part of the active production diagnosis path.
 
-### 6.4 Optional anomaly layer
-Anomaly support is explicitly deferred / optional, not MVP-critical.
+## 7. Data and storage details
 
-### 6.5 Confidence stack
-Locked behavior:
-- numeric confidence score
-- confidence bands (high / medium / low)
-- medium confidence triggers 1–2 extra confirmation questions
-- safety-critical visible evidence overrides confidence thresholds
+### Locked
+- canonical package path: `data/round1/`
+- canonical store: PostgreSQL
+- vector-ready store: pgvector enabled
 
-### 6.6 Not yet locked
-We did not hard-lock:
-- exact VLM provider
-- exact classifier model family
-- exact anomaly implementation
-- full conformal prediction as MVP requirement
+### Round 1 package files
+- `manifest.csv`
+- `roi_annotations.csv`
+- `roi_ontology.csv`
+- `roi_label_normalization.csv`
+- `label_map.yaml`
+- `known_cases_seed.jsonl`
+- `images/`
 
-Those should be chosen later based on:
-- dataset quality
-- implementation speed
-- cost
-- local/dev constraints
+### Storage responsibilities
+Postgres stores:
+- incidents
+- triage audits
+- known-case index snapshots
 
-## 7. Data and storage stack details
-### 7.1 Locked
-- SQLite first
-- Postgres later if/when needed
+SQLite is retained only so older records can still render through replay/history normalization.
 
-### 7.2 Why SQLite first
-- very low ops overhead
-- good for local-first MVP
-- fast to set up
-- enough for early incident/session logging
+## 8. Local environment strategy
 
-### 7.3 Why Postgres later
-- better concurrency
-- stronger production readiness
-- cleaner team/shared usage at scale
-
-### 7.4 File storage
-Locked MVP approach:
-- save files to local filesystem
-- store file metadata/path in SQLite
-
-### 7.5 Knowledge base storage
-Locked MVP approach:
-- structured entries in JSON or YAML
-- stored as versioned repository assets
-- retrieval uses fault, tier, evidence keywords, symptoms
-
-## 8. Config and environment strategy
-### 8.1 Locked
+### Locked
 - `frontend/.env.local`
 - `backend/.env`
+- Docker Compose for local Postgres
 
-### 8.2 Recommended environment variables
+### Important variables
+
 #### Frontend
 - `NEXT_PUBLIC_API_BASE_URL`
-- any non-secret frontend-only flags
+- `API_BASE_URL`
 
 #### Backend
-- `APP_ENV`
 - `DATABASE_URL`
-- `UPLOAD_DIR`
-- `AI_MODE`
-- `ENABLE_CLASSIFIER`
-- `ENABLE_ANOMALY`
-- provider API keys
-- optional demo flags later
+- `LEGACY_SQLITE_PATH`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `OMNITRIAGE_EMBEDDING_PROVIDER`
+- `UPLOAD_ROOT`
 
-### 8.3 Rule
-Secrets stay backend-only.
+## 9. Deferred choices
 
-## 9. Development workflow stack
-### 9.1 Locked
-- separate frontend/backend processes
-- no Docker required for MVP
-- local-first development
+Not locked yet:
+- hosted cloud database target
+- object storage migration
+- long-term retrieval ranking strategy
+- richer OCR pipeline
+- manufacturer-manual grounding
 
-### 9.2 Local run model
-- frontend runs in one terminal
-- backend runs in another terminal
-- SQLite local
-- uploads local
-- env files local
+## 10. Final stack summary
 
-### 9.3 Deferred
-- Docker as a hard requirement
-- full cloud deployment
-- multi-service orchestration
-
-## 10. Guidance / retrieval stack
-### 10.1 Locked
-Curated KB + retrieval-backed templates
-
-### 10.2 Output model by tier
-- Tier 1: user action card
-- Tier 2: local SOP card
-- Tier 3: remote ops action pack
-- Tier 4: dispatch packet + annotated evidence highlight
-
-### 10.3 Why this stack was chosen
-Because it is:
-- safer than fully generative guidance
-- more adaptive than static text
-- less brittle than full manual-grounded RAG in MVP
-
-## 11. Deferred / later-stage stack decisions
-These are intentionally not locked for MVP:
-- Docker from day one
-- cloud object storage from day one
-- PostgreSQL from day one
-- hosted deployment as day-one requirement
-- full manufacturer-manual-grounded RAG
-- mandatory anomaly detection in v1
-- full conformal prediction in v1
-- microservices
-
-## 12. Final stack summary
-### 12.1 Locked stack
+### Current live stack
 - Frontend: Next.js + TypeScript
 - Backend: FastAPI + Python
-- AI: VLM/API-first now, classifier later
-- DB: SQLite first
-- Files: local filesystem
-- Guidance: structured KB + retrieval-backed templates
-- Dev: separate local processes, no Docker required for MVP
+- Dataset intelligence: Round 1 package loaders
+- Retrieval: embedding-backed known-case matching
+- AI assist: optional Gemini VLM
+- DB: Postgres + pgvector
+- Files: local filesystem uploads
+- Dev infra: Docker Compose for Postgres
 
-### 12.2 Philosophy
-The approved stack favors:
-- speed to MVP
-- safe fallback behavior
-- low infra overhead
-- clarity for judges
-- a clean path to later hardening and deployment
+### Philosophy
+The current stack favors:
+- a real package-backed runtime
+- deterministic routing
+- local reproducibility
+- judge/demo credibility
+- a cleaner path to future retrieval and OCR improvements

@@ -1,0 +1,80 @@
+issue_families:
+- no_power
+- tripping
+- charging_slow
+- not_responding
+- unknown_mixed
+resolver_tiers:
+- driver
+- local_site
+- remote_ops
+- technician
+hazard_levels:
+- low
+- medium
+- high
+fault_type_defaults:
+  Burnt Mark Issue:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - no_power
+    - tripping
+    default_hazard_level: high
+    default_resolver_tier: technician
+    evidence_type: hardware_photo
+  Cable termination - connection:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - tripping
+    - no_power
+    default_hazard_level: high
+    default_resolver_tier: technician
+    evidence_type: hardware_photo
+  Charger No Pulse:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - not_responding
+    default_hazard_level: medium
+    default_resolver_tier: remote_ops
+    evidence_type: symptom_heavy_photo
+  MCB Tripped:
+    default_issue_family: tripping
+    alternate_issue_families: []
+    default_hazard_level: medium
+    default_resolver_tier: local_site
+    evidence_type: hardware_photo
+  TNB Fuse Blow Issue:
+    default_issue_family: no_power
+    alternate_issue_families:
+    - unknown_mixed
+    default_hazard_level: high
+    default_resolver_tier: technician
+    evidence_type: hardware_photo
+  Tapping TNB Meter:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - no_power
+    default_hazard_level: high
+    default_resolver_tier: technician
+    evidence_type: hardware_photo
+  WC Apps Error Logs:
+    default_issue_family: not_responding
+    alternate_issue_families:
+    - unknown_mixed
+    default_hazard_level: medium
+    default_resolver_tier: remote_ops
+    evidence_type: screenshot
+  Charger Red Indicator:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - not_responding
+    default_hazard_level: low
+    default_resolver_tier: technician
+    evidence_type: photo
+  Isolator Issue:
+    default_issue_family: unknown_mixed
+    alternate_issue_families:
+    - no_power
+    default_hazard_level: low
+    default_resolver_tier: technician
+    evidence_type: photo

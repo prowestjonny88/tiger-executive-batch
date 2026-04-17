@@ -1,17 +1,16 @@
 # OmniTriage Setup Guide
 
 Implementation note:
-- the live app still follows the organizer decision tree for workflow closure and escalation
-- the diagnosis layer is now branch-based on top of that workflow:
-  - `hardware_visual_branch`
-  - `ocr_text_branch`
-  - `symptom_multimodal_branch`
-- current live triage outputs remain organizer-native:
-  - `issue_type`
-  - `basic_conditions`
-  - `workflow.outcome`
-  - `workflow.rationale`
-- branch/classifier/OCR details are additive metadata for audits, replay, and result transparency
+- the live app now follows the Round 1 hard-replacement runtime
+- the primary contract is taxonomy-first:
+  - `issue_family`
+  - `fault_type`
+  - `evidence_type`
+  - `hazard_level`
+  - `resolver_tier`
+- the active diagnosis path is package-backed retrieval plus optional Gemini VLM assist
+- the active primary store is Postgres + pgvector
+- old SQLite records are only used for replay/history compatibility
 
 ## Prerequisites
 
@@ -19,8 +18,8 @@ Implementation note:
 - Python 3.12
 - Node.js and npm
 - Git
-- Optional: Gemini API key for live VLM diagnosis / OCR assist
-- Optional but recommended for the hardware visual branch: internet access on first DINOv2 model load unless the model is already cached locally
+- Docker Desktop
+- Optional: Gemini API key for live VLM diagnosis and Gemini embedding provider
 
 ## 1. Clone and enter the repo
 
@@ -29,7 +28,21 @@ git clone https://github.com/prowestjonny88/tiger-executive-batch
 cd tiger-executive-batch
 ```
 
-## 2. Backend setup
+## 2. Start local Postgres + pgvector
+
+From the repo root:
+
+```powershell
+docker compose up -d omnitriage-postgres
+```
+
+Default local database target used by the backend:
+
+```env
+DATABASE_URL=postgresql://omnitriage:omnitriage@localhost:5432/omnitriage
+```
+
+## 3. Backend setup
 
 Create the virtual environment and install the backend package with dev dependencies:
 
@@ -39,21 +52,20 @@ cd backend
 .\.venv\Scripts\python.exe -m pip install -e .[dev]
 ```
 
-Optional Gemini config in `backend/.env`:
+Recommended `backend/.env`:
 
 ```env
+DATABASE_URL=postgresql://omnitriage:omnitriage@localhost:5432/omnitriage
+LEGACY_SQLITE_PATH=backend/omnitriage.sqlite3
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.0-flash
+OMNITRIAGE_EMBEDDING_PROVIDER=hash
 ```
 
-Optional branch/runtime config in `backend/.env`:
-
-```env
-OMNITRIAGE_CLASSIFIER_ENABLED=true
-OMNITRIAGE_OCR_ENABLED=true
-OMNITRIAGE_OCR_GEMINI_ASSIST=false
-OMNITRIAGE_DINO_MODEL_NAME=facebook/dinov2-base
-```
+Notes:
+- use `OMNITRIAGE_EMBEDDING_PROVIDER=hash` for deterministic local verification
+- switch to `gemini` only when you want the embedding provider to call Gemini
+- the Round 1 package is expected at `data/round1/`
 
 Run the backend:
 
@@ -66,12 +78,11 @@ Verify:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8001/api/v1/health
 .\.venv\Scripts\python.exe .\vlm_doctor.py
-.\.venv\Scripts\python.exe .\test_live_api.py
-.\.venv\Scripts\python.exe -m pytest -q backend/tests
+.\.venv\Scripts\python.exe -m pytest -q backend/tests/test_api.py backend/tests/test_triage.py backend/tests/test_gemini.py
 .\.venv\Scripts\pyright.exe -p .\pyrightconfig.json
 ```
 
-## 3. Frontend setup
+## 4. Frontend setup
 
 From the repo root:
 
@@ -80,7 +91,7 @@ cd frontend
 npm.cmd install
 ```
 
-To proxy to the live FastAPI backend, create `frontend/.env.local`:
+Create `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
@@ -102,40 +113,48 @@ Useful routes:
 - `http://localhost:3000/demo`
 - `http://localhost:3000/history`
 
-## 4. How to tell Gemini is working
+Important:
+- the frontend no longer synthesizes preview, triage, or upload results locally
+- `NEXT_PUBLIC_API_BASE_URL` or `API_BASE_URL` must point to a reachable backend for `/upload`, `/intake`, and `/result` flows to work
 
+## 5. How to tell Gemini is working
+
+Configuration checks:
 - `backend/.env` contains a valid `GEMINI_API_KEY`
 - `.\.venv\Scripts\python.exe .\vlm_doctor.py` reports successful client initialization
-- `.\.venv\Scripts\python.exe .\test_live_api.py` returns structured preview/triage results
-- Stored audit payloads contain a meaningful `diagnosis.raw_provider_output` instead of a Gemini failure fallback message
-- Stored audit payloads should also show:
-  - organizer-native fields such as `diagnosis.issue_type` and `workflow.outcome`
-  - additive branch metadata such as `diagnosis.branch_name` and `diagnosis.diagnosis_source`
 
-## 4.1 Round 1 runtime assets
+Runtime checks:
+- `diagnosis.diagnosis_source` should switch from retrieval-only fallback to a Gemini-assisted source when Gemini is actually used
+- `diagnosis.raw_provider_output` should contain structured VLM output instead of a Gemini failure message
+- `diagnosis.retrieval_metadata.provider_name` should show the active embedding provider path
 
-The repo now includes canonical Round 1 integration assets under:
+Practical note:
+- the repo defaults cleanly without Gemini
+- Gemini is assistive in the current runtime; it is not required for the app to function locally
 
-- `backend/app/services/diagnosis_assets/`
-- `backend/app/services/diagnosis_config/`
+## 6. Round 1 package expectations
 
-Still pending in the broader data-prep direction:
+The active package path is:
 
 - `data/round1/manifest.csv`
+- `data/round1/roi_annotations.csv`
+- `data/round1/roi_ontology.csv`
+- `data/round1/roi_label_normalization.csv`
 - `data/round1/label_map.yaml`
-- optional supporting docs such as `docs/round1_taxonomy.md`
+- `data/round1/known_cases_seed.jsonl`
+- `data/round1/images/*`
 
-## 5. Troubleshooting
+The root `round1_v1/` directory may still exist in the repo as the imported source snapshot, but runtime code should treat `data/round1/` as canonical.
 
-- Hydration errors about `<html>` under `<main>` mean a nested App Router layout is rendering document tags. Only `frontend/app/layout.tsx` should render `<html>` and `<body>`.
+## 7. Troubleshooting
+
+- If backend startup fails with Postgres connection errors, make sure Docker Desktop is running and `docker compose up -d omnitriage-postgres` has completed successfully.
+- If API tests fail immediately with database errors, check `DATABASE_URL` and confirm the Postgres container is healthy.
+- If the result/history UI still mentions `issue_type`, `basic_conditions`, or `resolved/escalate`, you are running stale frontend code.
 - If uploads do not render in the result page, confirm the backend is running and `frontend/.env.local` points to `http://127.0.0.1:8001`.
-- If Gemini is configured but triage still behaves heuristically, inspect the latest `triage_audits` payload and check whether `diagnosis.raw_provider_output` says Gemini failed and heuristic fallback was used.
-- If the hardware visual branch does not activate, inspect:
-  - `diagnosis.branch_name`
-  - `diagnosis.classifier_metadata`
-  - whether the first DINOv2 model download was blocked or failed
-- If the UI still mentions driver/local resolver/remote ops/technician as the primary decision model, you are likely running stale frontend code. The current flow should show organizer issue type, shared basic checks, `resolved` or `escalate`, plus additive branch details when available.
-- If docs appear to conflict, use this order:
+- If preview, triage, or upload returns `503`, the frontend cannot reach the live backend and will not fall back to a local synthetic engine.
+- If Gemini is configured but the app still behaves like retrieval-only fallback, inspect the latest triage payload for `diagnosis.raw_provider_output` and `diagnosis.diagnosis_source`.
+- If docs conflict, use this order:
   1. `docs/OmniTriage_Comprehensive_Execution_Plan.md`
   2. `docs/progress_tracker.md`
   3. `docs/prd_task_breakdown.md`

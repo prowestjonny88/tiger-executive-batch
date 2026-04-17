@@ -1,46 +1,62 @@
 [
   {
-    "snippet_id": "kb-no-power",
-    "issue_type": "no_power",
-    "keywords": ["power", "lights off", "breaker", "voltage"],
-    "title": "No power supply checks",
+    "snippet_id": "kb-no-power-driver",
+    "issue_family": "no_power",
+    "resolver_tier": "driver",
+    "keywords": ["power", "lights off", "breaker", "isolator"],
+    "title": "Driver no-power checks",
     "body": [
-      "Check the DB / MCB state before touching the charger.",
-      "Measure or confirm incoming voltage at the charger feed.",
-      "Restore the supply if the upstream issue is confirmed; otherwise escalate."
+      "Confirm the charger display and LED state are completely off.",
+      "Check whether the nearby isolator or upstream breaker has been switched off or tripped.",
+      "If power is not restored after the visible checks, escalate with a wider context photo."
     ]
   },
   {
-    "snippet_id": "kb-tripping-mcb-rccb",
-    "issue_type": "tripping_mcb_rccb",
-    "keywords": ["trip", "mcb", "rccb", "breaker", "overheat", "loose cable"],
-    "title": "Tripping protection checks",
+    "snippet_id": "kb-tripping-local-site",
+    "issue_family": "tripping",
+    "resolver_tier": "local_site",
+    "keywords": ["trip", "mcb", "rccb", "breaker"],
+    "title": "Local-site tripping response",
     "body": [
-      "Confirm the installed MCB / RCCB rating matches the charger load.",
-      "Inspect for overheating, looseness, or abnormal heating at cable and termination points.",
-      "Reduce current or replace the protection device only if the site SOP allows it; otherwise escalate."
+      "Inspect the breaker state and capture a proof photo before resetting anything.",
+      "Attempt one supervised reset only if site SOP allows it and no hazard is visible.",
+      "Escalate if the breaker trips again or if heat or damage is observed."
     ]
   },
   {
-    "snippet_id": "kb-charging-slow",
-    "issue_type": "charging_slow",
-    "keywords": ["slow", "low current", "vehicle limiting", "voltage drop"],
-    "title": "Charging slow checks",
+    "snippet_id": "kb-charging-slow-remote-ops",
+    "issue_family": "charging_slow",
+    "resolver_tier": "remote_ops",
+    "keywords": ["slow", "low current", "vehicle limitation"],
+    "title": "Remote ops charging-slow review",
     "body": [
-      "Review the configured current output setting.",
-      "Confirm whether the vehicle is limiting charge acceptance.",
-      "Check for voltage drop or supply limitations and advise the customer."
+      "Collect the configured current setting or screenshot showing the reduced output state.",
+      "Confirm whether the vehicle may be limiting acceptance or if the issue is charger-side.",
+      "Use the evidence to decide whether field dispatch is actually required."
     ]
   },
   {
-    "snippet_id": "kb-not-responding",
-    "issue_type": "not_responding",
-    "keywords": ["frozen", "not responding", "reset", "blank screen", "pcb"],
-    "title": "Not responding recovery steps",
+    "snippet_id": "kb-not-responding-remote-ops",
+    "issue_family": "not_responding",
+    "resolver_tier": "remote_ops",
+    "keywords": ["faulted", "screenshot", "error log", "frozen"],
+    "title": "Remote ops screenshot/error review",
     "body": [
-      "Perform a controlled power cycle of the charger.",
-      "Inspect the PCB / control path if the display or controls remain frozen.",
-      "Reset the system once; escalate if the charger still does not respond."
+      "Review the screenshot or error text against known app-log patterns.",
+      "Request a fresh screenshot or screen recording if the text is incomplete.",
+      "Escalate to technician only if the remote evidence indicates a hazardous or irrecoverable fault."
+    ]
+  },
+  {
+    "snippet_id": "kb-unknown-technician",
+    "issue_family": "unknown_mixed",
+    "resolver_tier": "technician",
+    "keywords": ["burn", "exposed", "ground", "illegal wiring"],
+    "title": "Hazardous unknown case handling",
+    "body": [
+      "Preserve the charger state and do not attempt additional resets or ad-hoc fixes.",
+      "Capture the required proof photo or measurement requested by triage.",
+      "Dispatch technician review with the hazard details and matched known-case context."
     ]
   }
 ]

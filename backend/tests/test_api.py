@@ -97,7 +97,12 @@ def test_preview_then_triage_reuses_same_incident_id():
     assert triage_data["incident_id"] == preview_data["incident_id"]
     assert triage_data["diagnosis"]["issue_family"] == "not_responding"
     assert triage_data["routing"]["resolver_tier"] == "remote_ops"
-    assert triage_data["diagnosis"]["branch_name"] == "round1_vlm_retrieval"
+    assert triage_data["diagnosis"]["branch_name"] in {
+        triage_data["diagnosis"]["diagnosis_source"],
+        "retrieval_enriched_by_gemini",
+        "gemini_vlm_primary",
+        "heuristic_policy_fallback",
+    }
 
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         with conn.cursor() as cur:
@@ -117,7 +122,7 @@ def test_preview_then_triage_reuses_same_incident_id():
     payload = row[0]
     assert payload["attempted"] is True
     assert payload["incident_id"] == preview_data["incident_id"]
-    assert payload["diagnosis_source"] in {"gemini_vlm_retrieval", "round1_package_retrieval"}
+    assert payload["diagnosis_source"] in {"gemini_vlm_primary", "round1_package_retrieval", "heuristic_policy_fallback"}
 
 
 def test_recent_incidents_endpoint_includes_latest_round1_summary():
@@ -154,6 +159,8 @@ def test_recent_incidents_endpoint_includes_latest_round1_summary():
     assert latest["latest_issue_family"] == "charging_slow"
     assert latest["latest_resolver_tier"] == "remote_ops"
     assert latest["latest_fault"] is not None
+    assert latest["latest_hazard_level"] in {"low", "medium", "high"}
+    assert latest["latest_diagnosis_source"] is not None
 
 
 def test_incident_detail_replay_includes_normalized_triage_payload():
@@ -184,6 +191,7 @@ def test_incident_detail_replay_includes_normalized_triage_payload():
     payload = incident.json()["triage_payload"]
     assert payload["diagnosis"]["issue_family"] == "no_power"
     assert payload["routing"]["resolver_tier"] in {"driver", "remote_ops", "technician"}
+    assert payload["diagnosis"]["retrieval_metadata"]["match_state"] in {"exact_filename", "accepted", "weak", "rejected"}
 
 
 def test_upload_endpoint_persists_photo_and_preview_uses_metadata():

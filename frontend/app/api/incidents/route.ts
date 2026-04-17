@@ -1,15 +1,8 @@
-import { NextResponse } from "next/server";
-
-const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+import { proxyBackendJson } from "../_lib/backend-proxy";
 
 export async function GET() {
-  if (backendUrl) {
-    const response = await fetch(`${backendUrl}/api/v1/incidents`, {
-      cache: "no-store",
-    });
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  }
-
-  return NextResponse.json([]);
+  return proxyBackendJson("/api/v1/incidents", {
+    missingBackendMessage: "Live backend is required for incident history.",
+    unavailableMessage: "Live backend is unavailable. Incident history requires the FastAPI service.",
+  });
 }
