@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import svgPaths from "../../imports/6SafeGuidance/svg-onv6w9xh1f";
 import { ImageWithFallback } from "../../components/figma/ImageWithFallback";
-import { formatIssueType, type ApiTriageResponse } from "../../lib/api";
+import { formatIssueType, formatResolverTier, type ApiTriageResponse } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
 
 const bgImage = "/demo.png";
@@ -44,7 +44,8 @@ export default function SafeGuidance() {
   const title = triage.artifact.title;
   const summary = triage.artifact.summary;
   const incidentId = triage.incident_id;
-  const issueTypeLabel = formatIssueType(triage.workflow.issue_type);
+  const issueTypeLabel = formatIssueType(triage.routing.issue_family);
+  const resolverLabel = formatResolverTier(triage.routing.resolver_tier);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-2xl mx-auto px-6 py-16">
@@ -61,7 +62,7 @@ export default function SafeGuidance() {
               </svg>
             </div>
             <h3 className="text-[10px] font-extrabold uppercase tracking-[0.2em] drop-shadow-sm text-green-800">
-              {issueTypeLabel} Branch SOP
+              {resolverLabel} Guidance
             </h3>
           </div>
         </div>
@@ -76,8 +77,8 @@ export default function SafeGuidance() {
           ) : null}
 
           <div className="w-full mb-6 px-5 py-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium">
-            <span className="font-extrabold uppercase tracking-widest text-[10px] block mb-1">Organizer Branch Ready</span>
-            Follow these steps in order. Close the case only if the branch checks resolve the issue safely.
+            <span className="font-extrabold uppercase tracking-widest text-[10px] block mb-1">Resolver Guidance Ready</span>
+            Follow these steps in order. The assigned resolver tier is {resolverLabel.toLowerCase()} for the {issueTypeLabel.toLowerCase()} case family.
           </div>
 
           <div className="flex flex-col gap-4 w-full mb-10">
@@ -117,15 +118,17 @@ export default function SafeGuidance() {
               Close Case and Report
             </button>
 
-            <a
-              href="/escalation"
-              className="text-slate-500 hover:text-slate-800 font-bold py-2 px-4 transition-colors flex items-center gap-2 text-sm border-b-2 border-transparent hover:border-slate-300"
-            >
-              Still not resolved? Escalate
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 9.33333 9.33333">
-                <path d={svgPaths.pce77c00} fill="currentColor" />
-              </svg>
-            </a>
+            {triage.routing.escalation_required ? (
+              <a
+                href="/escalation"
+                className="text-slate-500 hover:text-slate-800 font-bold py-2 px-4 transition-colors flex items-center gap-2 text-sm border-b-2 border-transparent hover:border-slate-300"
+              >
+                Need higher-tier review?
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 9.33333 9.33333">
+                  <path d={svgPaths.pce77c00} fill="currentColor" />
+                </svg>
+              </a>
+            ) : null}
           </div>
         </div>
       </div>

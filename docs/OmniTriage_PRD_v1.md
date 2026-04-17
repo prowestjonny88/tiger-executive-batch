@@ -1,20 +1,28 @@
 # OmniTriage PRD v1
 
 ## Implementation Status Note
-This PRD reflects an earlier resolver-tier-first design phase.
+This PRD reflects an earlier pre-replacement design phase.
 
-The current live implementation uses the organizer decision tree instead:
-- issue type: `no_power`, `tripping_mcb_rccb`, `charging_slow`, `not_responding`
-- shared checks: main power supply, cable condition, indicator/error code
-- final workflow outcome: `resolved` or `escalate`
+The current live implementation is now the Round 1 hard-replacement runtime:
+- taxonomy-first diagnosis contract
+- package-backed retrieval from `data/round1/`
+- Postgres + pgvector primary persistence
+- resolver-tier routing as the live decision backbone
+
+It is no longer centered on:
+- organizer-native `issue_type`
+- `basic_conditions`
+- `workflow.outcome = resolved|escalate`
+- active classifier-first runtime behavior
 
 For the current implementation truth, prefer:
+- `docs/OmniTriage_Comprehensive_Execution_Plan.md`
 - `README.md`
 - `docs/OmniTriage_Technical_Architecture.md`
 - `docs/progress_tracker.md`
 
 **Product:** OmniTriage  
-**Theme:** ESUM x RExharge Case Study Competition — Theme 2: EV Charger Troubleshooting  
+**Theme:** ESUM x RExharge Case Study Competition - Theme 2: EV Charger Troubleshooting  
 **Document Type:** Product Requirements Document  
 **Version:** v1.0  
 **Status:** Draft  
@@ -40,7 +48,7 @@ It does five core things:
 
 > **Photo + symptoms -> diagnosis -> confidence-aware triage -> safe next action**
 
-The PRD is designed around the current reality that the organizer’s Round 1 dataset has **not yet arrived**. Therefore, OmniTriage must work **before supervised data exists**, improve after **Round 1**, harden after **Round 2**, and stay safe under **late Round 3 data shifts**.
+This PRD was written before the organizer's Round 1 dataset integration landed. It remains useful as historical product intent, but it no longer describes the live runtime contract, retrieval layer, or persistence model.
 
 ---
 

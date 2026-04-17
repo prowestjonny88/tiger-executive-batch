@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { formatIssueType, type ApiTriageResponse } from "../../lib/api";
+import { formatIssueType, formatResolverTier, type ApiTriageResponse } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
 
 const mapImage = "/demo.png";
@@ -42,7 +42,8 @@ export default function Escalation() {
 
   const hazardFlags = triage.diagnosis.hazard_flags ?? [];
   const isHazard = hazardFlags.length > 0;
-  const issueTypeLabel = formatIssueType(triage.workflow.issue_type);
+  const issueTypeLabel = formatIssueType(triage.routing.issue_family);
+  const resolverLabel = formatResolverTier(triage.routing.resolver_tier);
   const accentClass = isHazard ? "text-red-600 bg-red-100 border-red-200" : "text-amber-700 bg-amber-100 border-amber-200";
   const alertClass = isHazard ? "border-red-600" : "border-amber-500";
 
@@ -51,7 +52,7 @@ export default function Escalation() {
       <Card className="w-full overflow-hidden shadow-xl border-slate-200 mb-6 relative z-10">
         <div className="bg-slate-50 border-b border-slate-200 p-6 px-8 flex justify-between items-center w-full">
           <Badge variant={isHazard ? "destructive" : "warning"} className="font-bold text-[10px] uppercase tracking-widest px-3 py-1 shadow-sm">
-            {isHazard ? "Hazard Escalation" : "Organizer Escalation"}
+            {isHazard ? "Hazard Escalation" : "Resolver Escalation"}
           </Badge>
           <div className="font-mono text-slate-700 text-sm font-semibold tracking-wider">
             {triage?.incident_id ? `INC-${triage.incident_id}` : "ESCALATED CASE"}
@@ -70,7 +71,7 @@ export default function Escalation() {
           </CardTitle>
 
           <CardDescription className="text-lg max-w-lg mx-auto mb-10 text-slate-600 leading-relaxed">
-            The {issueTypeLabel.toLowerCase()} branch cannot be closed safely. Continue with escalation and preserve the charger state for follow-up.
+            The {issueTypeLabel.toLowerCase()} case is currently routed to {resolverLabel.toLowerCase()}. Preserve the charger state and continue with the escalation path.
           </CardDescription>
         </CardHeader>
 
@@ -84,9 +85,9 @@ export default function Escalation() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
               <Card className="p-6 border-slate-200 shadow-sm bg-slate-50">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Escalation Action</h4>
-                <p className="text-slate-800 font-medium">{triage.workflow.next_action}</p>
-                {triage.workflow.fallback_action ? (
-                  <p className="text-slate-500 text-sm mt-3">Fallback: {triage.workflow.fallback_action}</p>
+                <p className="text-slate-800 font-medium">{triage.routing.recommended_next_step}</p>
+                {triage.routing.fallback_action ? (
+                  <p className="text-slate-500 text-sm mt-3">Fallback: {triage.routing.fallback_action}</p>
                 ) : null}
               </Card>
 
@@ -104,8 +105,8 @@ export default function Escalation() {
             </div>
 
             <Card className="p-6 border-slate-200 shadow-sm bg-slate-50">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Workflow Rationale</h4>
-              <p className="text-slate-800 font-medium">{triage.workflow.rationale}</p>
+              <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Routing Rationale</h4>
+              <p className="text-slate-800 font-medium">{triage.routing.routing_rationale}</p>
             </Card>
 
             {hazardFlags.length > 0 ? (
@@ -140,11 +141,11 @@ export default function Escalation() {
         <div className="flex items-center gap-3">
           <div className={`w-2.5 h-2.5 rounded-full animate-pulse shadow-sm ${isHazard ? "bg-red-600" : "bg-amber-500"}`}></div>
           <span className="font-mono text-xs font-semibold text-slate-600">
-            {isHazard ? "SAFETY ESCALATION ACTIVE" : "ORGANIZER ESCALATION ACTIVE"}
+            {isHazard ? "SAFETY ESCALATION ACTIVE" : "RESOLVER ESCALATION ACTIVE"}
           </span>
         </div>
         <Button variant="link" asChild className="text-slate-600 hover:text-slate-900 px-0 underline underline-offset-4 decoration-slate-300 hover:decoration-slate-800">
-          <Link href="/guidance">View Branch SOP</Link>
+          <Link href="/guidance">View Guidance</Link>
         </Button>
       </div>
     </div>

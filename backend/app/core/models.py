@@ -5,22 +5,16 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-IssueType = Literal["no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"]
-BasicCheckStatus = Literal["ok", "problem", "unknown"]
-WorkflowOutcome = Literal["resolved", "escalate"]
+IssueFamily = Literal["no_power", "tripping", "charging_slow", "not_responding", "unknown_mixed"]
+HazardLevel = Literal["low", "medium", "high"]
+ResolverTier = Literal["driver", "local_site", "remote_ops", "technician"]
+EvidenceType = Literal["hardware_photo", "screenshot", "symptom_report", "symptom_heavy_photo", "mixed_photo", "unknown"]
 
 
 class ConfidenceBand(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
-
-
-class SeverityLevel(str, Enum):
-    LOW = "low"
-    MODERATE = "moderate"
-    HIGH = "high"
-    CRITICAL = "critical"
 
 
 class PhotoEvidence(BaseModel):
@@ -45,12 +39,6 @@ class UploadedPhotoPayload(BaseModel):
     content_base64: str
 
 
-class SymptomAnswer(BaseModel):
-    question_id: str
-    prompt: str
-    answer: str
-
-
 class IncidentInput(BaseModel):
     incident_id: Optional[int] = None
     site_id: str
@@ -63,59 +51,73 @@ class IncidentInput(BaseModel):
     demo_scenario_id: Optional[str] = None
 
 
-class BasicConditionsAssessment(BaseModel):
-    main_power_supply: BasicCheckStatus = "unknown"
-    cable_condition: BasicCheckStatus = "unknown"
-    indicator_or_error_code: BasicCheckStatus = "unknown"
-    indicator_detail: Optional[str] = None
+class DatasetEvidencePoint(BaseModel):
+    label: str
+    role: str
+    notes: Optional[str] = None
 
 
-class ClassifierMetadata(BaseModel):
-    enabled: bool = False
-    used: bool = False
-    bypassed: bool = False
-    bypass_reason: Optional[str] = None
-    model_name: Optional[str] = None
-    predicted_label: Optional[str] = None
-    predicted_probability: Optional[float] = None
-    confidence_policy_action: Optional[str] = None
-    candidate_labels: List[str] = Field(default_factory=list)
-    extra: Dict[str, Any] = Field(default_factory=dict)
+class KnownCaseHit(BaseModel):
+    canonical_file_name: str
+    match_score: float = Field(ge=0.0, le=1.0)
+    fault_type: str
+    issue_family: IssueFamily
+    evidence_type: EvidenceType
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
+    recommended_next_step: str
+    required_proof_next: str
+    visual_observation: str
+    engineering_rationale: Optional[str] = None
+    match_reason: str
+    component_primary: Optional[str] = None
+    visible_abnormalities: List[str] = Field(default_factory=list)
+    retrieval_source: str = "package_seed"
 
 
-class OcrMetadata(BaseModel):
-    extracted_text: Optional[str] = None
-    matched_rule: Optional[str] = None
-    matched_keywords: List[str] = Field(default_factory=list)
+class RetrievalMetadata(BaseModel):
+    provider_name: str
+    provider_mode: str
+    query_text: str
+    image_embedding_used: bool = False
+    text_embedding_used: bool = False
+    candidate_count: int = 0
+    match_state: Literal["exact_filename", "accepted", "weak", "rejected"] = "rejected"
+    selected_case: Optional[str] = None
+    selected_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    rejection_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
-    issue_type: IssueType
+    issue_family: IssueFamily
+    fault_type: str
+    evidence_type: EvidenceType
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
     likely_fault: str
     evidence_summary: str
-    basic_conditions: BasicConditionsAssessment
+    required_proof_next: Optional[str] = None
     raw_ocr_text: Optional[str] = None
     confidence_score: float = Field(ge=0.0, le=1.0)
     confidence_band: ConfidenceBand
     unknown_flag: bool = False
-    severity: SeverityLevel
-    hazard_flags: List[str] = Field(default_factory=list)
+    requires_follow_up: bool = False
+    follow_up_prompts: List[Dict[str, str]] = Field(default_factory=list)
     diagnosis_source: str = "heuristic"
-    branch_name: str = "heuristic_fallback"
-    resolver_hint_final: Optional[str] = None
-    next_question_hint: Optional[str] = None
-    next_action_hint: Optional[str] = None
-    classifier_metadata: Optional[ClassifierMetadata] = None
-    ocr_metadata: Optional[OcrMetadata] = None
+    branch_name: str = "round1_live_path"
+    hazard_flags: List[str] = Field(default_factory=list)
+    known_case_hit: Optional[KnownCaseHit] = None
+    retrieval_metadata: Optional[RetrievalMetadata] = None
+    confidence_reasoning: Optional[str] = None
 
 
 class ConfidenceAssessment(BaseModel):
     score: float = Field(ge=0.0, le=1.0)
     band: ConfidenceBand
-    requires_confirmation: bool
-    safety_override: bool
+    requires_follow_up: bool
+    novelty_detected: bool
     rationale: str
 
 
@@ -129,17 +131,21 @@ class SiteCapabilityProfile(BaseModel):
     notes: Optional[str] = None
 
 
-class WorkflowDecision(BaseModel):
-    issue_type: IssueType
-    branch_actions: List[str]
-    outcome: WorkflowOutcome
-    rationale: str
-    next_action: str
+class RoutingDecision(BaseModel):
+    issue_family: IssueFamily
+    fault_type: str
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
+    routing_rationale: str
+    recommended_next_step: str
     fallback_action: str
+    required_proof_next: Optional[str] = None
+    escalation_required: bool = False
 
 
 class ActionArtifact(BaseModel):
-    issue_type: IssueType
+    issue_family: IssueFamily
+    resolver_tier: ResolverTier
     title: str
     summary: str
     steps: List[str]
@@ -149,7 +155,8 @@ class ActionArtifact(BaseModel):
 
 class KnowledgeSnippet(BaseModel):
     snippet_id: str
-    issue_type: IssueType
+    issue_family: IssueFamily
+    resolver_tier: Optional[ResolverTier] = None
     keywords: List[str]
     title: str
     body: List[str]
@@ -159,7 +166,7 @@ class TriageResult(BaseModel):
     incident: IncidentInput
     diagnosis: DiagnosisResult
     confidence: ConfidenceAssessment
-    workflow: WorkflowDecision
+    routing: RoutingDecision
     artifact: ActionArtifact
 
 
@@ -172,5 +179,5 @@ class DemoScenario(BaseModel):
     symptom_text: str
     error_code: str
     follow_up_answers: Dict[str, str]
-    expected_issue_type: IssueType
-    expected_outcome: WorkflowOutcome
+    expected_issue_family: IssueFamily
+    expected_resolver_tier: ResolverTier

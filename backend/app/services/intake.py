@@ -274,21 +274,33 @@ def build_follow_up_questions(
             pass  # Fall through to heuristic
 
     # Heuristic fallback
-    from app.services.diagnosis import infer_evidence_type, infer_issue_family, run_diagnosis
+    from app.services.diagnosis import run_diagnosis
 
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
-    evidence_type = infer_evidence_type(incident)
-    inferred_issue_family = infer_issue_family(incident)
     diagnosis = run_diagnosis(incident)
 
     if "required_proof_next" not in answered and diagnosis.required_proof_next:
         questions.append({"question_id": "required_proof_next", "prompt": diagnosis.required_proof_next})
-    if "photo_request" not in answered and (quality_status != "usable" or evidence_type in {"symptom_report", "unknown"}):
+    if (
+        "photo_request" not in answered
+        and diagnosis.requires_follow_up
+        and (quality_status != "usable" or diagnosis.evidence_type in {"symptom_report", "unknown"})
+    ):
         questions.append({"question_id": "photo_request", "prompt": FOLLOW_UP_QUESTION_BANK["photo_request"]})
-    if "power_context" not in answered and inferred_issue_family in {"no_power", "unknown_mixed"}:
+    if (
+        "power_context" not in answered
+        and diagnosis.requires_follow_up
+        and diagnosis.unknown_flag
+        and diagnosis.evidence_type in {"hardware_photo", "symptom_report", "symptom_heavy_photo", "screenshot", "unknown"}
+    ):
         questions.append({"question_id": "power_context", "prompt": FOLLOW_UP_QUESTION_BANK["power_context"]})
-    if "error_text" not in answered and evidence_type == "screenshot" and not incident.error_code:
+    if (
+        "error_text" not in answered
+        and diagnosis.requires_follow_up
+        and diagnosis.evidence_type == "screenshot"
+        and not incident.error_code
+    ):
         questions.append({"question_id": "error_text", "prompt": FOLLOW_UP_QUESTION_BANK["error_text"]})
 
     return questions[:4]

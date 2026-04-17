@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import svgPaths from "../../imports/8Confirmation/svg-sylya79o1n";
 import { clearSession, readSession } from "../../lib/triage-session";
-import { formatIssueType } from "../../lib/api";
+import { formatIssueType, formatResolverTier } from "../../lib/api";
 
 export default function Confirmation() {
   const router = useRouter();
@@ -17,8 +17,8 @@ export default function Confirmation() {
   useEffect(() => {
     const session = readSession();
     setIncidentId(session.triage?.incident_id);
-    setOutcome(session.triage?.workflow?.outcome);
-    setIssueType(session.triage?.diagnosis?.issue_type);
+    setOutcome(session.triage?.routing?.resolver_tier);
+    setIssueType(session.triage?.diagnosis?.issue_family);
     setFault(session.triage?.diagnosis?.likely_fault);
     setLoaded(true);
   }, []);
@@ -34,11 +34,7 @@ export default function Confirmation() {
   };
 
   const outcomeLabel =
-    outcome === "resolved"
-      ? "Case Closed and Reported"
-      : outcome === "escalate"
-        ? "Escalation Logged"
-        : "Triage Complete";
+    outcome ? `${formatResolverTier(outcome)} Route Logged` : "Triage Complete";
 
   if (!loaded) {
     return (
@@ -79,14 +75,14 @@ export default function Confirmation() {
 
         {issueType && (
           <p className="text-slate-500 text-sm font-medium mb-8">
-            Organizer branch: <span className="text-slate-800 font-bold">{formatIssueType(issueType)}</span>
+            Issue family: <span className="text-slate-800 font-bold">{formatIssueType(issueType)}</span>
           </p>
         )}
 
         <p className="text-slate-600 text-lg max-w-md mx-auto mb-14 leading-relaxed font-medium">
-          {outcome === "resolved"
-            ? "The branch SOP has been completed and the case can be reported as resolved."
-            : "The case has been logged for escalation. Preserve the current charger state until follow-up is complete."}
+          {outcome === "driver" || outcome === "local_site"
+            ? "The case has been routed with a lower resolver tier and is ready for guided follow-up."
+            : "The case has been logged for higher-tier review. Preserve the current charger state until follow-up is complete."}
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mb-16">

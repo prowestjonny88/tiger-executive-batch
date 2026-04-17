@@ -1,0 +1,49 @@
+PACKAGE_DIR: C:\Users\JON\Downloads\annotation_rebuild\data_package\round1
+manifest exists: True
+roi_annotations exists: True
+images dir exists: True
+
+=== COUNTS ===
+manifest rows: 32
+unique manifest files: 32
+roi rows: 107
+unique roi files: 32
+disk files: 32
+
+=== KEY CONSISTENCY CHECKS ===
+manifest files missing on disk: 0
+roi files missing on disk: 0
+manifest files missing in roi_annotations: 0
+roi files not present in manifest: 0
+
+=== DUPLICATE CHECKS ===
+duplicate manifest canonical_file_name: 0
+duplicate roi_id: 0
+
+=== REQUIRED FIELD CHECKS (MANIFEST) ===
+canonical_file_name: empty_or_missing=0
+issue_family: empty_or_missing=0
+fault_type: empty_or_missing=0
+hazard_level: empty_or_missing=0
+resolver_tier: empty_or_missing=0
+component_primary: empty_or_missing=0
+visual_observation: empty_or_missing=0
+engineering_rationale: empty_or_missing=1
+recommended_next_step: empty_or_missing=0
+required_proof_next: empty_or_missing=0
+
+=== IMAGE OPEN CHECK ===
+unreadable images: 0
+dimension mismatches: 0
+
+=== FINAL RESULT ===
+PACKAGE_SANITY_PASS = True
+missing_in_disk_from_manifest: 0 []
+missing_in_disk_from_roi: 0 []
+missing_in_roi_from_manifest: 0 []
+extra_in_roi: 0 []
+dup_manifest: 0
+dup_roi_id: 0
+Empty DataFrame
+Columns: [canonical_file_name, fault_type, issue_family, notes]
+Index: []

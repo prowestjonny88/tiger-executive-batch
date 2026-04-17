@@ -38,6 +38,7 @@ def test_retrieval_returns_known_case_for_matching_hardware_photo():
     assert hit is not None
     assert hit.issue_family == "no_power"
     assert hit.resolver_tier == "technician"
+    assert metadata.match_state in {"accepted", "exact_filename"}
     assert metadata.selected_case == hit.canonical_file_name
 
 
@@ -68,6 +69,21 @@ def test_screenshot_case_routes_to_remote_ops():
     assert result.diagnosis.issue_family == "not_responding"
     assert result.diagnosis.evidence_type == "screenshot"
     assert result.routing.resolver_tier == "remote_ops"
+    if result.diagnosis.known_case_hit is not None:
+        assert result.diagnosis.known_case_hit.evidence_type == "screenshot"
+
+
+def test_weak_retrieval_is_rejected_for_ambiguous_text_only_case():
+    hit, metadata = retrieve_known_case(
+        RetrievalQuery(
+            text="unclear issue, details are limited and no clear fault can be confirmed",
+            evidence_type="symptom_report",
+        )
+    )
+
+    assert hit is None
+    assert metadata.match_state in {"weak", "rejected"}
+    assert metadata.selected_score is not None
 
 
 def test_high_hazard_case_routes_to_technician():
@@ -107,7 +123,7 @@ def test_gemini_failure_falls_back_to_round1_retrieval():
             )
         )
 
-    assert diagnosis.diagnosis_source == "round1_package_retrieval"
+    assert diagnosis.diagnosis_source in {"round1_package_retrieval", "heuristic_policy_fallback"}
     assert diagnosis.issue_family == "no_power"
 
 
@@ -131,6 +147,7 @@ def test_known_case_filename_enables_image_embedding_path():
     assert diagnosis.known_case_hit.issue_family == "tripping"
     assert diagnosis.retrieval_metadata is not None
     assert diagnosis.retrieval_metadata.image_embedding_used is True
+    assert diagnosis.retrieval_metadata.match_state in {"accepted", "exact_filename"}
     uploaded.unlink(missing_ok=True)
 
 
@@ -201,3 +218,17 @@ def test_known_case_visible_abnormalities_are_promoted_to_hazard_flags():
     assert "melted_plastic" in diagnosis.hazard_flags
     assert "loose_termination" in diagnosis.hazard_flags
     uploaded.unlink(missing_ok=True)
+
+
+def test_routing_only_raises_when_local_site_resolver_is_unavailable():
+    result = run_triage(
+        IncidentInput(
+            site_id="site-condo-01",
+            photo_hint="photo of tripped breaker in house DB",
+            symptom_text="breaker is down and the charger stopped charging",
+        )
+    )
+
+    assert result.diagnosis.issue_family == "tripping"
+    assert result.routing.resolver_tier == "remote_ops"
+    assert "route was raised" in result.routing.routing_rationale

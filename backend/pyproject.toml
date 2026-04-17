@@ -13,12 +13,10 @@ dependencies = [
   "pydantic>=2.8.0",
   "google-genai>=1.0.0",
   "python-dotenv>=1.0.0",
-  "numpy>=1.26.0",
   "pillow>=10.0.0",
-  "scikit-learn==1.6.1",
-  "torch>=2.2.0",
-  "torchvision>=0.20.0",
-  "transformers>=4.40.0"
+  "psycopg[binary]>=3.2.0",
+  "pgvector>=0.3.6",
+  "pyyaml>=6.0.2"
 ]
 
 [project.optional-dependencies]
@@ -35,6 +33,3 @@ addopts = "-p no:cacheprovider"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
-
-[tool.setuptools.package-data]
-"app.services" = ["diagnosis_assets/*.json", "diagnosis_assets/*.csv", "diagnosis_assets/*.pkl", "diagnosis_config/*.json"]

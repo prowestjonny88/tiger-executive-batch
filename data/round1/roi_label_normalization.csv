@@ -1,0 +1,3 @@
+raw_category_name,label_role,qa_counts_as_component,qa_counts_as_evidence,normalized_comment
+faulty_isolator,legacy_fault,False,True,legacy diagnosis-like ROI label
+fuse_blow,legacy_fault,False,True,legacy diagnosis-like ROI label
