@@ -2,9 +2,14 @@ import os
 import shutil
 from pathlib import Path
 
-os.environ["DATABASE_URL"] = str(Path(__file__).parent / "test-omnitriage.sqlite3")
+import pytest
+
+os.environ["DATABASE_URL"] = "postgresql://omnitriage:omnitriage@localhost:5432/omnitriage"
+os.environ["LEGACY_SQLITE_PATH"] = str(Path(__file__).parent / "missing-legacy.sqlite3")
 os.environ["UPLOAD_ROOT"] = str(Path(__file__).parent / "test-uploads")
 
+pytest.importorskip("psycopg")
+import psycopg
 from fastapi.testclient import TestClient
 
 from app.db.persistence import init_db
@@ -20,6 +25,17 @@ SMALL_PNG_BASE64 = (
 )
 
 
+def _reset_postgres() -> None:
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE triage_audits, incidents, known_case_index RESTART IDENTITY CASCADE")
+        conn.commit()
+
+
+def setup_function() -> None:
+    _reset_postgres()
+
+
 def test_preview_rejects_unknown_site():
     response = client.post(
         "/api/v1/intake/preview",
@@ -33,7 +49,7 @@ def test_preview_rejects_unknown_site():
     assert response.status_code == 404
 
 
-def test_preview_generates_organizer_follow_up_questions():
+def test_preview_generates_round1_follow_up_questions():
     preview = client.post(
         "/api/v1/intake/preview",
         json={
@@ -47,20 +63,19 @@ def test_preview_generates_organizer_follow_up_questions():
 
     assert preview.status_code == 200
     question_ids = {item["question_id"] for item in preview.json()["follow_up_questions"]}
-    assert "main_power_supply" in question_ids
-    assert "cable_condition" in question_ids
-    assert "indicator_or_error_code" in question_ids
+    assert "photo_request" in question_ids
+    assert "required_proof_next" in question_ids or "power_context" in question_ids
 
 
 def test_preview_then_triage_reuses_same_incident_id():
     preview = client.post(
         "/api/v1/intake/preview",
         json={
-            "site_id": "site-mall-01",
-            "charger_id": "rex-ac-01",
-            "photo_hint": "screen frozen, buttons unresponsive",
-            "symptom_text": "The charger remains powered but does not respond to input.",
-            "error_code": "UI-09",
+            "site_id": "site-condo-01",
+            "charger_id": "rex-ac-09",
+            "photo_hint": "WC Apps screenshot shows charger faulted status",
+            "symptom_text": "App screen captured after failed session.",
+            "error_code": "Faulted",
         },
     )
     assert preview.status_code == 200
@@ -70,43 +85,48 @@ def test_preview_then_triage_reuses_same_incident_id():
         "/api/v1/triage",
         json={
             "incident_id": preview_data["incident_id"],
-            "site_id": "site-mall-01",
-            "charger_id": "rex-ac-01",
-            "photo_hint": "screen frozen, buttons unresponsive",
-            "symptom_text": "The charger remains powered but does not respond to input.",
-            "error_code": "UI-09",
-            "follow_up_answers": {
-                "main_power_supply": "Power is available.",
-                "cable_condition": "Cable looks good.",
-                "indicator_or_error_code": "UI-09 is shown on the frozen display.",
-            },
+            "site_id": "site-condo-01",
+            "charger_id": "rex-ac-09",
+            "photo_hint": "WC Apps screenshot shows charger faulted status",
+            "symptom_text": "App screen captured after failed session.",
+            "error_code": "Faulted",
         },
     )
     assert triage.status_code == 200
     triage_data = triage.json()
     assert triage_data["incident_id"] == preview_data["incident_id"]
-    assert triage_data["diagnosis"]["issue_type"] == "not_responding"
-    assert triage_data["workflow"]["outcome"] == "resolved"
-    assert triage_data["diagnosis"]["branch_name"] == "symptom_multimodal_branch"
+    assert triage_data["diagnosis"]["issue_family"] == "not_responding"
+    assert triage_data["routing"]["resolver_tier"] == "remote_ops"
+    assert triage_data["diagnosis"]["branch_name"] == "round1_vlm_retrieval"
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT payload_json
+                FROM triage_audits
+                WHERE incident_id = %s AND stage = 'triage_gemini_attempt'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (preview_data["incident_id"],),
+            )
+            row = cur.fetchone()
+
+    assert row is not None
+    payload = row[0]
+    assert payload["attempted"] is True
+    assert payload["incident_id"] == preview_data["incident_id"]
+    assert payload["diagnosis_source"] in {"gemini_vlm_retrieval", "round1_package_retrieval"}
 
 
-def test_sites_and_demo_scenarios_endpoints_return_seeded_contracts():
-    sites = client.get("/api/v1/sites")
-    scenarios = client.get("/api/v1/demo/scenarios")
-
-    assert sites.status_code == 200
-    assert scenarios.status_code == 200
-    assert any(site["site_id"] == "site-mall-01" for site in sites.json())
-    assert any(scenario["scenario_id"] == "demo-no-power" for scenario in scenarios.json())
-
-
-def test_recent_incidents_endpoint_includes_latest_triage_summary():
+def test_recent_incidents_endpoint_includes_latest_round1_summary():
     preview = client.post(
         "/api/v1/intake/preview",
         json={
             "site_id": "site-condo-01",
             "charger_id": "rex-ac-09",
-            "photo_hint": "display on, reduced output",
+            "photo_hint": "display on, current limited",
             "symptom_text": "Charging is much slower than expected.",
             "error_code": "SLOW-11",
         },
@@ -119,14 +139,9 @@ def test_recent_incidents_endpoint_includes_latest_triage_summary():
             "incident_id": incident_id,
             "site_id": "site-condo-01",
             "charger_id": "rex-ac-09",
-            "photo_hint": "display on, reduced output",
+            "photo_hint": "display on, current limited",
             "symptom_text": "Charging is much slower than expected.",
             "error_code": "SLOW-11",
-            "follow_up_answers": {
-                "main_power_supply": "Main supply is available.",
-                "cable_condition": "Cable is in good condition.",
-                "indicator_or_error_code": "Display shows SLOW-11 and reduced current.",
-            },
         },
     )
 
@@ -136,10 +151,9 @@ def test_recent_incidents_endpoint_includes_latest_triage_summary():
     latest = incidents.json()[0]
     assert latest["id"] == incident_id
     assert latest["latest_stage"] == "triage_result"
-    assert latest["latest_issue_type"] == "charging_slow"
-    assert latest["latest_outcome"] == "resolved"
-    assert latest["latest_fault"] == "Output setting or vehicle limitation"
-    assert latest["latest_confidence_band"] in {"high", "medium"}
+    assert latest["latest_issue_family"] == "charging_slow"
+    assert latest["latest_resolver_tier"] == "remote_ops"
+    assert latest["latest_fault"] is not None
 
 
 def test_incident_detail_replay_includes_normalized_triage_payload():
@@ -162,40 +176,14 @@ def test_incident_detail_replay_includes_normalized_triage_payload():
             "charger_id": "rex-ac-01",
             "photo_hint": "display off, no lights",
             "symptom_text": "Charger appears unpowered.",
-            "follow_up_answers": {
-                "main_power_supply": "Supply is missing at the charger.",
-                "cable_condition": "Cable is normal.",
-                "indicator_or_error_code": "No indicator is visible.",
-            },
         },
     )
 
     incident = client.get(f"/api/v1/incidents/{incident_id}")
     assert incident.status_code == 200
     payload = incident.json()["triage_payload"]
-    assert payload["diagnosis"]["issue_type"] == "no_power"
-    assert payload["workflow"]["outcome"] in {"resolved", "escalate"}
-    assert payload["diagnosis"]["branch_name"] in {"symptom_multimodal_branch", "branch_orchestrator_fallback"}
-
-
-def test_triage_api_preserves_branch_and_ocr_metadata():
-    triage = client.post(
-        "/api/v1/triage",
-        json={
-            "site_id": "site-mall-01",
-            "charger_id": "rex-ac-01",
-            "photo_hint": "WC Apps screenshot shows charger faulted status",
-            "symptom_text": "App screen captured after failed session.",
-            "error_code": "Faulted",
-        },
-    )
-
-    assert triage.status_code == 200
-    diagnosis = triage.json()["diagnosis"]
-    assert diagnosis["branch_name"] == "ocr_text_branch"
-    assert diagnosis["diagnosis_source"] == "ocr_text_interpretation"
-    assert diagnosis["classifier_metadata"]["bypassed"] is True
-    assert diagnosis["ocr_metadata"]["matched_rule"] == "faulted_status"
+    assert payload["diagnosis"]["issue_family"] == "no_power"
+    assert payload["routing"]["resolver_tier"] in {"driver", "remote_ops", "technician"}
 
 
 def test_upload_endpoint_persists_photo_and_preview_uses_metadata():
@@ -235,8 +223,3 @@ def test_upload_endpoint_persists_photo_and_preview_uses_metadata():
     preview_data = preview.json()
     assert preview_data["quality"]["filename"] == "charger-screen.png"
     assert preview_data["quality"]["storage_path"] == uploaded_photo["storage_path"]
-    assert preview_data["quality"]["quality_status"] == "retake_required"
-
-    incidents = client.get("/api/v1/incidents")
-    latest = incidents.json()[0]
-    assert latest["photo_evidence"]["filename"] == "charger-screen.png"

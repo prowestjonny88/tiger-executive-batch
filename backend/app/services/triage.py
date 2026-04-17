@@ -1,26 +1,34 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.core.data import load_sites, load_snippets
 from app.core.models import IncidentInput, TriageResult
 from app.services.confidence import assess_confidence
-from app.services.diagnosis import run_diagnosis
+from app.services.diagnosis import run_diagnosis_with_debug
 from app.services.guidance import build_artifact
 from app.services.routing import route_incident
 
 
 def run_triage(incident: IncidentInput) -> TriageResult:
+    result, _ = run_triage_with_debug(incident)
+    return result
+
+
+def run_triage_with_debug(incident: IncidentInput) -> tuple[TriageResult, dict[str, Any]]:
     sites = {site.site_id: site for site in load_sites()}
     site = sites[incident.site_id]
 
-    diagnosis = run_diagnosis(incident)
+    diagnosis, diagnosis_debug = run_diagnosis_with_debug(incident)
     confidence = assess_confidence(diagnosis)
-    workflow = route_incident(incident, diagnosis, confidence, site)
-    artifact = build_artifact(workflow, diagnosis, load_snippets())
+    routing = route_incident(incident, diagnosis, confidence, site)
+    artifact = build_artifact(routing, diagnosis, load_snippets())
 
-    return TriageResult(
+    result = TriageResult(
         incident=incident,
         diagnosis=diagnosis,
         confidence=confidence,
-        workflow=workflow,
+        routing=routing,
         artifact=artifact,
     )
+    return result, {"diagnosis_debug": diagnosis_debug}

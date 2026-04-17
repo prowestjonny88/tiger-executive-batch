@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+import json
+import logging
+import time
+import uuid
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
 from app.db.persistence import init_db, list_recent_incidents, save_audit, save_incident, update_incident
-from app.services.intake import UPLOAD_ROOT, assess_image_quality, build_follow_up_questions, store_uploaded_photo
-from app.services.triage import run_triage
+from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
+from app.services.triage import run_triage_with_debug
 
 app = FastAPI(title="OmniTriage API", version="0.1.0")
-app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT, check_dir=False), name="uploads")
+app.mount("/uploads", StaticFiles(directory=get_upload_root(), check_dir=False), name="uploads")
+request_logger = logging.getLogger("omnitriage.request")
 
 
 def _validated_site_ids() -> set[str]:
@@ -29,6 +35,46 @@ def _persist_incident(incident: IncidentInput) -> int:
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+        request_logger.exception(
+            json.dumps(
+                {
+                    "event": "request_failed",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "client": request.client.host if request.client else None,
+                    "duration_ms": duration_ms,
+                }
+            )
+        )
+        raise
+
+    duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+    response.headers["X-Request-ID"] = request_id
+    request_logger.info(
+        json.dumps(
+            {
+                "event": "request_completed",
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "client": request.client.host if request.client else None,
+                "duration_ms": duration_ms,
+            }
+        )
+    )
+    return response
 
 
 @app.get("/api/v1/health")
@@ -94,6 +140,12 @@ def triage(incident: IncidentInput):
         raise HTTPException(status_code=404, detail="Unknown site_id")
 
     incident_id = _persist_incident(incident)
-    result = run_triage(incident)
+    incident.incident_id = incident_id
+    result, debug = run_triage_with_debug(incident)
+    diagnosis_debug = {
+        **debug["diagnosis_debug"],
+        "incident_id": incident_id,
+    }
+    save_audit("triage_gemini_attempt", diagnosis_debug, incident_id)
     save_audit("triage_result", result.model_dump(), incident_id)
     return {"incident_id": incident_id, **result.model_dump()}
