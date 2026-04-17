@@ -92,7 +92,12 @@ def _follow_up_prompts(issue_family: str, evidence_type: EvidenceType, known_cas
     return prompts[:3]
 
 
-def _hazard_flags(hazard_level: HazardLevel, incident: IncidentInput, known_case_fault: str | None) -> list[str]:
+def _hazard_flags(
+    hazard_level: HazardLevel,
+    incident: IncidentInput,
+    known_case_fault: str | None,
+    known_case_abnormalities: list[str] | None = None,
+) -> list[str]:
     flags: list[str] = []
     if hazard_level == "high":
         flags.append("high_hazard")
@@ -101,7 +106,14 @@ def _hazard_flags(hazard_level: HazardLevel, incident: IncidentInput, known_case
         flags.append("visible_hazard")
     if known_case_fault and "ground" in known_case_fault:
         flags.append("grounding_risk")
+    if known_case_abnormalities:
+        flags.extend(item.strip() for item in known_case_abnormalities if item.strip())
     return sorted(set(flags))
+
+
+def _has_explicit_visual_hazard(incident: IncidentInput) -> bool:
+    text = build_incident_text(incident).lower()
+    return any(token in text for token in ["burn", "melt", "exposed", "illegal wiring", "shock", "smell"])
 
 
 def _confidence_band(score: float) -> ConfidenceBand:
@@ -189,7 +201,12 @@ def run_diagnosis_with_debug(
     query_text = build_incident_text(incident)
     image_filename = incident.photo_evidence.filename if incident.photo_evidence else None
     known_case_hit, retrieval_metadata = retrieve_known_case(
-        RetrievalQuery(text=query_text or incident.site_id, evidence_type=evidence_type, image_filename=image_filename)
+        RetrievalQuery(
+            text=query_text or incident.site_id,
+            evidence_type=evidence_type,
+            image_filename=image_filename,
+            image_storage_path=incident.photo_evidence.storage_path if incident.photo_evidence else None,
+        )
     )
     inferred_issue_family = infer_issue_family(incident)
 
@@ -221,8 +238,12 @@ def run_diagnosis_with_debug(
     required_proof_next = (vlm_payload or {}).get("required_proof_next") or (known_case_hit.required_proof_next if known_case_hit else None)
 
     match_score = known_case_hit.match_score if known_case_hit else 0.35
-    if known_case_hit and known_case_hit.issue_family == "unknown_mixed" and inferred_issue_family != "unknown_mixed" and match_score < 0.75:
+    if known_case_hit and known_case_hit.issue_family == "unknown_mixed" and inferred_issue_family != "unknown_mixed" and (
+        evidence_type in {"symptom_report", "hardware_photo", "symptom_heavy_photo"} or match_score < 0.9
+    ):
         issue_family = inferred_issue_family
+        if hazard_level != "high":
+            resolver_tier = _fallback_resolver(issue_family, hazard_level)
     if (
         known_case_hit
         and evidence_type == "symptom_report"
@@ -239,6 +260,9 @@ def run_diagnosis_with_debug(
         known_case_hit = None
         hazard_level = "medium"
         score = min(score, 0.48)
+    if _has_explicit_visual_hazard(incident):
+        hazard_level = "high"
+        score = max(score, 0.78)
     if issue_family == "unknown_mixed":
         score = min(score, 0.58)
     if evidence_type == "screenshot" and extract_raw_ocr_text(incident):
@@ -247,12 +271,19 @@ def run_diagnosis_with_debug(
     unknown_flag = issue_family == "unknown_mixed" or score < 0.55
     requires_follow_up = unknown_flag or not required_proof_next
 
-    hazard_flags = _hazard_flags(hazard_level, incident, known_case_hit.fault_type if known_case_hit else fault_type)
+    hazard_flags = _hazard_flags(
+        hazard_level,
+        incident,
+        known_case_hit.fault_type if known_case_hit else fault_type,
+        known_case_hit.visible_abnormalities if known_case_hit else None,
+    )
 
     if issue_family == "unknown_mixed" and hazard_level != "high":
         resolver_tier = "remote_ops"
     elif hazard_level == "high":
         resolver_tier = "technician"
+
+    branch_name = "gemini_vlm_retrieval" if vlm_payload else "round1_package_retrieval"
 
     diagnosis = DiagnosisResult(
         raw_provider_output=raw_provider_output,
@@ -271,7 +302,7 @@ def run_diagnosis_with_debug(
         requires_follow_up=requires_follow_up,
         follow_up_prompts=_follow_up_prompts(issue_family, evidence_type, required_proof_next),
         diagnosis_source=diagnosis_source,
-        branch_name="round1_vlm_retrieval",
+        branch_name=branch_name,
         hazard_flags=hazard_flags,
         known_case_hit=known_case_hit,
         retrieval_metadata=retrieval_metadata,
