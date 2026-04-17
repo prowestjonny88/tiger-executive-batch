@@ -11,8 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import {
   ApiTriageResponse,
   fetchIncidentById,
-  formatBasicCheckStatus,
+  formatHazardLevel,
   formatIssueType,
+  formatResolverTier,
   resolveEvidenceUrl,
 } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
@@ -26,21 +27,20 @@ type OutcomeInfo = {
 };
 
 function outcomeInfo(triage: ApiTriageResponse): OutcomeInfo {
-  const outcome = triage.workflow.outcome;
-  if (outcome === "resolved") {
+  if (!triage.routing.escalation_required) {
     return {
-      label: "Branch Guidance Ready",
+      label: "Guidance Ready",
       color: "success",
-      description: "The organizer decision tree has enough information to continue with branch SOP guidance.",
+      description: "The routing engine identified a safe resolver tier and the next proof or action to collect.",
       nextHref: "/guidance",
-      nextLabel: "View Branch SOP",
+      nextLabel: "View Guidance",
     };
   }
 
   return {
     label: "Escalation Required",
-    color: triage.diagnosis.hazard_flags.length > 0 ? "destructive" : "warning",
-    description: "The organizer decision tree cannot close this case safely and requires escalation.",
+    color: triage.diagnosis.hazard_level === "high" ? "destructive" : "warning",
+    description: "A higher resolver tier is required before this case can proceed safely.",
     nextHref: "/escalation",
     nextLabel: "View Escalation Details",
   };
@@ -52,6 +52,21 @@ function confidenceBandClass(band: ApiTriageResponse["diagnosis"]["confidence_ba
     : band === "medium"
       ? "bg-amber-100 text-amber-800 border-amber-200"
       : "bg-slate-100 text-slate-700 border-slate-200";
+}
+
+function formatDiagnosisMethod(method?: string | null) {
+  if (!method) return "Unavailable";
+  return method
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function formatFlagLabel(value: string) {
+  return value
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }
 
 export default function ResultAssessmentPage() {
@@ -151,8 +166,6 @@ function ResultAssessment() {
   const info = outcomeInfo(triage);
   const isHazard = triage.diagnosis.hazard_flags.length > 0;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence?.storage_path);
-  const checks = triage.diagnosis.basic_conditions;
-
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16">
       <Card className="w-full overflow-hidden shadow-xl border-slate-200 mb-8 relative z-10 pt-4">
@@ -188,7 +201,7 @@ function ResultAssessment() {
           <CardTitle className="text-3xl font-extrabold mb-3 tracking-tight leading-snug">
             {triage.diagnosis.likely_fault}
           </CardTitle>
-          <p className="text-slate-500 text-base mb-2">{formatIssueType(triage.diagnosis.issue_type)}</p>
+          <p className="text-slate-500 text-base mb-2">{formatIssueType(triage.diagnosis.issue_family)}</p>
         </CardHeader>
 
         <CardContent className="px-10 md:px-14 pb-6 flex flex-col items-center">
@@ -257,43 +270,55 @@ function ResultAssessment() {
               <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
                 Next Action
               </h4>
-              <p className="font-bold text-slate-900 text-base">{triage.workflow.next_action}</p>
+              <p className="font-bold text-slate-900 text-base">{triage.routing.recommended_next_step}</p>
             </div>
 
             <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
               <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                Workflow Rationale
+                Routing Rationale
               </h4>
-              <p className="text-slate-700 text-sm leading-relaxed">{triage.workflow.rationale}</p>
+              <p className="text-slate-700 text-sm leading-relaxed">{triage.routing.routing_rationale}</p>
             </div>
 
-            {triage.diagnosis.branch_name ? (
+            {triage.diagnosis.diagnosis_source || triage.diagnosis.branch_name ? (
               <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
                 <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                  Diagnosis Branch
+                  Diagnosis Method
                 </h4>
-                <p className="font-bold text-slate-900 text-base">{triage.diagnosis.branch_name}</p>
-                {triage.diagnosis.diagnosis_source ? (
-                  <p className="text-slate-600 text-sm mt-1">Source: {triage.diagnosis.diagnosis_source}</p>
+                <p className="font-bold text-slate-900 text-base">
+                  {formatDiagnosisMethod(triage.diagnosis.diagnosis_source || triage.diagnosis.branch_name)}
+                </p>
+                {triage.diagnosis.branch_name && triage.diagnosis.branch_name !== triage.diagnosis.diagnosis_source ? (
+                  <p className="text-slate-600 text-sm mt-1">
+                    Execution path: {formatDiagnosisMethod(triage.diagnosis.branch_name)}
+                  </p>
                 ) : null}
               </div>
             ) : null}
 
-            {triage.diagnosis.classifier_metadata?.used || triage.diagnosis.ocr_metadata?.matched_rule ? (
+            {triage.diagnosis.known_case_hit || triage.diagnosis.retrieval_metadata ? (
               <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
                 <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                  Branch Detail
+                  Retrieval Detail
                 </h4>
-                {triage.diagnosis.classifier_metadata?.used ? (
-                  <p className="text-slate-700 text-sm leading-relaxed">
-                    Visual label: {triage.diagnosis.classifier_metadata.predicted_label} (
-                    {Math.round((triage.diagnosis.classifier_metadata.predicted_probability ?? 0) * 100)}%) | Policy:{" "}
-                    {triage.diagnosis.classifier_metadata.confidence_policy_action}
-                  </p>
+                {triage.diagnosis.known_case_hit ? (
+                  <div className="space-y-2">
+                    <p className="text-slate-700 text-sm leading-relaxed">
+                      Known case: {triage.diagnosis.known_case_hit.canonical_file_name} (
+                      {Math.round(triage.diagnosis.known_case_hit.match_score * 100)}%) | Match:{" "}
+                      {triage.diagnosis.known_case_hit.match_reason}
+                    </p>
+                    {triage.diagnosis.known_case_hit.visible_abnormalities.length > 0 ? (
+                      <p className="text-slate-700 text-sm leading-relaxed">
+                        Visible abnormalities:{" "}
+                        {triage.diagnosis.known_case_hit.visible_abnormalities.map(formatFlagLabel).join(" | ")}
+                      </p>
+                    ) : null}
+                  </div>
                 ) : null}
-                {triage.diagnosis.ocr_metadata?.matched_rule ? (
+                {triage.diagnosis.retrieval_metadata ? (
                   <p className="text-slate-700 text-sm leading-relaxed">
-                    OCR rule: {triage.diagnosis.ocr_metadata.matched_rule}
+                    Provider: {triage.diagnosis.retrieval_metadata.provider_name} ({triage.diagnosis.retrieval_metadata.provider_mode})
                   </p>
                 ) : null}
               </div>
@@ -302,19 +327,27 @@ function ResultAssessment() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Main Power Supply</h4>
-              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.main_power_supply)}</p>
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Issue Family</h4>
+              <p className="font-bold text-slate-900">{formatIssueType(triage.diagnosis.issue_family)}</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Cable Condition</h4>
-              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.cable_condition)}</p>
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Hazard Level</h4>
+              <p className="font-bold text-slate-900">{formatHazardLevel(triage.diagnosis.hazard_level)}</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Indicator / Error Code</h4>
-              <p className="font-bold text-slate-900">{formatBasicCheckStatus(checks.indicator_or_error_code)}</p>
-              {checks.indicator_detail ? <p className="text-slate-500 text-sm mt-1">{checks.indicator_detail}</p> : null}
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">Resolver Tier</h4>
+              <p className="font-bold text-slate-900">{formatResolverTier(triage.routing.resolver_tier)}</p>
             </div>
           </div>
+
+          {triage.routing.required_proof_next ? (
+            <div className="w-full mb-8 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <strong className="text-amber-800 text-sm uppercase tracking-widest font-extrabold block mb-1">
+                Required Proof Next
+              </strong>
+              <p className="text-amber-700 font-medium">{triage.routing.required_proof_next}</p>
+            </div>
+          ) : null}
 
           {isHazard ? (
             <div className="w-full mb-8 px-5 py-4 bg-red-50 border border-red-300 rounded-xl flex items-start gap-4">
@@ -325,7 +358,9 @@ function ResultAssessment() {
                 <strong className="text-red-800 text-sm uppercase tracking-widest font-extrabold block mb-1">
                   Hazard Flags
                 </strong>
-                <p className="text-red-700 font-medium">{triage.diagnosis.hazard_flags.join(" | ")}</p>
+                <p className="text-red-700 font-medium">
+                  {triage.diagnosis.hazard_flags.map(formatFlagLabel).join(" | ")}
+                </p>
               </div>
             </div>
           ) : null}
@@ -367,7 +402,7 @@ function ResultAssessment() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 15 15">
             <path d={svgPaths.p15221b80} fill="currentColor" />
           </svg>
-          Organizer tree applied
+          Routing assessment logged
         </div>
         <div className="w-px h-4 bg-slate-300"></div>
         <div className="flex items-center gap-2">

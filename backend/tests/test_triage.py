@@ -1,121 +1,62 @@
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
 from unittest.mock import patch
 
+from app.core.data import load_round1_manifest, round1_images_dir
 from app.core.models import IncidentInput, StoredPhotoEvidence
-from app.core.models import SeverityLevel
 from app.services.diagnosis import run_diagnosis
-from app.services.diagnosis_contracts import DiagnosisProviderResponse
-from app.services.diagnosis_support import make_basic_conditions
+from app.services.known_case_retrieval import RetrievalQuery, retrieve_known_case
 from app.services.triage import run_triage
 
 
-def test_no_power_branch_returns_resolved_workflow():
+def _copied_round1_image(filename: str, target_name: str) -> Path:
+    source = round1_images_dir() / filename
+    uploaded = Path(__file__).parent / "test-uploads" / "incidents" / target_name
+    uploaded.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, uploaded)
+    return uploaded
+
+
+def test_round1_manifest_is_available():
+    manifest = load_round1_manifest()
+    assert len(manifest) >= 32
+    assert all(item["canonical_file_name"] for item in manifest)
+
+
+def test_retrieval_returns_known_case_for_matching_hardware_photo():
+    hit, metadata = retrieve_known_case(
+        RetrievalQuery(
+            text="burn marks and melted plastic at isolator terminal",
+            evidence_type="hardware_photo",
+            image_filename="Burnt Mark Issue (1).jpg",
+        )
+    )
+
+    assert hit is not None
+    assert hit.issue_family == "no_power"
+    assert hit.resolver_tier == "technician"
+    assert metadata.selected_case == hit.canonical_file_name
+
+
+def test_no_power_case_routes_to_driver_when_non_hazardous():
     result = run_triage(
         IncidentInput(
             site_id="site-mall-01",
-            photo_hint="display off, no lights",
-            symptom_text="The charger has no power and the bay appears dead.",
-            follow_up_answers={
-                "main_power_supply": "Incoming supply is missing.",
-                "cable_condition": "Cable looks normal.",
-                "indicator_or_error_code": "No indicator is visible.",
-            },
+            photo_hint="display off, no lights, isolator may be off",
+            symptom_text="charger no pulse and no power at the bay",
         )
     )
-    assert result.diagnosis.issue_type == "no_power"
-    assert result.workflow.outcome == "resolved"
+
+    assert result.diagnosis.issue_family == "no_power"
+    assert result.routing.resolver_tier == "driver"
+    assert result.routing.escalation_required is False
 
 
-def test_tripping_branch_escalates_when_cable_condition_is_problem():
+def test_screenshot_case_routes_to_remote_ops():
     result = run_triage(
-        IncidentInput(
-            site_id="site-mall-01",
-            photo_hint="breaker trip with warm connector",
-            symptom_text="The MCB trips during charging and the connector feels hot.",
-            error_code="TRIP-02",
-            follow_up_answers={
-                "main_power_supply": "Power is available.",
-                "cable_condition": "Loose connector and overheating observed.",
-                "indicator_or_error_code": "TRIP-02 shown before trip.",
-            },
-        )
-    )
-    assert result.diagnosis.issue_type == "tripping_mcb_rccb"
-    assert result.workflow.outcome == "escalate"
-
-
-def test_charging_slow_branch_returns_resolved_workflow():
-    result = run_triage(
-        IncidentInput(
-            site_id="site-condo-01",
-            photo_hint="display on, reduced output",
-            symptom_text="Charging is much slower than usual for the same vehicle.",
-            error_code="SLOW-11",
-            follow_up_answers={
-                "main_power_supply": "Main supply is available.",
-                "cable_condition": "Cable and connector are good.",
-                "indicator_or_error_code": "Display shows reduced current and SLOW-11.",
-            },
-        )
-    )
-    assert result.diagnosis.issue_type == "charging_slow"
-    assert result.workflow.outcome == "resolved"
-
-
-def test_not_responding_branch_returns_resolved_workflow_when_power_is_stable():
-    result = run_triage(
-        IncidentInput(
-            site_id="site-condo-01",
-            photo_hint="screen frozen, buttons unresponsive",
-            symptom_text="The charger remains powered but the controls do not respond.",
-            error_code="UI-09",
-            follow_up_answers={
-                "main_power_supply": "Main power is available.",
-                "cable_condition": "Cable and connector are normal.",
-                "indicator_or_error_code": "Screen is frozen on UI-09.",
-            },
-        )
-    )
-    assert result.diagnosis.issue_type == "not_responding"
-    assert result.workflow.outcome == "resolved"
-
-
-def test_unknown_basic_checks_force_escalation():
-    result = run_triage(
-        IncidentInput(
-            site_id="site-condo-01",
-            photo_hint="unclear image",
-            symptom_text="Charger issue reported but observations are incomplete.",
-        )
-    )
-    assert result.workflow.outcome == "escalate"
-
-
-def test_visible_hazard_forces_escalation():
-    result = run_triage(
-        IncidentInput(
-            site_id="site-mall-01",
-            photo_hint="burn marks and exposed cable damage",
-            symptom_text="There is a burnt smell near the connector.",
-            error_code="SAFE-99",
-        )
-    )
-    assert result.workflow.outcome == "escalate"
-    assert "visible_hazard" in result.diagnosis.hazard_flags
-
-
-def test_vlm_failure_falls_back_to_organizer_heuristic_classification():
-    diagnosis = run_diagnosis(
-        IncidentInput(
-            site_id="site-condo-01",
-            photo_hint="display on, reduced output",
-            symptom_text="Charging is very slow today.",
-        )
-    )
-    assert diagnosis.issue_type == "charging_slow"
-
-
-def test_ocr_branch_selected_for_screenshot_text_cases():
-    diagnosis = run_diagnosis(
         IncidentInput(
             site_id="site-condo-01",
             photo_hint="WC Apps screenshot shows charger faulted status",
@@ -123,133 +64,140 @@ def test_ocr_branch_selected_for_screenshot_text_cases():
             error_code="Faulted",
         )
     )
-    assert diagnosis.branch_name == "ocr_text_branch"
-    assert diagnosis.diagnosis_source == "ocr_text_interpretation"
-    assert diagnosis.ocr_metadata is not None
-    assert diagnosis.ocr_metadata.matched_rule == "faulted_status"
+
+    assert result.diagnosis.issue_family == "not_responding"
+    assert result.diagnosis.evidence_type == "screenshot"
+    assert result.routing.resolver_tier == "remote_ops"
 
 
-def test_ocr_branch_selected_for_app_screenshot_image_even_without_text_hints():
-    with patch("app.services.diagnosis_support._looks_like_mobile_app_screenshot", return_value=True):
-        diagnosis = run_diagnosis(
-            IncidentInput(
-                site_id="site-condo-01",
-                photo_evidence=StoredPhotoEvidence(
-                    filename="568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
-                    media_type="image/jpeg",
-                    storage_path="uploads/incidents/568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
-                    byte_size=45678,
-                ),
-                photo_hint="Photo: 568a3aff-4595-4e3d-ae36-57b8ca10d5ea.jpg",
-                symptom_text="",
-                error_code="",
-            )
+def test_high_hazard_case_routes_to_technician():
+    result = run_triage(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="burn marks and exposed conductor near isolator",
+            symptom_text="Burnt smell and melted plastic visible.",
         )
+    )
 
-    assert diagnosis.branch_name == "ocr_text_branch"
-    assert diagnosis.diagnosis_source == "ocr_text_interpretation"
-    assert diagnosis.classifier_metadata is not None
-    assert diagnosis.classifier_metadata.bypassed is True
+    assert result.diagnosis.hazard_level == "high"
+    assert result.routing.resolver_tier == "technician"
+    assert "visible_hazard" in result.diagnosis.hazard_flags
 
 
-def test_symptom_branch_selected_for_no_pulse_cases():
-    diagnosis = run_diagnosis(
+def test_unknown_mixed_non_hazard_defaults_to_remote_ops():
+    result = run_triage(
         IncidentInput(
             site_id="site-condo-01",
-            symptom_text="Charger no pulse and charging never started.",
-            follow_up_answers={
-                "main_power_supply": "Power is available.",
-                "indicator_or_error_code": "No visible error code.",
-            },
+            photo_hint="unclear image of charger area",
+            symptom_text="Customer reported issue but no clear evidence yet.",
         )
     )
-    assert diagnosis.branch_name == "symptom_multimodal_branch"
-    assert diagnosis.issue_type == "not_responding"
-    assert diagnosis.classifier_metadata is not None
-    assert diagnosis.classifier_metadata.bypassed is True
+
+    assert result.diagnosis.issue_family == "unknown_mixed"
+    assert result.routing.resolver_tier == "remote_ops"
 
 
-def test_hardware_visual_branch_selected_for_in_scope_hardware_photos():
-    response = DiagnosisProviderResponse(
-        provider_summary="Mock hardware classifier response.",
-        issue_type="tripping_mcb_rccb",
-        likely_fault="MCB trip or upstream protective device issue",
-        confidence_score=0.97,
-        raw_ocr_text="",
-        severity=SeverityLevel.HIGH,
-        basic_conditions=make_basic_conditions(
-            main_power_supply="ok",
-            cable_condition="problem",
-            indicator_or_error_code="ok",
-        ),
-        branch_name="hardware_visual_branch",
-        diagnosis_source="hardware_visual_classifier",
-        classifier_metadata={
-            "enabled": True,
-            "used": True,
-            "bypassed": False,
-            "model_name": "facebook/dinov2-small",
-            "predicted_label": "mcb_tripped",
-            "predicted_probability": 0.97,
-            "confidence_policy_action": "strong_fault_hint",
-            "candidate_labels": ["mcb_tripped"],
-            "extra": {},
-        },
-    )
-
-    with patch("app.services.diagnosis.analyze_hardware_visual_branch", return_value=response):
+def test_gemini_failure_falls_back_to_round1_retrieval():
+    with patch("app.services.diagnosis.get_gemini_client", return_value=None):
         diagnosis = run_diagnosis(
             IncidentInput(
                 site_id="site-mall-01",
-                photo_evidence=StoredPhotoEvidence(
-                    filename="charger.jpg",
-                    media_type="image/jpeg",
-                    storage_path="uploads/incidents/charger.jpg",
-                    byte_size=128000,
-                ),
-                photo_hint="photo of breaker and charger hardware",
-                symptom_text="Customer reported visible breaker trip at charger.",
+                photo_hint="display off, no lights",
+                symptom_text="charger no pulse and no power",
             )
         )
 
-    assert diagnosis.branch_name == "hardware_visual_branch"
-    assert diagnosis.classifier_metadata is not None
-    assert diagnosis.classifier_metadata.used is True
-    assert diagnosis.classifier_metadata.predicted_label == "mcb_tripped"
+    assert diagnosis.diagnosis_source == "round1_package_retrieval"
+    assert diagnosis.issue_family == "no_power"
 
 
-def test_classifier_branch_failure_falls_back_safely():
-    with patch("app.services.diagnosis.analyze_hardware_visual_branch", side_effect=RuntimeError("classifier offline")), patch(
-        "app.services.diagnosis.get_gemini_client", return_value=None
-    ):
-        diagnosis = run_diagnosis(
-            IncidentInput(
-                site_id="site-mall-01",
-                photo_evidence=StoredPhotoEvidence(
-                    filename="charger.jpg",
-                    media_type="image/jpeg",
-                    storage_path="uploads/incidents/charger.jpg",
-                    byte_size=128000,
-                ),
-                photo_hint="no power at charger and hardware photo attached",
-                symptom_text="The charger has no power.",
-            )
-        )
-
-    assert diagnosis.branch_name == "branch_orchestrator_fallback"
-    assert diagnosis.issue_type == "no_power"
-
-
-def test_ocr_over_voltage_rule_sets_hazard_and_escalation_signal():
+def test_known_case_filename_enables_image_embedding_path():
+    uploaded = _copied_round1_image("MCB Tripped (1).jpg", "mcb-tripped.jpg")
     diagnosis = run_diagnosis(
         IncidentInput(
             site_id="site-mall-01",
-            photo_hint="app screenshot with Over-Voltage Fault warning",
-            symptom_text="WC Apps Error Logs screenshot attached.",
-            error_code="Over-Voltage Fault",
+            photo_evidence=StoredPhotoEvidence(
+                filename="MCB Tripped (1).jpg",
+                media_type="image/jpeg",
+                storage_path=str(uploaded),
+                byte_size=64000,
+            ),
+            photo_hint="photo of tripped breaker",
+            symptom_text="breaker is down and charging will not start",
         )
     )
-    assert diagnosis.branch_name == "ocr_text_branch"
-    assert "visible_hazard" in diagnosis.hazard_flags
-    assert diagnosis.ocr_metadata is not None
-    assert diagnosis.ocr_metadata.matched_rule == "over_voltage_fault"
+
+    assert diagnosis.known_case_hit is not None
+    assert diagnosis.known_case_hit.issue_family == "tripping"
+    assert diagnosis.retrieval_metadata is not None
+    assert diagnosis.retrieval_metadata.image_embedding_used is True
+    uploaded.unlink(missing_ok=True)
+
+
+def test_retrieval_matches_uploaded_copy_by_image_content():
+    uploaded = _copied_round1_image("MCB Tripped (1).jpg", "uuid-upload.jpg")
+
+    hit, metadata = retrieve_known_case(
+        RetrievalQuery(
+            text="uploaded photo with little context",
+            evidence_type="hardware_photo",
+            image_filename="8e06d2e6-uuid-upload.jpg",
+            image_storage_path=str(uploaded),
+        )
+    )
+
+    assert hit is not None
+    assert hit.canonical_file_name == "MCB Tripped (1).jpg"
+    assert hit.issue_family == "tripping"
+    assert metadata.image_embedding_used is True
+    uploaded.unlink(missing_ok=True)
+
+
+def test_run_diagnosis_uses_uploaded_image_content_when_text_is_weak():
+    uploaded = _copied_round1_image("MCB Tripped (1).jpg", "uuid-upload-weak-text.jpg")
+    source = round1_images_dir() / "MCB Tripped (1).jpg"
+
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_evidence=StoredPhotoEvidence(
+                filename="8e06d2e6-uuid-upload.jpg",
+                media_type="image/jpeg",
+                storage_path=str(uploaded),
+                byte_size=source.stat().st_size,
+            ),
+            photo_hint="Photo: 8e06d2e6-uuid-upload.jpg",
+            symptom_text="",
+        )
+    )
+
+    assert diagnosis.known_case_hit is not None
+    assert diagnosis.issue_family == "tripping"
+    assert diagnosis.fault_type == "mcb_tripped"
+    uploaded.unlink(missing_ok=True)
+
+
+def test_known_case_visible_abnormalities_are_promoted_to_hazard_flags():
+    uploaded = _copied_round1_image("Burnt Mark Issue (2).jpg", "uuid-burnt-mark.jpg")
+    source = round1_images_dir() / "Burnt Mark Issue (2).jpg"
+
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_evidence=StoredPhotoEvidence(
+                filename="8e06d2e6-burnt-mark.jpg",
+                media_type="image/jpeg",
+                storage_path=str(uploaded),
+                byte_size=source.stat().st_size,
+            ),
+            photo_hint="Photo: 8e06d2e6-burnt-mark.jpg",
+            symptom_text="",
+        )
+    )
+
+    assert diagnosis.known_case_hit is not None
+    assert diagnosis.known_case_hit.canonical_file_name == "Burnt Mark Issue (2).jpg"
+    assert "burn_mark" in diagnosis.hazard_flags
+    assert "melted_plastic" in diagnosis.hazard_flags
+    assert "loose_termination" in diagnosis.hazard_flags
+    uploaded.unlink(missing_ok=True)
