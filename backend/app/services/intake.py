@@ -13,7 +13,12 @@ from fastapi import HTTPException
 from app.core.models import IncidentInput, PhotoEvidence, StoredPhotoEvidence, UploadedPhotoPayload
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 
-UPLOAD_ROOT = Path(os.getenv("UPLOAD_ROOT", Path(__file__).resolve().parents[2] / "uploads"))
+
+def get_upload_root() -> Path:
+    return Path(os.getenv("UPLOAD_ROOT", Path(__file__).resolve().parents[2] / "uploads"))
+
+
+UPLOAD_ROOT = get_upload_root()
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MEDIA_TYPE_SUFFIXES = {
     "image/jpeg": ".jpg",
@@ -44,7 +49,7 @@ def store_uploaded_photo(payload: UploadedPhotoPayload) -> StoredPhotoEvidence:
         raise HTTPException(status_code=413, detail="Photo payload exceeds 10MB limit")
 
     stored_name = f"{uuid4().hex}-{_safe_filename(payload.filename, payload.media_type)}"
-    upload_dir = UPLOAD_ROOT / "incidents"
+    upload_dir = get_upload_root() / "incidents"
     upload_dir.mkdir(parents=True, exist_ok=True)
     stored_path = upload_dir / stored_name
     stored_path.write_bytes(content)
@@ -72,7 +77,7 @@ Rules:
 - quality_notes is a short single sentence explaining the quality decision
 - follow_up_questions is a list (max 4 items) of objects with "question_id" and "prompt"
 - Only include questions whose question_id is NOT already answered
-- Available question_ids: "main_power_supply", "cable_condition", "indicator_or_error_code", "issue_type_detail"
+- Available question_ids: "photo_request", "power_context", "required_proof_next", "error_text"
 - If the photo is "usable" and most useful answers are clear from context, return zero follow-up questions
 
 Respond with ONLY a JSON object, no markdown.
@@ -127,7 +132,7 @@ def _call_gemini_intake(
     # Attach photo bytes if we have them
     if photo_evidence and photo_evidence.storage_path:
         candidate_paths = [
-            UPLOAD_ROOT / Path(photo_evidence.storage_path).name,
+            get_upload_root() / Path(photo_evidence.storage_path).name,
             Path(__file__).resolve().parents[2] / photo_evidence.storage_path,
         ]
         for p in candidate_paths:
@@ -245,10 +250,10 @@ def assess_image_quality(
 
 
 FOLLOW_UP_QUESTION_BANK = {
-    "main_power_supply": "Is the main power supply available at the charger right now?",
-    "cable_condition": "Does the cable and connector look good, or is there looseness, overheating, or visible damage?",
-    "indicator_or_error_code": "What indicator state or error code do you see on the charger?",
-    "issue_type_detail": "Which best matches the issue: no power, tripping MCB/RCCB, charging slow, or not responding?",
+    "photo_request": "Please capture a wider photo of the charger and upstream power path.",
+    "power_context": "Has the upstream isolator or breaker state been checked and photographed?",
+    "required_proof_next": "Please provide the next proof requested by the triage system.",
+    "error_text": "If there is a visible error message, capture it clearly in text or screenshot form.",
 }
 
 
@@ -269,47 +274,21 @@ def build_follow_up_questions(
             pass  # Fall through to heuristic
 
     # Heuristic fallback
-    from app.services.diagnosis import infer_basic_conditions, infer_issue_type
+    from app.services.diagnosis import infer_evidence_type, infer_issue_family, run_diagnosis
 
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
-    basic_conditions = infer_basic_conditions(incident)
-    inferred_issue_type = infer_issue_type(incident, basic_conditions)
+    evidence_type = infer_evidence_type(incident)
+    inferred_issue_family = infer_issue_family(incident)
+    diagnosis = run_diagnosis(incident)
 
-    check_sequence = [
-        ("main_power_supply", basic_conditions.main_power_supply),
-        ("cable_condition", basic_conditions.cable_condition),
-        ("indicator_or_error_code", basic_conditions.indicator_or_error_code),
-    ]
-    for question_id, status in check_sequence:
-        if question_id not in answered and (status == "unknown" or quality_status != "usable"):
-            questions.append({"question_id": question_id, "prompt": FOLLOW_UP_QUESTION_BANK[question_id]})
-
-    ambiguity_tokens = [
-        "unknown",
-        "issue",
-        "problem",
-        "fault",
-        "not sure",
-        "unclear",
-    ]
-    text = " ".join(
-        [
-            incident.photo_hint or "",
-            incident.symptom_text or "",
-            incident.error_code or "",
-        ]
-    ).lower()
-    if (
-        "issue_type_detail" not in answered
-        and len(questions) < 4
-        and (quality_status != "usable" or any(token in text for token in ambiguity_tokens))
-    ):
-        questions.append(
-            {
-                "question_id": "issue_type_detail",
-                "prompt": f"We currently infer '{inferred_issue_type.replace('_', ' ')}'. {FOLLOW_UP_QUESTION_BANK['issue_type_detail']}",
-            }
-        )
+    if "required_proof_next" not in answered and diagnosis.required_proof_next:
+        questions.append({"question_id": "required_proof_next", "prompt": diagnosis.required_proof_next})
+    if "photo_request" not in answered and (quality_status != "usable" or evidence_type in {"symptom_report", "unknown"}):
+        questions.append({"question_id": "photo_request", "prompt": FOLLOW_UP_QUESTION_BANK["photo_request"]})
+    if "power_context" not in answered and inferred_issue_family in {"no_power", "unknown_mixed"}:
+        questions.append({"question_id": "power_context", "prompt": FOLLOW_UP_QUESTION_BANK["power_context"]})
+    if "error_text" not in answered and evidence_type == "screenshot" and not incident.error_code:
+        questions.append({"question_id": "error_text", "prompt": FOLLOW_UP_QUESTION_BANK["error_text"]})
 
     return questions[:4]

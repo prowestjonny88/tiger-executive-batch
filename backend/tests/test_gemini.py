@@ -1,8 +1,8 @@
 import json
 from unittest.mock import MagicMock, patch
 
-from app.core.models import IncidentInput, SeverityLevel
-from app.services.diagnosis import GeminiDiagnosisProvider
+from app.core.models import IncidentInput
+from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
 from app.services.intake import _call_gemini_intake
 
 
@@ -31,56 +31,23 @@ def test_gemini_intake_provider_usable():
     assert len(questions) == 0
 
 
-def test_gemini_intake_provider_weak():
+def test_gemini_diagnosis_provider_parses_round1_schema():
     mock_response = MagicMock()
     mock_response.text = json.dumps(
         {
-            "quality_status": "weak",
-            "quality_notes": "A bit blurry.",
-            "follow_up_questions": [{"question_id": "main_power_supply", "prompt": "Is the main power supply available?"}],
+            "issue_family": "tripping",
+            "fault_type": "mcb_tripped",
+            "evidence_summary": "Breaker handle is visibly down.",
+            "hazard_level": "medium",
+            "required_proof_next": "Photo of the breaker reset to ON position.",
+            "resolver_tier_hint": "local_site",
         }
     )
 
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    incident = IncidentInput(site_id="site-01", photo_hint="blurry")
-
-    with patch("app.services.intake.get_gemini_client", return_value=mock_client), patch(
-        "app.services.intake.GEMINI_MODEL", "gemini-2.0-flash"
-    ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
-        status, notes, questions = _call_gemini_intake(incident, None)
-
-    assert status == "weak"
-    assert notes == "A bit blurry."
-    assert len(questions) == 1
-    assert questions[0]["question_id"] == "main_power_supply"
-
-
-def test_gemini_diagnosis_provider():
-    mock_response = MagicMock()
-    mock_response.text = json.dumps(
-        {
-            "provider_summary": "Diagnosis complete.",
-            "issue_type": "tripping_mcb_rccb",
-            "likely_fault": "Broken plug",
-            "confidence_score": 0.95,
-            "raw_ocr_text": "ERR123",
-            "severity": "critical",
-            "basic_conditions": {
-                "main_power_supply": "ok",
-                "cable_condition": "problem",
-                "indicator_or_error_code": "ok",
-                "indicator_detail": "ERR123",
-            },
-            "hazard_flags": ["visible_hazard"],
-        }
-    )
-
-    mock_client = MagicMock()
-    mock_client.models.generate_content.return_value = mock_response
-
-    incident = IncidentInput(site_id="site-01", symptom_text="Broken plug")
+    incident = IncidentInput(site_id="site-01", symptom_text="Breaker is down.")
 
     with patch("app.services.diagnosis.get_gemini_client", return_value=mock_client), patch(
         "app.services.diagnosis.GEMINI_MODEL", "gemini-2.0-flash"
@@ -88,30 +55,80 @@ def test_gemini_diagnosis_provider():
         provider = GeminiDiagnosisProvider()
         result = provider.analyze(incident)
 
-    assert result.provider_summary == "Diagnosis complete."
-    assert result.issue_type == "tripping_mcb_rccb"
-    assert result.likely_fault == "Broken plug"
-    assert result.confidence_score == 0.95
-    assert result.raw_ocr_text == "ERR123"
-    assert result.severity == SeverityLevel.CRITICAL
-    assert result.basic_conditions.cable_condition == "problem"
-    assert "visible_hazard" in result.hazard_flags
+    assert result["issue_family"] == "tripping"
+    assert result["fault_type"] == "mcb_tripped"
+    assert result["resolver_tier_hint"] == "local_site"
 
 
-def test_gemini_diagnosis_fallback_on_parse_error():
-    mock_response = MagicMock()
-    mock_response.text = "NOT JSON"
+def test_run_diagnosis_uses_gemini_payload_when_available():
+    provider = MagicMock()
+    provider.analyze.return_value = {
+        "issue_family": "tripping",
+        "fault_type": "mcb_tripped",
+        "evidence_summary": "Breaker handle is down.",
+        "hazard_level": "medium",
+        "required_proof_next": "Photo of the breaker reset to ON position.",
+        "resolver_tier_hint": "local_site",
+    }
 
-    mock_client = MagicMock()
-    mock_client.models.generate_content.return_value = mock_response
+    diagnosis = run_diagnosis(
+        IncidentInput(
+            site_id="site-mall-01",
+            symptom_text="Breaker is down.",
+            photo_hint="mcb tripped in DB",
+        ),
+        provider=provider,
+    )
 
-    incident = IncidentInput(site_id="site-01", symptom_text="Broken plug")
+    assert diagnosis.diagnosis_source == "gemini_vlm_retrieval"
+    assert diagnosis.issue_family == "tripping"
+    assert diagnosis.resolver_tier == "local_site"
 
-    with patch("app.services.diagnosis.get_gemini_client", return_value=mock_client), patch(
-        "app.services.diagnosis.GEMINI_MODEL", "gemini-2.0-flash"
-    ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
-        provider = GeminiDiagnosisProvider()
-        result = provider.analyze(incident)
 
-    assert result.issue_type == "not_responding"
-    assert result.confidence_score == 0.45
+def test_run_diagnosis_with_debug_records_gemini_success():
+    provider = MagicMock()
+    provider.analyze.return_value = {
+        "issue_family": "tripping",
+        "fault_type": "mcb_tripped",
+        "evidence_summary": "Breaker handle is down.",
+        "hazard_level": "medium",
+        "required_proof_next": "Photo of the breaker reset to ON position.",
+        "resolver_tier_hint": "local_site",
+    }
+
+    diagnosis, debug = run_diagnosis_with_debug(
+        IncidentInput(
+            incident_id=42,
+            site_id="site-mall-01",
+            symptom_text="Breaker is down.",
+            photo_hint="mcb tripped in DB",
+        ),
+        provider=provider,
+    )
+
+    assert diagnosis.diagnosis_source == "gemini_vlm_retrieval"
+    assert debug["attempted"] is True
+    assert debug["succeeded"] is True
+    assert debug["incident_id"] == 42
+    assert debug["error"] is None
+
+
+def test_run_diagnosis_with_debug_records_gemini_failure():
+    provider = MagicMock()
+    provider.analyze.side_effect = RuntimeError("proxy refused connection")
+
+    diagnosis, debug = run_diagnosis_with_debug(
+        IncidentInput(
+            incident_id=84,
+            site_id="site-mall-01",
+            symptom_text="charger no pulse and no power",
+            photo_hint="display off, no lights",
+        ),
+        provider=provider,
+    )
+
+    assert diagnosis.diagnosis_source == "round1_package_retrieval"
+    assert debug["attempted"] is True
+    assert debug["succeeded"] is False
+    assert debug["incident_id"] == 84
+    assert "proxy refused connection" in (debug["error"] or "")

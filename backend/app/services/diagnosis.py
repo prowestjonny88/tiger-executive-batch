@@ -1,319 +1,322 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
-from typing import Callable
+import time
+from pathlib import Path
+from typing import Any
 
 from app.core.models import (
-    ClassifierMetadata,
     ConfidenceBand,
     DiagnosisResult,
+    EvidenceType,
+    HazardLevel,
     IncidentInput,
-    OcrMetadata,
-    SeverityLevel,
+    ResolverTier,
 )
-from app.services.diagnosis_classifier import analyze_hardware_visual_branch
-from app.services.diagnosis_contracts import DiagnosisProviderResponse
-from app.services.diagnosis_ocr import analyze_ocr_branch
-from app.services.diagnosis_support import (
-    VALID_ISSUE_TYPES,
-    VALID_SEVERITIES,
-    clamp_score,
-    confidence_band,
-    extract_visible_hazard_flags,
-    infer_basic_conditions,
-    infer_issue_type,
-    is_probably_screenshot_evidence,
-    is_probably_symptom_heavy,
-    likely_fault_for,
-    make_basic_conditions,
-    normalize_status,
-    severity_for,
-    text_blob,
-)
-from app.services.diagnosis_symptom import analyze_symptom_branch
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
+from app.services.known_case_retrieval import RetrievalQuery, retrieve_known_case
+
+logger = logging.getLogger(__name__)
 
 
-class DiagnosisProvider:
-    def analyze(self, incident: IncidentInput) -> DiagnosisProviderResponse:
-        raise NotImplementedError
+def build_incident_text(incident: IncidentInput) -> str:
+    parts = [
+        incident.photo_hint or "",
+        incident.symptom_text or "",
+        incident.error_code or "",
+        " ".join(f"{key} {value}" for key, value in incident.follow_up_answers.items()),
+    ]
+    return " ".join(part for part in parts if part).strip()
 
 
-_DIAGNOSIS_SYSTEM_PROMPT = """\
-You are OmniTriage, an expert EV charger field-diagnostics engine.
-You receive a structured incident observation and must respond with a JSON object.
+def infer_evidence_type(incident: IncidentInput) -> EvidenceType:
+    text = build_incident_text(incident).lower()
+    screenshot_tokens = [
+        "wc apps",
+        "screenshot",
+        "screen capture",
+        "error logs",
+        "faulted",
+        "over-voltage",
+        "app screen",
+    ]
+    symptom_tokens = ["no pulse", "not charging", "no display", "screen off", "not responding", "frozen"]
 
-Rules:
-- issue_type must be ONE of: "no_power", "tripping_mcb_rccb", "charging_slow", "not_responding"
-- confidence_score must be a float 0.0-1.0
-- severity must be ONE of: "low", "moderate", "high", "critical"
-- basic_conditions.main_power_supply must be ONE of: "ok", "problem", "unknown"
-- basic_conditions.cable_condition must be ONE of: "ok", "problem", "unknown"
-- basic_conditions.indicator_or_error_code must be ONE of: "ok", "problem", "unknown"
-- hazard_flags is a list of strings; use "visible_hazard" if there is evidence of burning, exposed wiring, water ingress, or severe damage
-- likely_fault should be a short, human-readable English phrase (max 12 words)
-- raw_ocr_text is any error code or display text you can read from the photo (empty string if none)
-- provider_summary is a 1-2 sentence narrative of your reasoning
-
-Respond with ONLY a JSON object - no markdown, no commentary.
-Schema:
-{
-  "provider_summary": "...",
-  "issue_type": "...",
-  "likely_fault": "...",
-  "confidence_score": 0.0,
-  "raw_ocr_text": "...",
-  "severity": "...",
-  "basic_conditions": {
-    "main_power_supply": "unknown",
-    "cable_condition": "unknown",
-    "indicator_or_error_code": "unknown",
-    "indicator_detail": ""
-  },
-  "hazard_flags": []
-}
-"""
+    if any(token in text for token in screenshot_tokens):
+        return "screenshot"
+    if incident.photo_evidence and any(token in text for token in symptom_tokens):
+        return "symptom_heavy_photo"
+    if incident.photo_evidence:
+        return "hardware_photo"
+    if incident.symptom_text or incident.error_code:
+        return "symptom_report"
+    return "unknown"
 
 
-def _build_diagnosis_prompt(incident: IncidentInput) -> str:
-    parts: list[str] = ["## Incident observation"]
-    parts.append(f"- Site: {incident.site_id}")
-    if incident.charger_id:
-        parts.append(f"- Charger: {incident.charger_id}")
+def infer_issue_family(incident: IncidentInput) -> str:
+    text = build_incident_text(incident).lower()
+    if any(token in text for token in ["mcb", "rccb", "trip", "breaker"]):
+        return "tripping"
+    if any(token in text for token in ["slow", "reduced output", "vehicle limitation", "voltage drop"]):
+        return "charging_slow"
+    if any(token in text for token in ["no power", "no pulse", "lights off", "display off", "dead"]):
+        return "no_power"
+    if any(token in text for token in ["faulted", "frozen", "not responding", "error log", "app"]):
+        return "not_responding"
+    return "unknown_mixed"
+
+
+def _looks_ambiguous(text: str) -> bool:
+    ambiguous_tokens = ["unclear", "not sure", "no clear", "unknown", "details are limited", "cannot confirm", "insufficient evidence"]
+    return any(token in text for token in ambiguous_tokens)
+
+
+def extract_raw_ocr_text(incident: IncidentInput) -> str | None:
     if incident.error_code:
-        parts.append(f"- Error code / display text: {incident.error_code}")
-    if incident.symptom_text:
-        parts.append(f"- Symptom description: {incident.symptom_text}")
-    if incident.photo_hint:
-        parts.append(f"- Photo observation: {incident.photo_hint}")
-    if incident.follow_up_answers:
-        parts.append("- Follow-up answers:")
-        for key, value in incident.follow_up_answers.items():
-            parts.append(f"    {key}: {value}")
-    if incident.demo_scenario_id:
-        parts.append(f"- Demo scenario: {incident.demo_scenario_id}")
-    return "\n".join(parts)
+        return incident.error_code
+    text = " ".join([incident.photo_hint or "", incident.symptom_text or ""])
+    match = re.search(r"(faulted|over-?voltage fault|ui-\d+|trip-\d+|slow-\d+)", text, flags=re.IGNORECASE)
+    return match.group(1) if match else None
 
 
-def heuristic_provider_response(incident: IncidentInput) -> DiagnosisProviderResponse:
-    text = text_blob(incident)
-    basic_conditions = infer_basic_conditions(incident)
-    hazard_flags = extract_visible_hazard_flags(text, basic_conditions)
-    issue_type = infer_issue_type(incident, basic_conditions)
-
-    if issue_type == "no_power":
-        score = 0.9 if basic_conditions.main_power_supply == "problem" else 0.74
-    elif issue_type == "tripping_mcb_rccb":
-        score = 0.91 if any(token in text for token in ["mcb", "rccb", "breaker", "trip"]) else 0.78
-    elif issue_type == "charging_slow":
-        score = 0.86 if any(token in text for token in ["slow", "voltage drop", "vehicle limiting"]) else 0.72
-    else:
-        score = 0.83 if basic_conditions.indicator_or_error_code != "unknown" else 0.68
-
-    return DiagnosisProviderResponse(
-        provider_summary="Organizer decision-tree heuristic applied to the available incident evidence.",
-        issue_type=issue_type,
-        likely_fault=likely_fault_for(issue_type, basic_conditions),
-        confidence_score=score,
-        raw_ocr_text=incident.error_code or "",
-        severity=severity_for(issue_type, basic_conditions, hazard_flags, score),
-        basic_conditions=basic_conditions,
-        hazard_flags=hazard_flags,
-        diagnosis_source="organizer_heuristic",
-        branch_name="heuristic_fallback",
-    )
+def _follow_up_prompts(issue_family: str, evidence_type: EvidenceType, known_case_required_proof: str | None) -> list[dict[str, str]]:
+    prompts: list[dict[str, str]] = []
+    if evidence_type in {"symptom_report", "unknown"}:
+        prompts.append({"question_id": "photo_request", "prompt": "Capture a wider photo of the charger and upstream power path."})
+    if issue_family == "unknown_mixed":
+        prompts.append({"question_id": "power_context", "prompt": "Confirm whether upstream power and isolator state have been checked."})
+    if known_case_required_proof:
+        prompts.append({"question_id": "required_proof_next", "prompt": known_case_required_proof})
+    return prompts[:3]
 
 
-def _parse_gemini_diagnosis(raw: str) -> DiagnosisProviderResponse:
-    text = re.sub(r"^```[a-z]*\n?", "", raw.strip(), flags=re.MULTILINE)
-    text = re.sub(r"```$", "", text.strip())
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        fallback_conditions = make_basic_conditions()
-        return DiagnosisProviderResponse(
-            provider_summary=raw[:300],
-            issue_type="not_responding",
-            likely_fault="Unconfirmed charger issue",
-            confidence_score=0.45,
-            raw_ocr_text="",
-            severity=SeverityLevel.MODERATE,
-            basic_conditions=fallback_conditions,
-            hazard_flags=[],
-            diagnosis_source="gemini_parse_error",
-            branch_name="gemini_provider",
-        )
-
-    issue_type_raw = str(data.get("issue_type", "not_responding"))
-    issue_type = issue_type_raw if issue_type_raw in VALID_ISSUE_TYPES else "not_responding"
-
-    severity_raw = data.get("severity", "moderate")
-    severity = SeverityLevel(severity_raw) if severity_raw in VALID_SEVERITIES else SeverityLevel.MODERATE
-
-    try:
-        score = clamp_score(float(data.get("confidence_score", 0.5)))
-    except (TypeError, ValueError):
-        score = 0.5
-
-    basic_raw = data.get("basic_conditions", {})
-    if not isinstance(basic_raw, dict):
-        basic_raw = {}
-    basic_conditions = make_basic_conditions(
-        main_power_supply=normalize_status(basic_raw.get("main_power_supply")),
-        cable_condition=normalize_status(basic_raw.get("cable_condition")),
-        indicator_or_error_code=normalize_status(basic_raw.get("indicator_or_error_code")),
-        indicator_detail=str(basic_raw.get("indicator_detail", "")),
-    )
-
-    hazard_flags = [str(flag) for flag in data.get("hazard_flags", []) if isinstance(flag, str)]
-
-    return DiagnosisProviderResponse(
-        provider_summary=str(data.get("provider_summary", ""))[:500],
-        issue_type=issue_type,  # type: ignore[arg-type]
-        likely_fault=str(data.get("likely_fault", "Unconfirmed charger issue"))[:120],
-        confidence_score=score,
-        raw_ocr_text=str(data.get("raw_ocr_text", "")),
-        severity=severity,
-        basic_conditions=basic_conditions,
-        hazard_flags=hazard_flags,
-        diagnosis_source="gemini_multimodal",
-        branch_name="gemini_provider",
-    )
+def _hazard_flags(hazard_level: HazardLevel, incident: IncidentInput, known_case_fault: str | None) -> list[str]:
+    flags: list[str] = []
+    if hazard_level == "high":
+        flags.append("high_hazard")
+    text = build_incident_text(incident).lower()
+    if any(token in text for token in ["burn", "melt", "exposed", "illegal wiring", "shock", "smell"]):
+        flags.append("visible_hazard")
+    if known_case_fault and "ground" in known_case_fault:
+        flags.append("grounding_risk")
+    return sorted(set(flags))
 
 
-class GeminiDiagnosisProvider(DiagnosisProvider):
-    def analyze(self, incident: IncidentInput) -> DiagnosisProviderResponse:
+def _confidence_band(score: float) -> ConfidenceBand:
+    if score >= 0.8:
+        return ConfidenceBand.HIGH
+    if score >= 0.55:
+        return ConfidenceBand.MEDIUM
+    return ConfidenceBand.LOW
+
+
+def _fallback_resolver(issue_family: str, hazard_level: HazardLevel) -> ResolverTier:
+    if hazard_level == "high":
+        return "technician"
+    if issue_family == "unknown_mixed":
+        return "remote_ops"
+    if issue_family == "tripping":
+        return "local_site"
+    if issue_family == "no_power":
+        return "driver"
+    return "remote_ops"
+
+
+class GeminiDiagnosisProvider:
+    def analyze(self, incident: IncidentInput) -> dict[str, Any]:
         client = get_gemini_client()
         if client is None:
-            return HeuristicDiagnosisProvider().analyze(incident)
+            raise RuntimeError("Gemini client unavailable")
 
         try:
             from google.genai import types as genai_types  # type: ignore[import-untyped]
-            from app.services.diagnosis_classifier import _resolve_photo_path
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("google-genai not installed") from exc
 
-            prompt_text = _build_diagnosis_prompt(incident)
-            contents: list[object] = [prompt_text]
+        prompt = f"""Return JSON only.
+Schema:
+{{
+  "issue_family": "no_power|tripping|charging_slow|not_responding|unknown_mixed",
+  "fault_type": "short phrase",
+  "evidence_summary": "short summary",
+  "hazard_level": "low|medium|high",
+  "required_proof_next": "short instruction",
+  "resolver_tier_hint": "driver|local_site|remote_ops|technician"
+}}
 
-            if incident.photo_evidence and incident.photo_evidence.storage_path:
-                photo_path = _resolve_photo_path(incident)
-                if photo_path is not None and photo_path.exists():
-                    raw_bytes = photo_path.read_bytes()
-                    contents.insert(
-                        0,
-                        genai_types.Part.from_bytes(
-                            data=raw_bytes,
-                            mime_type=incident.photo_evidence.media_type,
-                        ),
-                    )
+Incident:
+- site_id: {incident.site_id}
+- charger_id: {incident.charger_id or ""}
+- photo_hint: {incident.photo_hint or ""}
+- symptom_text: {incident.symptom_text or ""}
+- error_code: {incident.error_code or ""}
+- follow_up_answers: {json.dumps(incident.follow_up_answers)}
+"""
 
-            response = client.models.generate_content(  # type: ignore[attr-defined]
-                model=GEMINI_MODEL,
-                contents=contents,
-                config=genai_types.GenerateContentConfig(
-                    system_instruction=_DIAGNOSIS_SYSTEM_PROMPT,
-                    temperature=0.1,
-                    max_output_tokens=512,
-                ),
-            )
-            parsed = _parse_gemini_diagnosis(response.text or "")
-            if parsed.basic_conditions == make_basic_conditions():
-                heuristic = heuristic_provider_response(incident)
-                parsed.basic_conditions = heuristic.basic_conditions
-                if parsed.likely_fault == "Unconfirmed charger issue":
-                    parsed.likely_fault = heuristic.likely_fault
-            return parsed
-        except Exception as exc:  # noqa: BLE001
-            heuristic = HeuristicDiagnosisProvider().analyze(incident)
-            heuristic.provider_summary = (
-                f"Gemini call failed ({exc!s}); using heuristic fallback. {heuristic.provider_summary}"
-            )[:500]
-            heuristic.diagnosis_source = "gemini_fallback_heuristic"
-            return heuristic
+        contents: list[object] = [prompt]
+        if incident.photo_evidence:
+            candidate = Path(__file__).resolve().parents[2] / incident.photo_evidence.storage_path
+            if candidate.exists():
+                contents.insert(
+                    0,
+                    genai_types.Part.from_bytes(
+                        data=candidate.read_bytes(),
+                        mime_type=incident.photo_evidence.media_type,
+                    ),
+                )
 
-
-class HeuristicDiagnosisProvider(DiagnosisProvider):
-    def analyze(self, incident: IncidentInput) -> DiagnosisProviderResponse:
-        return heuristic_provider_response(incident)
-
-
-class BranchOrchestratingDiagnosisProvider(DiagnosisProvider):
-    def analyze(self, incident: IncidentInput) -> DiagnosisProviderResponse:
-        providers: list[tuple[str, Callable[[IncidentInput], DiagnosisProviderResponse]]] = []
-        if is_probably_screenshot_evidence(incident):
-            providers.append(("ocr_text_branch", analyze_ocr_branch))
-        if is_probably_symptom_heavy(incident) or not incident.photo_evidence:
-            providers.append(("symptom_multimodal_branch", analyze_symptom_branch))
-        if incident.photo_evidence and not is_probably_screenshot_evidence(incident):
-            providers.append(("hardware_visual_branch", analyze_hardware_visual_branch))
-
-        if not providers:
-            providers.append(("symptom_multimodal_branch", analyze_symptom_branch))
-
-        errors: list[str] = []
-        for branch_name, provider in providers:
-            try:
-                return provider(incident)
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"{branch_name}: {exc!s}")
-
-        fallback_provider = GeminiDiagnosisProvider() if get_gemini_client() is not None else HeuristicDiagnosisProvider()
-        fallback = fallback_provider.analyze(incident)
-        if errors:
-            fallback.provider_summary = (
-                f"Branch providers unavailable ({'; '.join(errors)}). {fallback.provider_summary}"
-            )[:500]
-        if fallback.branch_name == "heuristic_fallback":
-            fallback.branch_name = "branch_orchestrator_fallback"
-        return fallback
+        response = client.models.generate_content(  # type: ignore[attr-defined]
+            model=GEMINI_MODEL,
+            contents=contents,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.0,
+                max_output_tokens=512,
+            ),
+        )
+        raw = (response.text or "").strip()
+        raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.MULTILINE)
+        raw = re.sub(r"```$", "", raw.strip())
+        return json.loads(raw)
 
 
-def run_diagnosis(incident: IncidentInput, provider: DiagnosisProvider | None = None) -> DiagnosisResult:
-    if provider is None:
-        provider = BranchOrchestratingDiagnosisProvider()
-    response = provider.analyze(incident)
-    band = confidence_band(response.confidence_score)
-    return DiagnosisResult(
-        raw_provider_output=response.provider_summary,
-        issue_type=response.issue_type,
-        likely_fault=response.likely_fault,
-        evidence_summary=(
-            incident.symptom_text
-            or f"Photo hint: {incident.photo_hint or 'n/a'}; OCR/error code: {incident.error_code or 'none'}."
-        ),
-        basic_conditions=response.basic_conditions,
-        raw_ocr_text=response.raw_ocr_text,
-        confidence_score=response.confidence_score,
-        confidence_band=band,
-        unknown_flag=any(
-            status == "unknown"
-            for status in [
-                response.basic_conditions.main_power_supply,
-                response.basic_conditions.cable_condition,
-                response.basic_conditions.indicator_or_error_code,
-            ]
-        ),
-        severity=response.severity,
-        hazard_flags=response.hazard_flags,
-        diagnosis_source=response.diagnosis_source,
-        branch_name=response.branch_name,
-        resolver_hint_final=response.resolver_hint_final,
-        next_question_hint=response.next_question_hint,
-        next_action_hint=response.next_action_hint,
-        classifier_metadata=ClassifierMetadata.model_validate(response.classifier_metadata)
-        if response.classifier_metadata
-        else None,
-        ocr_metadata=OcrMetadata.model_validate(response.ocr_metadata) if response.ocr_metadata else None,
+def run_diagnosis_with_debug(
+    incident: IncidentInput,
+    provider: GeminiDiagnosisProvider | None = None,
+) -> tuple[DiagnosisResult, dict[str, Any]]:
+    evidence_type = infer_evidence_type(incident)
+    query_text = build_incident_text(incident)
+    image_filename = incident.photo_evidence.filename if incident.photo_evidence else None
+    known_case_hit, retrieval_metadata = retrieve_known_case(
+        RetrievalQuery(text=query_text or incident.site_id, evidence_type=evidence_type, image_filename=image_filename)
     )
+    inferred_issue_family = infer_issue_family(incident)
+
+    vlm_payload: dict[str, Any] | None = None
+    raw_provider_output = "Round 1 retrieval fallback"
+    diagnosis_source = "round1_package_retrieval"
+    gemini_started_at = time.perf_counter()
+    gemini_attempted = True
+    gemini_succeeded = False
+    gemini_error: str | None = None
+    if provider is None:
+        provider = GeminiDiagnosisProvider()
+    try:
+        vlm_payload = provider.analyze(incident)
+        raw_provider_output = json.dumps(vlm_payload)
+        diagnosis_source = "gemini_vlm_retrieval"
+        gemini_succeeded = True
+    except Exception as exc:
+        gemini_error = str(exc)
+        raw_provider_output = f"Gemini unavailable or failed; using Round 1 retrieval fallback. Error: {exc}"
+
+    issue_family = (vlm_payload or {}).get("issue_family") or (known_case_hit.issue_family if known_case_hit else inferred_issue_family)
+    fault_type = (vlm_payload or {}).get("fault_type") or (known_case_hit.fault_type if known_case_hit else "unknown_fault")
+    evidence_summary = (vlm_payload or {}).get("evidence_summary") or (
+        known_case_hit.visual_observation if known_case_hit else (incident.symptom_text or incident.photo_hint or "Limited evidence provided.")
+    )
+    hazard_level = (vlm_payload or {}).get("hazard_level") or (known_case_hit.hazard_level if known_case_hit else "medium")
+    resolver_tier = (vlm_payload or {}).get("resolver_tier_hint") or (known_case_hit.resolver_tier if known_case_hit else _fallback_resolver(issue_family, hazard_level))
+    required_proof_next = (vlm_payload or {}).get("required_proof_next") or (known_case_hit.required_proof_next if known_case_hit else None)
+
+    match_score = known_case_hit.match_score if known_case_hit else 0.35
+    if known_case_hit and known_case_hit.issue_family == "unknown_mixed" and inferred_issue_family != "unknown_mixed" and match_score < 0.75:
+        issue_family = inferred_issue_family
+    if (
+        known_case_hit
+        and evidence_type == "symptom_report"
+        and known_case_hit.evidence_type not in {"symptom_report", "screenshot"}
+        and inferred_issue_family != "unknown_mixed"
+        and match_score < 0.9
+    ):
+        issue_family = inferred_issue_family
+        fault_type = "unknown_fault" if fault_type == known_case_hit.fault_type else fault_type
+        resolver_tier = _fallback_resolver(issue_family, hazard_level)
+    score = max(match_score, 0.42 if vlm_payload else 0.32)
+    if _looks_ambiguous(query_text.lower()) and evidence_type in {"symptom_report", "unknown"}:
+        issue_family = "unknown_mixed"
+        known_case_hit = None
+        hazard_level = "medium"
+        score = min(score, 0.48)
+    if issue_family == "unknown_mixed":
+        score = min(score, 0.58)
+    if evidence_type == "screenshot" and extract_raw_ocr_text(incident):
+        score = max(score, 0.76)
+    band = _confidence_band(score)
+    unknown_flag = issue_family == "unknown_mixed" or score < 0.55
+    requires_follow_up = unknown_flag or not required_proof_next
+
+    hazard_flags = _hazard_flags(hazard_level, incident, known_case_hit.fault_type if known_case_hit else fault_type)
+
+    if issue_family == "unknown_mixed" and hazard_level != "high":
+        resolver_tier = "remote_ops"
+    elif hazard_level == "high":
+        resolver_tier = "technician"
+
+    diagnosis = DiagnosisResult(
+        raw_provider_output=raw_provider_output,
+        issue_family=issue_family,  # type: ignore[arg-type]
+        fault_type=fault_type,
+        evidence_type=evidence_type,
+        hazard_level=hazard_level,  # type: ignore[arg-type]
+        resolver_tier=resolver_tier,  # type: ignore[arg-type]
+        likely_fault=fault_type.replace("_", " ").strip() or "Unknown fault",
+        evidence_summary=evidence_summary,
+        required_proof_next=required_proof_next,
+        raw_ocr_text=extract_raw_ocr_text(incident),
+        confidence_score=score,
+        confidence_band=band,
+        unknown_flag=unknown_flag,
+        requires_follow_up=requires_follow_up,
+        follow_up_prompts=_follow_up_prompts(issue_family, evidence_type, required_proof_next),
+        diagnosis_source=diagnosis_source,
+        branch_name="round1_vlm_retrieval",
+        hazard_flags=hazard_flags,
+        known_case_hit=known_case_hit,
+        retrieval_metadata=retrieval_metadata,
+        confidence_reasoning=(
+            "Known-case retrieval and VLM context aligned."
+            if vlm_payload and known_case_hit
+            else "Known-case retrieval provided the primary diagnosis signal."
+            if known_case_hit
+            else "Evidence did not strongly match a known case; using taxonomy-safe fallback."
+        ),
+    )
+
+    gemini_attempt = {
+        "attempted": gemini_attempted,
+        "succeeded": gemini_succeeded,
+        "model": GEMINI_MODEL,
+        "latency_ms": round((time.perf_counter() - gemini_started_at) * 1000, 2),
+        "error": gemini_error,
+        "incident_id": incident.incident_id,
+        "site_id": incident.site_id,
+        "charger_id": incident.charger_id,
+        "diagnosis_source": diagnosis.diagnosis_source,
+        "issue_family": diagnosis.issue_family,
+        "resolver_tier": diagnosis.resolver_tier,
+        "evidence_type": diagnosis.evidence_type,
+        "has_photo_evidence": incident.photo_evidence is not None,
+        "known_case_selected": retrieval_metadata.selected_case if retrieval_metadata else None,
+        "retrieval_provider": retrieval_metadata.provider_name if retrieval_metadata else None,
+        "retrieval_mode": retrieval_metadata.provider_mode if retrieval_metadata else None,
+    }
+    logger.info(json.dumps({"event": "triage_gemini_attempt", **gemini_attempt}))
+    return diagnosis, gemini_attempt
+
+
+def run_diagnosis(incident: IncidentInput, provider: GeminiDiagnosisProvider | None = None) -> DiagnosisResult:
+    diagnosis, _ = run_diagnosis_with_debug(incident, provider=provider)
+    return diagnosis
 
 
 __all__ = [
-    "BranchOrchestratingDiagnosisProvider",
-    "DiagnosisProvider",
     "GeminiDiagnosisProvider",
-    "HeuristicDiagnosisProvider",
-    "heuristic_provider_response",
-    "infer_basic_conditions",
-    "infer_issue_type",
+    "build_incident_text",
+    "extract_raw_ocr_text",
+    "infer_evidence_type",
+    "infer_issue_family",
     "run_diagnosis",
+    "run_diagnosis_with_debug",
 ]
