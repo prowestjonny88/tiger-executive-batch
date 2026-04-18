@@ -269,21 +269,22 @@ def test_gemini_embedding_provider_uses_semantic_image_descriptor():
     )
     embedding_response = MagicMock()
     embedding_response.embeddings = [MagicMock(values=[float(index) for index in range(300)])]
-
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = perception_response
     mock_client.models.embed_content.return_value = embedding_response
-
+    hash_provider = HashEmbeddingProvider()
     with patch("app.services.embeddings.get_gemini_client", return_value=mock_client), patch(
         "google.genai.types.GenerateContentConfig", MagicMock(), create=True
     ), patch("google.genai.types.Part.from_bytes", MagicMock(return_value="image-part"), create=True):
         provider = GeminiEmbeddingProvider()
-        vector = provider.embed_image(image_path)
+        text_vector = provider.embed_text("breaker is down")
+        image_vector = provider.embed_image(image_path)
 
-    assert len(vector) == EMBEDDING_DIMENSION
-    assert vector != HashEmbeddingProvider().embed_image(image_path)
-    assert mock_client.models.generate_content.called
+    assert len(text_vector) == EMBEDDING_DIMENSION
+    assert len(image_vector) == EMBEDDING_DIMENSION
     assert mock_client.models.embed_content.called
+    assert mock_client.models.generate_content.called
+    assert image_vector != hash_provider.embed_image(image_path)
     image_path.unlink(missing_ok=True)
 
 
@@ -294,6 +295,17 @@ def test_embedding_runtime_status_warns_for_hash_mode_outside_development():
     warnings = status["warnings"]
     assert isinstance(warnings, list)
     assert status["provider_name"] == "hash_embedding_provider"
-    assert status["image_mode"] == "deterministic_hash"
+    assert status["image_mode"] == "exact_image_fingerprint_only"
     assert status["semantic_image_enabled"] is False
     assert "Hash embeddings are active outside development." in warnings
+    assert status["retrieval_signal_mode"] == "perception_driven"
+
+
+def test_embedding_runtime_status_reports_semantic_image_mode_when_gemini_available():
+    with patch("app.services.embeddings.get_gemini_client", return_value=MagicMock()):
+        status = get_embedding_runtime_status(GeminiEmbeddingProvider())
+
+    assert status["provider_name"] == "gemini_embedding_provider"
+    assert status["semantic_image_enabled"] is True
+    assert status["image_mode"] == "semantic_gemini_descriptor"
+    assert status["retrieval_signal_mode"] == "hybrid_semantic_image"

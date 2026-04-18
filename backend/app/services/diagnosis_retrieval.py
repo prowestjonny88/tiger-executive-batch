@@ -207,6 +207,7 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
     query_text_vector = provider.embed_text(query_text)
     query_image_path = _resolve_query_image_path(incident.photo_evidence.storage_path) if incident.photo_evidence else None
     query_image_vector = provider.embed_image(query_image_path) if query_image_path is not None else None
+    exact_image_fingerprint_enabled = bool(runtime_status["exact_image_fingerprint_enabled"]) and query_image_vector is not None
     semantic_image_enabled = bool(runtime_status["semantic_image_enabled"]) and query_image_vector is not None
 
     exact_case = None
@@ -226,11 +227,11 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
         case = KnownCaseHit.model_validate(payload)
         text_score = float(row.get("text_score") or 0.0)
         image_score = float(row.get("image_score") or 0.0)
-        image_weight = 0.45 if semantic_image_enabled and evidence.evidence_type != "screenshot" else 0.08
+        semantic_bonus, compatibility_score, notes = _compatible_bonus(evidence, case)
+        image_weight = 0.42 if semantic_image_enabled and evidence.evidence_type != "screenshot" else 0.08
         if evidence.evidence_type == "screenshot":
             image_weight = 0.03 if semantic_image_enabled else 0.01
         text_weight = 1.0 - image_weight
-        semantic_bonus, compatibility_score, notes = _compatible_bonus(evidence, case)
         score = max(min((text_score * text_weight) + (image_score * image_weight) + semantic_bonus, 1.0), 0.0)
         if exact_case is not None and case.canonical_file_name == exact_case.canonical_file_name:
             score = max(score, 0.99)
@@ -244,12 +245,12 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             score = max(score, 0.72)
             compatibility_score = max(compatibility_score, 0.7)
             notes.append("Semantic image similarity materially supported the KB case.")
-        elif not semantic_image_enabled and image_score >= 0.999:
+        elif exact_image_fingerprint_enabled and image_score >= 0.999:
             score = max(score, 0.93)
             compatibility_score = max(compatibility_score, 0.82)
-            notes.append("Exact fallback image fingerprint matched the KB case.")
-        elif query_image_vector is not None and not semantic_image_enabled and image_score >= 0.9:
-            notes.append("Strong fallback image fingerprint detected, but image-only boosts were intentionally limited.")
+            notes.append("Exact-image fingerprint matched the KB case.")
+        elif query_image_vector is not None and image_score >= 0.9:
+            notes.append("Strong image signal detected, but candidate trust still depends on structured evidence.")
         candidates.append(
             _candidate_from_case(
                 case,
@@ -273,10 +274,18 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
         primary.compatibility_notes.extend(note for note in gate_notes if note not in primary.compatibility_notes)
     runtime_warnings = runtime_status.get("warnings")
     warnings = [str(warning) for warning in runtime_warnings] if isinstance(runtime_warnings, list) else []
-    image_signal_trust = "semantic" if semantic_image_enabled else "fallback_limited"
+    image_signal_trust = (
+        "semantic"
+        if semantic_image_enabled
+        else "exact_image_shortcut_only"
+        if exact_image_fingerprint_enabled
+        else "disabled"
+    )
     gate_basis_detail = (
         "Accepted with semantic image agreement and structured evidence."
         if gate_decision == "accepted" and semantic_image_enabled and primary is not None and (primary.image_score or 0.0) >= 0.75
+        else "Accepted with structured evidence support plus an exact-image shortcut."
+        if gate_decision == "accepted" and exact_image_fingerprint_enabled and primary is not None and (primary.image_score or 0.0) >= 0.999
         else "Accepted from structured evidence and KB compatibility."
         if gate_decision == "accepted"
         else "Candidate set informed reasoning, but no case was strong enough to anchor directly."
@@ -309,7 +318,8 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
             "embedding_dimension": EMBEDDING_DIMENSION,
             "image_mode": runtime_status["image_mode"],
-            "semantic_image_enabled": runtime_status["semantic_image_enabled"],
+            "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
+            "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
             "embedding_provider_name": runtime_status["provider_name"],
             "embedding_provider_mode": runtime_status["provider_mode"],
             "image_signal_trust": image_signal_trust,
@@ -347,7 +357,8 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             "score_margin_top2": round(margin, 4) if margin is not None else None,
             "top_family_consensus": consensus,
             "image_mode": runtime_status["image_mode"],
-            "semantic_image_enabled": runtime_status["semantic_image_enabled"],
+            "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
+            "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
             "image_signal_trust": image_signal_trust,
             "warnings": warnings,
         },

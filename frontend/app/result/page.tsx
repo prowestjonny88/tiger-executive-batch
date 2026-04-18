@@ -329,7 +329,8 @@ function ResultAssessment() {
                     {triage.kb_retrieval.provider_name} ({triage.kb_retrieval.provider_mode})
                   </p>
                   <p className="text-slate-700 text-sm leading-relaxed">
-                    Image mode: {formatDiagnosisMethod(String(retrievalExtra.image_mode || "unavailable"))} | Signal trust:{" "}
+                    Retrieval signal: {formatDiagnosisMethod(String(retrievalExtra.retrieval_signal_mode || "unavailable"))} | Image support:{" "}
+                    {formatDiagnosisMethod(String(retrievalExtra.image_mode || "unavailable"))} | Signal trust:{" "}
                     {formatDiagnosisMethod(String(retrievalExtra.image_signal_trust || "unavailable"))}
                   </p>
                   <p className="text-slate-700 text-sm leading-relaxed">

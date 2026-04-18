@@ -24,6 +24,9 @@ class EmbeddingProvider(Protocol):
     @property
     def semantic_image_enabled(self) -> bool: ...
 
+    @property
+    def exact_image_fingerprint_enabled(self) -> bool: ...
+
     def embed_text(self, text: str) -> list[float]: ...
 
     def embed_image(self, image_path: Path) -> list[float]: ...
@@ -77,8 +80,9 @@ def _project_vector(values: list[float], target_dimension: int = EMBEDDING_DIMEN
 class HashEmbeddingProvider:
     name = "hash_embedding_provider"
     mode = "deterministic_fallback"
-    image_mode = "deterministic_hash"
+    image_mode = "exact_image_fingerprint_only"
     semantic_image_enabled = False
+    exact_image_fingerprint_enabled = True
 
     def embed_text(self, text: str) -> list[float]:
         normalized = " ".join(text.strip().lower().split()) or "<empty>"
@@ -111,16 +115,20 @@ class GeminiEmbeddingProvider:
         return get_gemini_client() is not None
 
     @property
+    def exact_image_fingerprint_enabled(self) -> bool:
+        return True
+
+    @property
     def image_mode(self) -> str:
         if self.semantic_image_enabled:
             return "semantic_gemini_descriptor"
-        return "deterministic_hash_fallback"
+        return "exact_image_fingerprint_only"
 
     @property
     def mode(self) -> str:
-        if self.semantic_image_enabled:
-            return "gemini_semantic_hybrid"
-        return "gemini_unavailable_fallback"
+        if get_gemini_client() is not None:
+            return "gemini_text_image_hybrid"
+        return "gemini_text_unavailable_fallback"
 
     def _embed_text_with_client(self, text: str) -> list[float] | None:
         client = get_gemini_client()
@@ -148,7 +156,7 @@ class GeminiEmbeddingProvider:
 
     def _semantic_image_descriptor(self, image_path: Path) -> str | None:
         client = get_gemini_client()
-        if client is None:
+        if client is None or not image_path.exists():
             return None
         try:
             from google.genai import types as genai_types  # type: ignore[import-untyped]
@@ -165,7 +173,7 @@ class GeminiEmbeddingProvider:
                     (
                         "Inspect this image for OmniTriage retrieval. Return JSON only with keys: "
                         "scene_summary, components_visible, visible_abnormalities, ocr_findings, "
-                        "hazard_signals, retrieval_keywords. Keep values concise and grounded in the image."
+                        "hazard_signals, retrieval_keywords. Keep all values short, grounded, and useful for similarity search."
                     ),
                 ],
                 config=genai_types.GenerateContentConfig(
@@ -247,6 +255,8 @@ def get_embedding_runtime_status(provider: EmbeddingProvider | None = None) -> d
         "provider_mode": resolved_provider.mode,
         "image_mode": resolved_provider.image_mode,
         "semantic_image_enabled": resolved_provider.semantic_image_enabled,
+        "retrieval_signal_mode": "hybrid_semantic_image" if resolved_provider.semantic_image_enabled else "perception_driven",
+        "exact_image_fingerprint_enabled": resolved_provider.exact_image_fingerprint_enabled,
         "embedding_dimension": EMBEDDING_DIMENSION,
         "warnings": warnings,
     }

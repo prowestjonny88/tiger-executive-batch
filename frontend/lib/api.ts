@@ -240,7 +240,7 @@ export type IncidentHistoryItem = {
   latest_diagnosis_source?: string | null;
   latest_retrieval_provider?: string | null;
   latest_retrieval_provider_mode?: string | null;
-  latest_image_embedding_mode?: string | null;
+  latest_retrieval_signal_mode?: string | null;
   latest_retrieval_warning?: string | null;
   latest_known_case?: string | null;
   latest_kb_gate_decision?: "accepted" | "contextual_only" | "rejected" | null;

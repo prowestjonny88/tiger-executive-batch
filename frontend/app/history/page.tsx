@@ -122,8 +122,8 @@ export default function HistoryPage() {
                                 {incident.latest_retrieval_provider_mode ? ` (${incident.latest_retrieval_provider_mode})` : ""}
                               </div>
                             ) : null}
-                            {incident.latest_image_embedding_mode ? (
-                              <div>Image mode: {incident.latest_image_embedding_mode}</div>
+                            {incident.latest_retrieval_signal_mode ? (
+                              <div>Retrieval signal: {incident.latest_retrieval_signal_mode}</div>
                             ) : null}
                             {incident.latest_retrieval_warning ? (
                               <div className="text-amber-700">{incident.latest_retrieval_warning}</div>
