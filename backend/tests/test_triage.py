@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from os import environ
 from pathlib import Path
 
 from unittest.mock import patch
@@ -220,6 +221,21 @@ def test_known_case_visible_abnormalities_are_promoted_to_hazard_flags():
     assert "melted_plastic" in diagnosis.hazard_flags
     assert "loose_termination" in diagnosis.hazard_flags
     uploaded.unlink(missing_ok=True)
+
+
+def test_retrieval_metadata_surfaces_hash_warning_outside_development():
+    with patch.dict(environ, {"APP_ENV": "production", "OMNITRIAGE_EMBEDDING_PROVIDER": "hash"}, clear=False):
+        diagnosis = run_diagnosis(
+            IncidentInput(
+                site_id="site-mall-01",
+                photo_hint="display off, no lights",
+                symptom_text="charger no pulse and no power",
+            )
+        )
+
+    assert diagnosis.retrieval_metadata is not None
+    assert diagnosis.retrieval_metadata.extra is not None
+    assert "Hash embeddings are active outside development." in diagnosis.retrieval_metadata.extra["warnings"]
 
 
 def test_routing_only_raises_when_local_site_resolver_is_unavailable():

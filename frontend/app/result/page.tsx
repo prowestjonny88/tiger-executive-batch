@@ -80,6 +80,11 @@ function formatGateDecision(value?: string | null) {
   return formatDiagnosisMethod(value);
 }
 
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
 export default function ResultAssessmentPage() {
   return (
     <Suspense
@@ -177,6 +182,8 @@ function ResultAssessment() {
   const info = outcomeInfo(triage);
   const isHazard = triage.diagnosis.hazard_flags.length > 0;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence?.storage_path);
+  const retrievalExtra = triage.kb_retrieval?.extra ?? {};
+  const retrievalWarnings = readStringArray(retrievalExtra.warnings);
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16">
       <Card className="w-full overflow-hidden shadow-xl border-slate-200 mb-8 relative z-10 pt-4">
@@ -322,12 +329,26 @@ function ResultAssessment() {
                     {triage.kb_retrieval.provider_name} ({triage.kb_retrieval.provider_mode})
                   </p>
                   <p className="text-slate-700 text-sm leading-relaxed">
+                    Image mode: {formatDiagnosisMethod(String(retrievalExtra.image_mode || "unavailable"))} | Signal trust:{" "}
+                    {formatDiagnosisMethod(String(retrievalExtra.image_signal_trust || "unavailable"))}
+                  </p>
+                  <p className="text-slate-700 text-sm leading-relaxed">
                     {triage.kb_retrieval.gate_basis}
                   </p>
+                  {typeof retrievalExtra.gate_basis_detail === "string" && retrievalExtra.gate_basis_detail ? (
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      {retrievalExtra.gate_basis_detail}
+                    </p>
+                  ) : null}
                   {triage.kb_retrieval.score_margin_top2 !== undefined && triage.kb_retrieval.score_margin_top2 !== null ? (
                     <p className="text-slate-700 text-sm leading-relaxed">
                       Top-1 margin: {formatPercent(triage.kb_retrieval.score_margin_top2)} | Stable neighborhood:{" "}
                       {triage.kb_retrieval.stable_neighborhood ? "Yes" : "No"}
+                    </p>
+                  ) : null}
+                  {retrievalWarnings.length > 0 ? (
+                    <p className="text-amber-700 text-sm leading-relaxed">
+                      Warning: {retrievalWarnings.join(" | ")}
                     </p>
                   ) : null}
                 </div>

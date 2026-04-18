@@ -131,6 +131,8 @@ def _extract_legacy_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         confidence = latest_triage_payload.get("confidence", {})
         retrieval = diagnosis.get("retrieval_metadata") or {}
         kb_retrieval = latest_triage_payload.get("kb_retrieval") or {}
+        kb_extra = kb_retrieval.get("extra") or {}
+        warnings = kb_extra.get("warnings") if isinstance(kb_extra, dict) else None
         summary["latest_issue_family"] = diagnosis.get("issue_family")
         summary["latest_resolver_tier"] = routing.get("resolver_tier")
         summary["latest_fault"] = diagnosis.get("fault_type") or diagnosis.get("likely_fault")
@@ -138,6 +140,9 @@ def _extract_legacy_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_hazard_level"] = diagnosis.get("hazard_level")
         summary["latest_diagnosis_source"] = diagnosis.get("diagnosis_source")
         summary["latest_retrieval_provider"] = retrieval.get("provider_name")
+        summary["latest_retrieval_provider_mode"] = kb_retrieval.get("provider_mode")
+        summary["latest_image_embedding_mode"] = kb_extra.get("image_mode") if isinstance(kb_extra, dict) else None
+        summary["latest_retrieval_warning"] = warnings[0] if isinstance(warnings, list) and warnings else None
         summary["latest_known_case"] = (
             (kb_retrieval.get("primary_candidate") or {}).get("canonical_file_name")
             or (diagnosis.get("known_case_hit") or {}).get("canonical_file_name")
@@ -151,6 +156,9 @@ def _extract_legacy_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_hazard_level"] = None
         summary["latest_diagnosis_source"] = None
         summary["latest_retrieval_provider"] = None
+        summary["latest_retrieval_provider_mode"] = None
+        summary["latest_image_embedding_mode"] = None
+        summary["latest_retrieval_warning"] = None
         summary["latest_known_case"] = None
         summary["latest_kb_gate_decision"] = None
 

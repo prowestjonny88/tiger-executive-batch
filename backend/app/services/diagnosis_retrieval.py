@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from app.core.models import (
 from app.db.persistence import fetch_known_case_candidates, get_known_case_index_status, init_db, upsert_known_case_index_entry
 from app.services.diagnosis_fallback import infer_issue_family
 from app.services.diagnosis_gate import decide_kb_gate
-from app.services.embeddings import EMBEDDING_DIMENSION, get_embedding_provider
+from app.services.embeddings import EMBEDDING_DIMENSION, get_embedding_provider, get_embedding_runtime_status
 from app.services.round1_dataset import round1_case_text, round1_image_path, round1_known_case_map, round1_known_cases
 
 
@@ -29,6 +28,12 @@ class RetrievalAssessment:
     retrieval_metadata: RetrievalMetadata | None
     strong_retrieval: bool
     default_summary: str
+
+
+def _isoformat_or_value(value: object) -> object:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()  # type: ignore[attr-defined]
+    return value
 
 
 def _resolve_query_image_path(storage_path: str | None) -> Path | None:
@@ -196,11 +201,13 @@ def _ensure_known_case_index(provider_name: str, provider_mode: str) -> dict[str
 
 def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEvidence) -> RetrievalAssessment:
     provider = get_embedding_provider()
+    runtime_status = get_embedding_runtime_status(provider)
     index_status = _ensure_known_case_index(provider.name, provider.mode)
     query_text = evidence.retrieval_text or incident.site_id
     query_text_vector = provider.embed_text(query_text)
     query_image_path = _resolve_query_image_path(incident.photo_evidence.storage_path) if incident.photo_evidence else None
     query_image_vector = provider.embed_image(query_image_path) if query_image_path is not None else None
+    semantic_image_enabled = bool(runtime_status["semantic_image_enabled"]) and query_image_vector is not None
 
     exact_case = None
     if incident.photo_evidence and incident.photo_evidence.filename:
@@ -219,9 +226,9 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
         case = KnownCaseHit.model_validate(payload)
         text_score = float(row.get("text_score") or 0.0)
         image_score = float(row.get("image_score") or 0.0)
-        image_weight = 0.55 if query_image_vector is not None and evidence.evidence_type != "screenshot" else 0.15
+        image_weight = 0.45 if semantic_image_enabled and evidence.evidence_type != "screenshot" else 0.08
         if evidence.evidence_type == "screenshot":
-            image_weight = 0.05
+            image_weight = 0.03 if semantic_image_enabled else 0.01
         text_weight = 1.0 - image_weight
         semantic_bonus, compatibility_score, notes = _compatible_bonus(evidence, case)
         score = max(min((text_score * text_weight) + (image_score * image_weight) + semantic_bonus, 1.0), 0.0)
@@ -229,14 +236,20 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             score = max(score, 0.99)
             compatibility_score = max(compatibility_score, 0.9)
             notes.append("Exact filename shortcut matched the KB image.")
-        elif image_score >= 0.9 and evidence.evidence_type in {"hardware_photo", "symptom_heavy_photo", "mixed_photo"}:
+        elif semantic_image_enabled and image_score >= 0.9 and evidence.evidence_type in {"hardware_photo", "symptom_heavy_photo", "mixed_photo"}:
             score = max(score, 0.9)
             compatibility_score = max(compatibility_score, 0.8)
-            notes.append("High image similarity strongly matched the KB case.")
-        elif image_score >= 0.75 and evidence.evidence_type in {"hardware_photo", "symptom_heavy_photo", "mixed_photo"}:
+            notes.append("Semantic image similarity strongly matched the KB case.")
+        elif semantic_image_enabled and image_score >= 0.75 and evidence.evidence_type in {"hardware_photo", "symptom_heavy_photo", "mixed_photo"}:
             score = max(score, 0.72)
             compatibility_score = max(compatibility_score, 0.7)
-            notes.append("Image similarity materially supported the KB case.")
+            notes.append("Semantic image similarity materially supported the KB case.")
+        elif not semantic_image_enabled and image_score >= 0.999:
+            score = max(score, 0.93)
+            compatibility_score = max(compatibility_score, 0.82)
+            notes.append("Exact fallback image fingerprint matched the KB case.")
+        elif query_image_vector is not None and not semantic_image_enabled and image_score >= 0.9:
+            notes.append("Strong fallback image fingerprint detected, but image-only boosts were intentionally limited.")
         candidates.append(
             _candidate_from_case(
                 case,
@@ -258,11 +271,18 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
     )
     if primary is not None:
         primary.compatibility_notes.extend(note for note in gate_notes if note not in primary.compatibility_notes)
-
-    warnings: list[str] = []
-    app_env = os.getenv("APP_ENV", "development").strip().lower()
-    if provider.name == "hash_embedding_provider" and app_env not in {"development", "dev", "test"}:
-        warnings.append("Hash embeddings are active outside development.")
+    runtime_warnings = runtime_status.get("warnings")
+    warnings = [str(warning) for warning in runtime_warnings] if isinstance(runtime_warnings, list) else []
+    image_signal_trust = "semantic" if semantic_image_enabled else "fallback_limited"
+    gate_basis_detail = (
+        "Accepted with semantic image agreement and structured evidence."
+        if gate_decision == "accepted" and semantic_image_enabled and primary is not None and (primary.image_score or 0.0) >= 0.75
+        else "Accepted from structured evidence and KB compatibility."
+        if gate_decision == "accepted"
+        else "Candidate set informed reasoning, but no case was strong enough to anchor directly."
+        if gate_decision == "contextual_only"
+        else "No candidate cleared compatibility and confidence requirements."
+    )
 
     kb_retrieval = KbRetrievalResult(
         query_text=query_text,
@@ -286,7 +306,14 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             "perception_mode": perception.mode,
             "retrieval_backend": "postgres_pgvector",
             "index_row_count": index_status.get("row_count"),
+            "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
             "embedding_dimension": EMBEDDING_DIMENSION,
+            "image_mode": runtime_status["image_mode"],
+            "semantic_image_enabled": runtime_status["semantic_image_enabled"],
+            "embedding_provider_name": runtime_status["provider_name"],
+            "embedding_provider_mode": runtime_status["provider_mode"],
+            "image_signal_trust": image_signal_trust,
+            "gate_basis_detail": gate_basis_detail,
             "warnings": warnings,
         },
     )
@@ -315,9 +342,14 @@ def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEv
             "weak_threshold": weak_threshold,
             "gate_decision": gate_decision,
             "gate_basis": gate_basis,
+            "gate_basis_detail": gate_basis_detail,
             "retrieval_backend": "postgres_pgvector",
             "score_margin_top2": round(margin, 4) if margin is not None else None,
             "top_family_consensus": consensus,
+            "image_mode": runtime_status["image_mode"],
+            "semantic_image_enabled": runtime_status["semantic_image_enabled"],
+            "image_signal_trust": image_signal_trust,
+            "warnings": warnings,
         },
     )
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Protocol
@@ -11,8 +12,17 @@ EMBEDDING_DIMENSION = 256
 
 
 class EmbeddingProvider(Protocol):
-    name: str
-    mode: str
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def mode(self) -> str: ...
+
+    @property
+    def image_mode(self) -> str: ...
+
+    @property
+    def semantic_image_enabled(self) -> bool: ...
 
     def embed_text(self, text: str) -> list[float]: ...
 
@@ -67,6 +77,8 @@ def _project_vector(values: list[float], target_dimension: int = EMBEDDING_DIMEN
 class HashEmbeddingProvider:
     name = "hash_embedding_provider"
     mode = "deterministic_fallback"
+    image_mode = "deterministic_hash"
+    semantic_image_enabled = False
 
     def embed_text(self, text: str) -> list[float]:
         normalized = " ".join(text.strip().lower().split()) or "<empty>"
@@ -89,15 +101,31 @@ class HashEmbeddingProvider:
 
 class GeminiEmbeddingProvider:
     name = "gemini_embedding_provider"
-    mode = "gemini_optional"
 
     def __init__(self, fallback: EmbeddingProvider | None = None) -> None:
         self._fallback = fallback or HashEmbeddingProvider()
+        self._image_vector_cache: dict[tuple[str, int, int], list[float]] = {}
 
-    def embed_text(self, text: str) -> list[float]:
+    @property
+    def semantic_image_enabled(self) -> bool:
+        return get_gemini_client() is not None
+
+    @property
+    def image_mode(self) -> str:
+        if self.semantic_image_enabled:
+            return "semantic_gemini_descriptor"
+        return "deterministic_hash_fallback"
+
+    @property
+    def mode(self) -> str:
+        if self.semantic_image_enabled:
+            return "gemini_semantic_hybrid"
+        return "gemini_unavailable_fallback"
+
+    def _embed_text_with_client(self, text: str) -> list[float] | None:
         client = get_gemini_client()
         if client is None:
-            return self._fallback.embed_text(text)
+            return None
         try:
             response = client.models.embed_content(  # type: ignore[attr-defined]
                 model="gemini-embedding-001",
@@ -107,14 +135,121 @@ class GeminiEmbeddingProvider:
             if values:
                 return _project_vector(values)
         except Exception:
-            return self._fallback.embed_text(text)
+            return None
+        return None
+
+    def _image_cache_key(self, image_path: Path) -> tuple[str, int, int]:
+        resolved = image_path.resolve(strict=False)
+        try:
+            stat = resolved.stat()
+            return (str(resolved), stat.st_size, stat.st_mtime_ns)
+        except OSError:
+            return (str(resolved), 0, 0)
+
+    def _semantic_image_descriptor(self, image_path: Path) -> str | None:
+        client = get_gemini_client()
+        if client is None:
+            return None
+        try:
+            from google.genai import types as genai_types  # type: ignore[import-untyped]
+        except ImportError:
+            return None
+        try:
+            response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=os.getenv("GEMINI_IMAGE_EMBED_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.0-flash")),
+                contents=[
+                    genai_types.Part.from_bytes(
+                        data=image_path.read_bytes(),
+                        mime_type="image/jpeg" if image_path.suffix.lower() in {".jpg", ".jpeg"} else "image/png",
+                    ),
+                    (
+                        "Inspect this image for OmniTriage retrieval. Return JSON only with keys: "
+                        "scene_summary, components_visible, visible_abnormalities, ocr_findings, "
+                        "hazard_signals, retrieval_keywords. Keep values concise and grounded in the image."
+                    ),
+                ],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=1024,
+                    response_mime_type="application/json",
+                ),
+            )
+            raw = (response.text or "").strip()
+            if raw.startswith("```"):
+                raw = raw.strip("`")
+                raw = raw.split("\n", 1)[-1]
+            data = json.loads(raw)
+        except Exception:
+            return None
+
+        descriptor_parts: list[str] = []
+        scene_summary = str(data.get("scene_summary") or "").strip()
+        if scene_summary:
+            descriptor_parts.append(scene_summary)
+        for label in (
+            "components_visible",
+            "visible_abnormalities",
+            "ocr_findings",
+            "hazard_signals",
+            "retrieval_keywords",
+        ):
+            values = data.get(label)
+            if isinstance(values, list):
+                normalized = [str(value).strip() for value in values if str(value).strip()]
+            elif isinstance(values, str):
+                normalized = [values.strip()] if values.strip() else []
+            else:
+                normalized = []
+            if normalized:
+                descriptor_parts.append(f"{label}: {'; '.join(normalized)}")
+        descriptor = " | ".join(part for part in descriptor_parts if part).strip()
+        return descriptor or None
+
+    def embed_text(self, text: str) -> list[float]:
+        embedded = self._embed_text_with_client(text)
+        if embedded is not None:
+            return embedded
         return self._fallback.embed_text(text)
 
     def embed_image(self, image_path: Path) -> list[float]:
+        if not image_path.exists():
+            return self._fallback.embed_image(image_path)
+        cache_key = self._image_cache_key(image_path)
+        cached = self._image_vector_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
+        descriptor = self._semantic_image_descriptor(image_path)
+        if descriptor:
+            embedded = self._embed_text_with_client(descriptor)
+            if embedded is not None:
+                self._image_vector_cache[cache_key] = list(embedded)
+                return embedded
         return self._fallback.embed_image(image_path)
 
     def embed_case(self, text: str, image_path: Path | None = None) -> list[float]:
-        return self._fallback.embed_case(text, image_path)
+        text_vector = self.embed_text(text)
+        if image_path is None:
+            return text_vector
+        image_vector = self.embed_image(image_path)
+        return [(left + right) / 2.0 for left, right in zip(text_vector, image_vector)]
+
+
+def get_embedding_runtime_status(provider: EmbeddingProvider | None = None) -> dict[str, object]:
+    resolved_provider = provider or get_embedding_provider()
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    warnings: list[str] = []
+    if resolved_provider.name == "hash_embedding_provider" and app_env not in {"development", "dev", "test"}:
+        warnings.append("Hash embeddings are active outside development.")
+    if not getattr(resolved_provider, "semantic_image_enabled", False) and app_env not in {"development", "dev", "test"}:
+        warnings.append("Semantic image embeddings are unavailable; retrieval image scoring is in fallback mode.")
+    return {
+        "provider_name": resolved_provider.name,
+        "provider_mode": resolved_provider.mode,
+        "image_mode": resolved_provider.image_mode,
+        "semantic_image_enabled": resolved_provider.semantic_image_enabled,
+        "embedding_dimension": EMBEDDING_DIMENSION,
+        "warnings": warnings,
+    }
 
 
 def get_embedding_provider() -> EmbeddingProvider:

@@ -1,9 +1,11 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput, KbRetrievalResult, PerceptionResult, StoredPhotoEvidence, StructuredEvidence
 from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
 from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput
+from app.services.embeddings import EMBEDDING_DIMENSION, GeminiEmbeddingProvider, HashEmbeddingProvider, get_embedding_runtime_status
 from app.services.intake import _call_gemini_intake, build_follow_up_questions
 
 
@@ -247,3 +249,51 @@ def test_build_follow_up_questions_uses_diagnosis_contract_fields():
 
     question_ids = {item["question_id"] for item in questions}
     assert question_ids == {"required_proof_next", "power_context", "error_text", "diagnosis_uncertainty"}
+
+
+def test_gemini_embedding_provider_uses_semantic_image_descriptor():
+    image_path = Path(__file__).parent / "test-uploads" / "semantic-image.jpg"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"\xff\xd8semantic-test\xff\xd9")
+
+    perception_response = MagicMock()
+    perception_response.text = json.dumps(
+        {
+            "scene_summary": "Open DB board with burnt terminal.",
+            "components_visible": ["db_board", "breaker"],
+            "visible_abnormalities": ["burn_mark"],
+            "ocr_findings": ["C32"],
+            "hazard_signals": ["overheat"],
+            "retrieval_keywords": ["burnt terminal", "db board"],
+        }
+    )
+    embedding_response = MagicMock()
+    embedding_response.embeddings = [MagicMock(values=[float(index) for index in range(300)])]
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = perception_response
+    mock_client.models.embed_content.return_value = embedding_response
+
+    with patch("app.services.embeddings.get_gemini_client", return_value=mock_client), patch(
+        "google.genai.types.GenerateContentConfig", MagicMock(), create=True
+    ), patch("google.genai.types.Part.from_bytes", MagicMock(return_value="image-part"), create=True):
+        provider = GeminiEmbeddingProvider()
+        vector = provider.embed_image(image_path)
+
+    assert len(vector) == EMBEDDING_DIMENSION
+    assert vector != HashEmbeddingProvider().embed_image(image_path)
+    assert mock_client.models.generate_content.called
+    assert mock_client.models.embed_content.called
+    image_path.unlink(missing_ok=True)
+
+
+def test_embedding_runtime_status_warns_for_hash_mode_outside_development():
+    with patch.dict("os.environ", {"APP_ENV": "production"}, clear=False):
+        status = get_embedding_runtime_status(HashEmbeddingProvider())
+
+    warnings = status["warnings"]
+    assert isinstance(warnings, list)
+    assert status["provider_name"] == "hash_embedding_provider"
+    assert status["image_mode"] == "deterministic_hash"
+    assert status["semantic_image_enabled"] is False
+    assert "Hash embeddings are active outside development." in warnings

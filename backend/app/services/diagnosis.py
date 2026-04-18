@@ -87,6 +87,11 @@ def run_diagnosis_with_debug(
         "missing_evidence": evidence.missing_evidence,
         "structured_evidence_summary": evidence.human_summary,
         "structured_retrieval_text": evidence.retrieval_text,
+        "retrieval_image_mode": retrieval.kb_retrieval.extra.get("image_mode") if retrieval.kb_retrieval.extra else None,
+        "retrieval_semantic_image_enabled": (
+            retrieval.kb_retrieval.extra.get("semantic_image_enabled") if retrieval.kb_retrieval.extra else None
+        ),
+        "retrieval_warnings": retrieval.kb_retrieval.extra.get("warnings") if retrieval.kb_retrieval.extra else [],
     }
     return perception, evidence, retrieval.kb_retrieval, diagnosis, debug
 

@@ -10,7 +10,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
-from app.db.persistence import init_db, save_audit, save_incident, update_incident
+from app.db.persistence import get_known_case_index_status, init_db, save_audit, save_incident, update_incident
+from app.services.embeddings import get_embedding_provider, get_embedding_runtime_status
 from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
 from app.services.history import get_incident_history_by_id, list_incident_history
 from app.services.triage import run_triage_with_debug
@@ -18,6 +19,7 @@ from app.services.triage import run_triage_with_debug
 app = FastAPI(title="OmniTriage API", version="0.1.0")
 app.mount("/uploads", StaticFiles(directory=get_upload_root(), check_dir=False), name="uploads")
 request_logger = logging.getLogger("omnitriage.request")
+runtime_logger = logging.getLogger("omnitriage.runtime")
 
 
 def _validated_site_ids() -> set[str]:
@@ -33,9 +35,34 @@ def _persist_incident(incident: IncidentInput) -> int:
     return save_incident(payload)
 
 
+def _isoformat_or_value(value: object) -> object:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()  # type: ignore[attr-defined]
+    return value
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
+    provider = get_embedding_provider()
+    runtime_status = get_embedding_runtime_status(provider)
+    index_status = get_known_case_index_status()
+    runtime_logger.info(
+        json.dumps(
+            {
+                "event": "runtime_startup",
+                "retrieval_backend": "postgres_pgvector",
+                "embedding_provider": runtime_status["provider_name"],
+                "embedding_mode": runtime_status["provider_mode"],
+                "image_mode": runtime_status["image_mode"],
+                "semantic_image_enabled": runtime_status["semantic_image_enabled"],
+                "embedding_dimension": runtime_status["embedding_dimension"],
+                "index_row_count": index_status.get("row_count"),
+                "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
+                "warnings": runtime_status["warnings"],
+            }
+        )
+    )
 
 
 @app.middleware("http")

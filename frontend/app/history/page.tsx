@@ -117,7 +117,16 @@ export default function HistoryPage() {
                               <div>KB gate: {incident.latest_kb_gate_decision}</div>
                             ) : null}
                             {incident.latest_retrieval_provider ? (
-                              <div>{incident.latest_retrieval_provider}</div>
+                              <div>
+                                {incident.latest_retrieval_provider}
+                                {incident.latest_retrieval_provider_mode ? ` (${incident.latest_retrieval_provider_mode})` : ""}
+                              </div>
+                            ) : null}
+                            {incident.latest_image_embedding_mode ? (
+                              <div>Image mode: {incident.latest_image_embedding_mode}</div>
+                            ) : null}
+                            {incident.latest_retrieval_warning ? (
+                              <div className="text-amber-700">{incident.latest_retrieval_warning}</div>
                             ) : null}
                           </div>
                         ) : null}
