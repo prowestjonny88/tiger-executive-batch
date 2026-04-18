@@ -334,6 +334,10 @@ function ResultAssessment() {
                     {formatDiagnosisMethod(String(retrievalExtra.image_signal_trust || "unavailable"))}
                   </p>
                   <p className="text-slate-700 text-sm leading-relaxed">
+                    Descriptor schema: {String(retrievalExtra.retrieval_descriptor_schema_version || "unavailable")} | Exact-image shortcut:{" "}
+                    {formatDiagnosisMethod(String(retrievalExtra.exact_image_shortcut_mode || "unavailable"))}
+                  </p>
+                  <p className="text-slate-700 text-sm leading-relaxed">
                     {triage.kb_retrieval.gate_basis}
                   </p>
                   {typeof retrievalExtra.gate_basis_detail === "string" && retrievalExtra.gate_basis_detail ? (
@@ -350,6 +354,19 @@ function ResultAssessment() {
                   {retrievalWarnings.length > 0 ? (
                     <p className="text-amber-700 text-sm leading-relaxed">
                       Warning: {retrievalWarnings.join(" | ")}
+                    </p>
+                  ) : null}
+                  {typeof retrievalExtra.exact_image_shortcut_used === "boolean" ? (
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      Exact-image shortcut used: {retrievalExtra.exact_image_shortcut_used ? "Yes" : "No"}
+                      {typeof retrievalExtra.structured_compatibility_confirmed === "boolean"
+                        ? ` | Structured compatibility confirmed: ${retrievalExtra.structured_compatibility_confirmed ? "Yes" : "No"}`
+                        : ""}
+                    </p>
+                  ) : null}
+                  {typeof retrievalExtra.shortcut_block_reason === "string" && retrievalExtra.shortcut_block_reason ? (
+                    <p className="text-slate-600 text-sm leading-relaxed">
+                      Shortcut policy: {retrievalExtra.shortcut_block_reason}
                     </p>
                   ) : null}
                 </div>

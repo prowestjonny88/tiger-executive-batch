@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
 from app.db.persistence import get_known_case_index_status, init_db, save_audit, save_incident, update_incident
-from app.services.embeddings import get_embedding_provider, get_embedding_runtime_status
+from app.services.embeddings import enforce_embedding_runtime_policy, get_embedding_provider, get_embedding_runtime_status
 from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
 from app.services.history import get_incident_history_by_id, list_incident_history
 from app.services.triage import run_triage_with_debug
@@ -41,11 +41,33 @@ def _isoformat_or_value(value: object) -> object:
     return value
 
 
+def _runtime_health_payload() -> dict[str, object]:
+    provider = get_embedding_provider()
+    runtime_status = get_embedding_runtime_status(provider)
+    index_status = get_known_case_index_status()
+    return {
+        "status": "ok",
+        "retrieval_backend": "postgres_pgvector",
+        "embedding_provider": runtime_status["provider_name"],
+        "embedding_mode": runtime_status["provider_mode"],
+        "image_mode": runtime_status["image_mode"],
+        "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
+        "exact_image_shortcut_mode": runtime_status["exact_image_shortcut_mode"],
+        "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
+        "semantic_descriptor_enabled": runtime_status["semantic_descriptor_enabled"],
+        "retrieval_descriptor_schema_version": runtime_status["retrieval_descriptor_schema_version"],
+        "embedding_dimension": runtime_status["embedding_dimension"],
+        "index_row_count": index_status.get("row_count"),
+        "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
+        "warnings": runtime_status["warnings"],
+    }
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
     provider = get_embedding_provider()
-    runtime_status = get_embedding_runtime_status(provider)
+    runtime_status = enforce_embedding_runtime_policy(provider)
     index_status = get_known_case_index_status()
     runtime_logger.info(
         json.dumps(
@@ -56,7 +78,10 @@ def startup() -> None:
                 "embedding_mode": runtime_status["provider_mode"],
                 "image_mode": runtime_status["image_mode"],
                 "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
+                "exact_image_shortcut_mode": runtime_status["exact_image_shortcut_mode"],
                 "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
+                "semantic_descriptor_enabled": runtime_status["semantic_descriptor_enabled"],
+                "retrieval_descriptor_schema_version": runtime_status["retrieval_descriptor_schema_version"],
                 "embedding_dimension": runtime_status["embedding_dimension"],
                 "index_row_count": index_status.get("row_count"),
                 "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
@@ -108,7 +133,7 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok"}
+    return _runtime_health_payload()
 
 
 @app.get("/api/v1/sites")

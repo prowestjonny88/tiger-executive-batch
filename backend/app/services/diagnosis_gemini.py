@@ -30,6 +30,20 @@ class ReasoningInput:
     missing_evidence: list[str]
 
 
+def should_invoke_reasoning(reasoning_input: ReasoningInput) -> tuple[bool, str]:
+    if reasoning_input.perception.mode == "text_only":
+        return False, "text_only_evidence"
+    if reasoning_input.gate_decision in {"contextual_only", "rejected"}:
+        return True, f"kb_gate_{reasoning_input.gate_decision}"
+    if reasoning_input.perception.mode == "heuristic":
+        return True, "perception_heuristic_fallback"
+    if reasoning_input.perception.uncertainty_notes:
+        return True, "perception_uncertainty"
+    if reasoning_input.missing_evidence:
+        return True, "missing_structured_evidence"
+    return False, "accepted_kb_without_material_uncertainty"
+
+
 class GeminiDiagnosisProvider:
     def analyze(self, reasoning_input: ReasoningInput) -> dict[str, Any]:
         client = get_gemini_client()

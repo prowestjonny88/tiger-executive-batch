@@ -77,6 +77,8 @@ def init_db() -> None:
                     embedding vector(32),
                     text_embedding vector({EMBEDDING_DIMENSION}),
                     image_embedding vector({EMBEDDING_DIMENSION}),
+                    descriptor_json JSONB,
+                    descriptor_schema_version TEXT,
                     evidence_type TEXT,
                     issue_family TEXT,
                     hazard_level TEXT,
@@ -91,6 +93,8 @@ def init_db() -> None:
             )
             cur.execute(f"ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS text_embedding vector({EMBEDDING_DIMENSION})")
             cur.execute(f"ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS image_embedding vector({EMBEDDING_DIMENSION})")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS descriptor_json JSONB")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS descriptor_schema_version TEXT")
             cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS evidence_type TEXT")
             cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS issue_family TEXT")
             cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS hazard_level TEXT")
@@ -201,6 +205,8 @@ def upsert_known_case_index_entry(
     *,
     text_embedding: list[float],
     image_embedding: list[float] | None,
+    descriptor_artifact: dict[str, Any] | None,
+    descriptor_schema_version: str,
     evidence_type: str,
     issue_family: str,
     hazard_level: str,
@@ -222,6 +228,8 @@ def upsert_known_case_index_entry(
                     embedding,
                     text_embedding,
                     image_embedding,
+                    descriptor_json,
+                    descriptor_schema_version,
                     evidence_type,
                     issue_family,
                     hazard_level,
@@ -231,13 +239,15 @@ def upsert_known_case_index_entry(
                     embedding_mode,
                     embedding_dimension
                 )
-                VALUES (%s, %s::jsonb, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+                VALUES (%s, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
                 ON CONFLICT (case_key)
                 DO UPDATE SET
                     payload_json = EXCLUDED.payload_json,
                     embedding = EXCLUDED.embedding,
                     text_embedding = EXCLUDED.text_embedding,
                     image_embedding = EXCLUDED.image_embedding,
+                    descriptor_json = EXCLUDED.descriptor_json,
+                    descriptor_schema_version = EXCLUDED.descriptor_schema_version,
                     evidence_type = EXCLUDED.evidence_type,
                     issue_family = EXCLUDED.issue_family,
                     hazard_level = EXCLUDED.hazard_level,
@@ -253,6 +263,8 @@ def upsert_known_case_index_entry(
                     legacy_embedding_literal,
                     text_literal,
                     image_literal,
+                    json.dumps(descriptor_artifact) if descriptor_artifact is not None else None,
+                    descriptor_schema_version,
                     evidence_type,
                     issue_family,
                     hazard_level,
@@ -275,7 +287,8 @@ def get_known_case_index_status() -> dict[str, Any]:
                     MAX(created_at) AS latest_created_at,
                     MAX(embedding_provider) AS embedding_provider,
                     MAX(embedding_mode) AS embedding_mode,
-                    MAX(embedding_dimension) AS embedding_dimension
+                    MAX(embedding_dimension) AS embedding_dimension,
+                    MAX(descriptor_schema_version) AS descriptor_schema_version
                 FROM known_case_index
                 """
             )
@@ -378,6 +391,9 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_retrieval_provider"] = retrieval.get("provider_name")
         summary["latest_retrieval_provider_mode"] = kb_retrieval.get("provider_mode")
         summary["latest_retrieval_signal_mode"] = kb_extra.get("retrieval_signal_mode") if isinstance(kb_extra, dict) else None
+        summary["latest_exact_image_shortcut_mode"] = (
+            kb_extra.get("exact_image_shortcut_mode") if isinstance(kb_extra, dict) else None
+        )
         summary["latest_retrieval_warning"] = warnings[0] if isinstance(warnings, list) and warnings else None
         summary["latest_known_case"] = (
             (kb_retrieval.get("primary_candidate") or {}).get("canonical_file_name")
@@ -394,6 +410,7 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_retrieval_provider"] = None
         summary["latest_retrieval_provider_mode"] = None
         summary["latest_retrieval_signal_mode"] = None
+        summary["latest_exact_image_shortcut_mode"] = None
         summary["latest_retrieval_warning"] = None
         summary["latest_known_case"] = None
         summary["latest_kb_gate_decision"] = None

@@ -270,28 +270,28 @@ def build_follow_up_questions(
     from app.services.diagnosis_perception import assess_perception
     from app.services.diagnosis_retrieval import assess_retrieval
     from app.services.diagnosis_synthesis import synthesize_diagnosis
-    from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput, assess_gemini
+    from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput, assess_gemini, should_invoke_reasoning
 
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
     perception = assess_perception(incident)
     evidence = build_structured_evidence(incident, perception)
     retrieval = assess_retrieval(incident, perception, evidence)
+    reasoning_input = ReasoningInput(
+        incident=incident,
+        perception=perception,
+        evidence=evidence,
+        kb_candidates=retrieval.kb_retrieval.candidates,
+        gate_decision=retrieval.kb_retrieval.gate_decision,
+        missing_evidence=evidence.missing_evidence,
+    )
+    invoke_reasoning, reasoning_call_basis = should_invoke_reasoning(reasoning_input)
     gemini_assessment = (
-        assess_gemini(
-            ReasoningInput(
-                incident=incident,
-                perception=perception,
-                evidence=evidence,
-                kb_candidates=retrieval.kb_retrieval.candidates,
-                gate_decision=retrieval.kb_retrieval.gate_decision,
-                missing_evidence=evidence.missing_evidence,
-            )
-        )
-        if perception.mode != "text_only"
+        assess_gemini(reasoning_input)
+        if invoke_reasoning
         else GeminiAssessment(
             payload=None,
-            raw_provider_output="Gemini reasoning skipped for text-only evidence.",
+            raw_provider_output=f"Gemini reasoning skipped by policy: {reasoning_call_basis}.",
             attempted=False,
             succeeded=False,
             error=None,

@@ -49,6 +49,18 @@ def test_preview_rejects_unknown_site():
     assert response.status_code == 404
 
 
+def test_health_endpoint_exposes_runtime_mode():
+    response = client.get("/api/v1/health")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["retrieval_backend"] == "postgres_pgvector"
+    assert payload["embedding_provider"] in {"hash_embedding_provider", "gemini_embedding_provider"}
+    assert payload["exact_image_shortcut_mode"] in {"demo", "guarded", "off"}
+    assert "warnings" in payload
+
+
 def test_preview_generates_round1_follow_up_questions():
     preview = client.post(
         "/api/v1/intake/preview",
@@ -158,6 +170,7 @@ def test_recent_incidents_endpoint_includes_latest_round1_summary():
     assert latest["latest_fault"] is not None
     assert latest["latest_hazard_level"] in {"low", "medium", "high"}
     assert latest["latest_diagnosis_source"] is not None
+    assert latest["latest_exact_image_shortcut_mode"] in {"demo", "guarded", "off", None}
 
 
 def test_incident_detail_replay_includes_normalized_triage_payload():

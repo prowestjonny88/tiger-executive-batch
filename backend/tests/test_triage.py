@@ -173,6 +173,52 @@ def test_retrieval_matches_uploaded_copy_by_image_content():
     uploaded.unlink(missing_ok=True)
 
 
+def test_exact_image_shortcut_mode_off_disables_filename_shortcut():
+    with patch.dict(environ, {"OMNITRIAGE_EXACT_IMAGE_SHORTCUT_MODE": "off"}, clear=False):
+        hit, metadata = retrieve_known_case(
+            RetrievalQuery(
+                text="burn marks and melted plastic at isolator terminal",
+                evidence_type="hardware_photo",
+                image_filename="Burnt Mark Issue (1).jpg",
+            )
+        )
+
+    assert metadata.extra is not None
+    assert metadata.extra.get("exact_image_shortcut_mode") == "off"
+    assert metadata.extra.get("exact_image_shortcut_used") is False
+    assert metadata.match_state in {"accepted", "weak", "rejected"}
+    if hit is not None:
+        assert hit.match_reason != "exact_filename_match"
+
+
+def test_exact_image_shortcut_mode_guarded_requires_compatibility():
+    uploaded = _copied_round1_image("MCB Tripped (1).jpg", "guarded-mode.jpg")
+    with patch.dict(environ, {"OMNITRIAGE_EXACT_IMAGE_SHORTCUT_MODE": "guarded"}, clear=False):
+        diagnosis = run_diagnosis(
+            IncidentInput(
+                site_id="site-mall-01",
+                photo_evidence=StoredPhotoEvidence(
+                    filename="MCB Tripped (1).jpg",
+                    media_type="image/jpeg",
+                    storage_path=str(uploaded),
+                    byte_size=64000,
+                ),
+                photo_hint="photo of tripped breaker",
+                symptom_text="breaker is down and charging will not start",
+            )
+        )
+
+    assert diagnosis.retrieval_metadata is not None
+    assert diagnosis.retrieval_metadata.extra is not None
+    assert diagnosis.retrieval_metadata.extra["exact_image_shortcut_mode"] == "guarded"
+    assert diagnosis.retrieval_metadata.extra["exact_image_shortcut_used"] in {True, False}
+    if diagnosis.retrieval_metadata.extra["exact_image_shortcut_used"]:
+        assert diagnosis.retrieval_metadata.extra["structured_compatibility_confirmed"] is True
+    else:
+        assert diagnosis.retrieval_metadata.extra["shortcut_block_reason"] is not None
+    uploaded.unlink(missing_ok=True)
+
+
 def test_run_diagnosis_uses_uploaded_image_content_when_text_is_weak():
     uploaded = _copied_round1_image("MCB Tripped (1).jpg", "uuid-upload-weak-text.jpg")
     source = round1_images_dir() / "MCB Tripped (1).jpg"

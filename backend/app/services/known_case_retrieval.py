@@ -7,6 +7,7 @@ from app.services.round1_dataset import round1_known_case_map
 from app.services.diagnosis_evidence import build_structured_evidence
 from app.services.diagnosis_perception import assess_perception
 from app.services.diagnosis_retrieval import assess_retrieval
+from app.services.embeddings import get_exact_image_shortcut_mode
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class RetrievalQuery:
 
 def retrieve_known_case(query: RetrievalQuery):
     exact_case = round1_known_case_map().get(query.image_filename or "")
-    if exact_case is not None and not query.image_storage_path:
+    if exact_case is not None and not query.image_storage_path and get_exact_image_shortcut_mode() == "demo":
         return exact_case.model_copy(update={"match_score": 0.99, "match_reason": "exact_filename_match"}), RetrievalMetadata(
             provider_name="kb_exact_shortcut",
             provider_mode="deterministic_shortcut",
@@ -31,7 +32,7 @@ def retrieve_known_case(query: RetrievalQuery):
             selected_case=exact_case.canonical_file_name,
             selected_score=0.99,
             rejection_threshold=0.68,
-            extra={"exact_filename": query.image_filename},
+            extra={"exact_filename": query.image_filename, "exact_image_shortcut_mode": "demo", "exact_image_shortcut_used": True},
         )
 
     incident = IncidentInput(

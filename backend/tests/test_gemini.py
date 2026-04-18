@@ -2,10 +2,26 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from app.core.models import IncidentInput, KbRetrievalResult, PerceptionResult, StoredPhotoEvidence, StructuredEvidence
+from app.core.models import (
+    IncidentInput,
+    KbCandidateHit,
+    KbRetrievalResult,
+    KnownCaseHit,
+    PerceptionResult,
+    RetrievalMetadata,
+    StoredPhotoEvidence,
+    StructuredEvidence,
+)
 from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
-from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput
-from app.services.embeddings import EMBEDDING_DIMENSION, GeminiEmbeddingProvider, HashEmbeddingProvider, get_embedding_runtime_status
+from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput, should_invoke_reasoning
+from app.services.diagnosis_retrieval import RetrievalAssessment
+from app.services.embeddings import (
+    EMBEDDING_DIMENSION,
+    GeminiEmbeddingProvider,
+    HashEmbeddingProvider,
+    enforce_embedding_runtime_policy,
+    get_embedding_runtime_status,
+)
 from app.services.intake import _call_gemini_intake, build_follow_up_questions
 
 
@@ -284,6 +300,9 @@ def test_gemini_embedding_provider_uses_semantic_image_descriptor():
     assert len(image_vector) == EMBEDDING_DIMENSION
     assert mock_client.models.embed_content.called
     assert mock_client.models.generate_content.called
+    descriptor_artifact = provider.image_descriptor_artifact(image_path)
+    assert descriptor_artifact is not None
+    assert descriptor_artifact["schema_version"] == "v1"
     assert image_vector != hash_provider.embed_image(image_path)
     image_path.unlink(missing_ok=True)
 
@@ -299,6 +318,7 @@ def test_embedding_runtime_status_warns_for_hash_mode_outside_development():
     assert status["semantic_image_enabled"] is False
     assert "Hash embeddings are active outside development." in warnings
     assert status["retrieval_signal_mode"] == "perception_driven"
+    assert status["exact_image_shortcut_mode"] == "guarded"
 
 
 def test_embedding_runtime_status_reports_semantic_image_mode_when_gemini_available():
@@ -308,4 +328,146 @@ def test_embedding_runtime_status_reports_semantic_image_mode_when_gemini_availa
     assert status["provider_name"] == "gemini_embedding_provider"
     assert status["semantic_image_enabled"] is True
     assert status["image_mode"] == "semantic_gemini_descriptor"
-    assert status["retrieval_signal_mode"] == "hybrid_semantic_image"
+    assert status["retrieval_signal_mode"] == "descriptor_driven_semantic_image"
+    assert status["retrieval_descriptor_schema_version"] == "v1"
+
+
+def test_embedding_policy_blocks_hash_mode_in_production_without_override():
+    with patch.dict("os.environ", {"APP_ENV": "production", "OMNITRIAGE_ALLOW_HASH_EMBEDDINGS": "false"}, clear=False):
+        try:
+            enforce_embedding_runtime_policy(HashEmbeddingProvider())
+            assert False, "Expected production hash policy to raise"
+        except RuntimeError as exc:
+            assert "Hash embeddings are disabled" in str(exc)
+
+
+def test_should_invoke_reasoning_skips_clean_accepted_case():
+    invoke, basis = should_invoke_reasoning(
+        ReasoningInput(
+            incident=IncidentInput(site_id="site-01"),
+            perception=PerceptionResult(
+                mode="vlm",
+                evidence_type="hardware_photo",
+                scene_summary="Clear breaker photo.",
+                confidence_score=0.88,
+            ),
+            evidence=StructuredEvidence(
+                evidence_type="hardware_photo",
+                human_summary="Clear breaker photo.",
+                retrieval_text="breaker clear photo",
+            ),
+            kb_candidates=[],
+            gate_decision="accepted",
+            missing_evidence=[],
+        )
+    )
+
+    assert invoke is False
+    assert basis == "accepted_kb_without_material_uncertainty"
+
+
+def test_run_diagnosis_with_debug_skips_reasoning_for_clean_accepted_case():
+    retrieval = RetrievalAssessment(
+        issue_family_hint="tripping",
+        evidence_type="hardware_photo",
+        query_text="clear breaker photo",
+        kb_retrieval=KbRetrievalResult(
+            query_text="clear breaker photo",
+            provider_name="gemini_embedding_provider",
+            provider_mode="gemini_text_image_hybrid",
+            gate_decision="accepted",
+            gate_basis="Accepted candidate aligned strongly.",
+            candidate_count=1,
+            primary_candidate=KbCandidateHit(
+                canonical_file_name="MCB Tripped (1).jpg",
+                match_score=0.92,
+                compatibility_score=0.9,
+                fault_type="mcb_tripped",
+                issue_family="tripping",
+                evidence_type="hardware_photo",
+                hazard_level="medium",
+                resolver_tier="local_site",
+                recommended_next_step="Reset the breaker and retest.",
+                required_proof_next="Photo of the breaker after reset.",
+                visual_observation="Breaker handle is visibly down.",
+                match_reason="pgvector_hybrid_retrieval",
+                visible_abnormalities=["tripped_breaker"],
+                retrieval_source="package_seed",
+                compatibility_notes=[],
+            ),
+            candidates=[],
+            image_embedding_used=True,
+            text_embedding_used=True,
+            top_family_consensus=["tripping"],
+            stable_neighborhood=True,
+            compatibility_notes=[],
+            extra={},
+        ),
+        known_case_hit=KnownCaseHit(
+            canonical_file_name="MCB Tripped (1).jpg",
+            match_score=0.92,
+            fault_type="mcb_tripped",
+            issue_family="tripping",
+            evidence_type="hardware_photo",
+            hazard_level="medium",
+            resolver_tier="local_site",
+            recommended_next_step="Reset the breaker and retest.",
+            required_proof_next="Photo of the breaker after reset.",
+            visual_observation="Breaker handle is visibly down.",
+            match_reason="pgvector_hybrid_retrieval",
+            visible_abnormalities=["tripped_breaker"],
+            retrieval_source="package_seed",
+        ),
+        retrieval_metadata=RetrievalMetadata(
+            provider_name="gemini_embedding_provider",
+            provider_mode="gemini_text_image_hybrid",
+            query_text="clear breaker photo",
+            image_embedding_used=True,
+            text_embedding_used=True,
+            candidate_count=1,
+            match_state="accepted",
+            selected_case="MCB Tripped (1).jpg",
+            selected_score=0.92,
+            rejection_threshold=0.68,
+        ),
+        strong_retrieval=True,
+        default_summary="Breaker handle is visibly down.",
+    )
+    provider = MagicMock()
+
+    with patch(
+        "app.services.diagnosis.assess_perception",
+        return_value=PerceptionResult(
+            mode="vlm",
+            evidence_type="hardware_photo",
+            scene_summary="Breaker handle is visibly down.",
+            components_visible=["breaker"],
+            visible_abnormalities=["tripped_breaker"],
+            ocr_findings=[],
+            hazard_signals=[],
+            uncertainty_notes=[],
+            confidence_score=0.88,
+            requires_follow_up=False,
+            provider_attempted=True,
+            fallback_used=False,
+        ),
+    ), patch(
+        "app.services.diagnosis.build_structured_evidence",
+        return_value=StructuredEvidence(
+            evidence_type="hardware_photo",
+            human_summary="Breaker handle is visibly down.",
+            retrieval_text="clear breaker photo",
+            components_visible=["breaker"],
+            visible_abnormalities=["tripped_breaker"],
+            ocr_findings=[],
+            hazard_signals=[],
+            missing_evidence=[],
+            incomplete=False,
+        ),
+    ), patch("app.services.diagnosis.assess_retrieval", return_value=retrieval):
+        _, _, _, diagnosis, debug = run_diagnosis_with_debug(IncidentInput(site_id="site-mall-01"), provider=provider)
+
+    provider.analyze.assert_not_called()
+    assert debug["reasoning_call_policy"] == "skipped"
+    assert debug["reasoning_call_basis"] == "accepted_kb_without_material_uncertainty"
+    assert diagnosis.diagnosis_source in {"kb_accepted", "kb_enriched_by_reasoning"}

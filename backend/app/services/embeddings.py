@@ -9,6 +9,9 @@ from typing import Protocol
 from app.services.gemini_client import get_gemini_client
 
 EMBEDDING_DIMENSION = 256
+RETRIEVAL_DESCRIPTOR_SCHEMA_VERSION = "v1"
+_DEV_ENVS = {"development", "dev", "test"}
+_PRODUCTION_ENVS = {"production", "prod"}
 
 
 class EmbeddingProvider(Protocol):
@@ -27,11 +30,16 @@ class EmbeddingProvider(Protocol):
     @property
     def exact_image_fingerprint_enabled(self) -> bool: ...
 
+    @property
+    def retrieval_descriptor_schema_version(self) -> str: ...
+
     def embed_text(self, text: str) -> list[float]: ...
 
     def embed_image(self, image_path: Path) -> list[float]: ...
 
     def embed_case(self, text: str, image_path: Path | None = None) -> list[float]: ...
+
+    def image_descriptor_artifact(self, image_path: Path) -> dict[str, object] | None: ...
 
 
 def _digest_to_unit_vector(payload: bytes) -> list[float]:
@@ -83,6 +91,7 @@ class HashEmbeddingProvider:
     image_mode = "exact_image_fingerprint_only"
     semantic_image_enabled = False
     exact_image_fingerprint_enabled = True
+    retrieval_descriptor_schema_version = RETRIEVAL_DESCRIPTOR_SCHEMA_VERSION
 
     def embed_text(self, text: str) -> list[float]:
         normalized = " ".join(text.strip().lower().split()) or "<empty>"
@@ -102,6 +111,9 @@ class HashEmbeddingProvider:
         image_vector = self.embed_image(image_path)
         return [(left + right) / 2.0 for left, right in zip(text_vector, image_vector)]
 
+    def image_descriptor_artifact(self, image_path: Path) -> dict[str, object] | None:
+        return None
+
 
 class GeminiEmbeddingProvider:
     name = "gemini_embedding_provider"
@@ -109,6 +121,7 @@ class GeminiEmbeddingProvider:
     def __init__(self, fallback: EmbeddingProvider | None = None) -> None:
         self._fallback = fallback or HashEmbeddingProvider()
         self._image_vector_cache: dict[tuple[str, int, int], list[float]] = {}
+        self._descriptor_cache: dict[tuple[str, int, int], dict[str, object]] = {}
 
     @property
     def semantic_image_enabled(self) -> bool:
@@ -117,6 +130,10 @@ class GeminiEmbeddingProvider:
     @property
     def exact_image_fingerprint_enabled(self) -> bool:
         return True
+
+    @property
+    def retrieval_descriptor_schema_version(self) -> str:
+        return RETRIEVAL_DESCRIPTOR_SCHEMA_VERSION
 
     @property
     def image_mode(self) -> str:
@@ -154,7 +171,7 @@ class GeminiEmbeddingProvider:
         except OSError:
             return (str(resolved), 0, 0)
 
-    def _semantic_image_descriptor(self, image_path: Path) -> str | None:
+    def _semantic_image_descriptor(self, image_path: Path) -> dict[str, object] | None:
         client = get_gemini_client()
         if client is None or not image_path.exists():
             return None
@@ -190,10 +207,10 @@ class GeminiEmbeddingProvider:
         except Exception:
             return None
 
-        descriptor_parts: list[str] = []
+        artifact: dict[str, object] = {"schema_version": RETRIEVAL_DESCRIPTOR_SCHEMA_VERSION}
         scene_summary = str(data.get("scene_summary") or "").strip()
         if scene_summary:
-            descriptor_parts.append(scene_summary)
+            artifact["scene_summary"] = scene_summary
         for label in (
             "components_visible",
             "visible_abnormalities",
@@ -208,10 +225,47 @@ class GeminiEmbeddingProvider:
                 normalized = [values.strip()] if values.strip() else []
             else:
                 normalized = []
+            artifact[label] = normalized
+        if not any(artifact.get(key) for key in artifact if key != "schema_version"):
+            return None
+        return artifact
+
+    def _descriptor_text(self, artifact: dict[str, object]) -> str | None:
+        descriptor_parts: list[str] = []
+        scene_summary = str(artifact.get("scene_summary") or "").strip()
+        if scene_summary:
+            descriptor_parts.append(scene_summary)
+        for label in (
+            "components_visible",
+            "visible_abnormalities",
+            "ocr_findings",
+            "hazard_signals",
+            "retrieval_keywords",
+        ):
+            values = artifact.get(label)
+            if isinstance(values, list):
+                normalized = [str(value).strip() for value in values if str(value).strip()]
+            elif isinstance(values, str):
+                normalized = [values.strip()] if values.strip() else []
+            else:
+                normalized = []
             if normalized:
                 descriptor_parts.append(f"{label}: {'; '.join(normalized)}")
         descriptor = " | ".join(part for part in descriptor_parts if part).strip()
         return descriptor or None
+
+    def image_descriptor_artifact(self, image_path: Path) -> dict[str, object] | None:
+        if not image_path.exists():
+            return None
+        cache_key = self._image_cache_key(image_path)
+        cached = self._descriptor_cache.get(cache_key)
+        if cached is not None:
+            return dict(cached)
+        artifact = self._semantic_image_descriptor(image_path)
+        if artifact is not None:
+            self._descriptor_cache[cache_key] = dict(artifact)
+            return dict(artifact)
+        return None
 
     def embed_text(self, text: str) -> list[float]:
         embedded = self._embed_text_with_client(text)
@@ -226,9 +280,10 @@ class GeminiEmbeddingProvider:
         cached = self._image_vector_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        descriptor = self._semantic_image_descriptor(image_path)
-        if descriptor:
-            embedded = self._embed_text_with_client(descriptor)
+        descriptor_artifact = self.image_descriptor_artifact(image_path)
+        descriptor_text = self._descriptor_text(descriptor_artifact) if descriptor_artifact is not None else None
+        if descriptor_text:
+            embedded = self._embed_text_with_client(descriptor_text)
             if embedded is not None:
                 self._image_vector_cache[cache_key] = list(embedded)
                 return embedded
@@ -246,20 +301,55 @@ def get_embedding_runtime_status(provider: EmbeddingProvider | None = None) -> d
     resolved_provider = provider or get_embedding_provider()
     app_env = os.getenv("APP_ENV", "development").strip().lower()
     warnings: list[str] = []
-    if resolved_provider.name == "hash_embedding_provider" and app_env not in {"development", "dev", "test"}:
+    allow_hash_embeddings = os.getenv("OMNITRIAGE_ALLOW_HASH_EMBEDDINGS", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    policy_violation: str | None = None
+    if resolved_provider.name == "hash_embedding_provider" and app_env not in _DEV_ENVS:
         warnings.append("Hash embeddings are active outside development.")
-    if not getattr(resolved_provider, "semantic_image_enabled", False) and app_env not in {"development", "dev", "test"}:
+    if resolved_provider.name == "hash_embedding_provider" and app_env in _PRODUCTION_ENVS and not allow_hash_embeddings:
+        policy_violation = (
+            "Hash embeddings are disabled in production-like environments unless "
+            "OMNITRIAGE_ALLOW_HASH_EMBEDDINGS=true."
+        )
+    if not getattr(resolved_provider, "semantic_image_enabled", False) and app_env not in _DEV_ENVS:
         warnings.append("Semantic image embeddings are unavailable; retrieval image scoring is in fallback mode.")
     return {
         "provider_name": resolved_provider.name,
         "provider_mode": resolved_provider.mode,
         "image_mode": resolved_provider.image_mode,
         "semantic_image_enabled": resolved_provider.semantic_image_enabled,
-        "retrieval_signal_mode": "hybrid_semantic_image" if resolved_provider.semantic_image_enabled else "perception_driven",
+        "retrieval_signal_mode": (
+            "descriptor_driven_semantic_image" if resolved_provider.semantic_image_enabled else "perception_driven"
+        ),
         "exact_image_fingerprint_enabled": resolved_provider.exact_image_fingerprint_enabled,
+        "exact_image_shortcut_mode": get_exact_image_shortcut_mode(),
+        "semantic_descriptor_enabled": resolved_provider.semantic_image_enabled,
+        "retrieval_descriptor_schema_version": resolved_provider.retrieval_descriptor_schema_version,
+        "allow_hash_embeddings": allow_hash_embeddings,
         "embedding_dimension": EMBEDDING_DIMENSION,
+        "policy_violation": policy_violation,
         "warnings": warnings,
     }
+
+
+def get_exact_image_shortcut_mode() -> str:
+    configured = os.getenv("OMNITRIAGE_EXACT_IMAGE_SHORTCUT_MODE", "").strip().lower()
+    if configured in {"demo", "guarded", "off"}:
+        return configured
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    return "demo" if app_env in _DEV_ENVS else "guarded"
+
+
+def enforce_embedding_runtime_policy(provider: EmbeddingProvider | None = None) -> dict[str, object]:
+    runtime_status = get_embedding_runtime_status(provider)
+    violation = runtime_status.get("policy_violation")
+    if isinstance(violation, str) and violation:
+        raise RuntimeError(violation)
+    return runtime_status
 
 
 def get_embedding_provider() -> EmbeddingProvider:

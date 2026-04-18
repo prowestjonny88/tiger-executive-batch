@@ -125,6 +125,9 @@ export default function HistoryPage() {
                             {incident.latest_retrieval_signal_mode ? (
                               <div>Retrieval signal: {incident.latest_retrieval_signal_mode}</div>
                             ) : null}
+                            {incident.latest_exact_image_shortcut_mode ? (
+                              <div>Exact-image shortcut: {incident.latest_exact_image_shortcut_mode}</div>
+                            ) : null}
                             {incident.latest_retrieval_warning ? (
                               <div className="text-amber-700">{incident.latest_retrieval_warning}</div>
                             ) : null}

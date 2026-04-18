@@ -15,7 +15,13 @@ from app.services.diagnosis_fallback import (
     infer_evidence_type,
     infer_issue_family,
 )
-from app.services.diagnosis_gemini import GeminiAssessment, GeminiDiagnosisProvider, ReasoningInput, assess_gemini
+from app.services.diagnosis_gemini import (
+    GeminiAssessment,
+    GeminiDiagnosisProvider,
+    ReasoningInput,
+    assess_gemini,
+    should_invoke_reasoning,
+)
 from app.services.diagnosis_perception import assess_perception
 from app.services.diagnosis_retrieval import RetrievalAssessment, assess_retrieval
 from app.services.diagnosis_synthesis import synthesize_diagnosis
@@ -31,26 +37,25 @@ def run_diagnosis_with_debug(
     perception = assess_perception(incident)
     evidence = build_structured_evidence(incident, perception)
     retrieval = assess_retrieval(incident, perception, evidence)
+    reasoning_input = ReasoningInput(
+        incident=incident,
+        perception=perception,
+        evidence=evidence,
+        kb_candidates=retrieval.kb_retrieval.candidates,
+        gate_decision=retrieval.kb_retrieval.gate_decision,
+        missing_evidence=evidence.missing_evidence,
+    )
+    invoke_reasoning, reasoning_call_basis = should_invoke_reasoning(reasoning_input)
     gemini = (
-        GeminiAssessment(
+        assess_gemini(reasoning_input, provider=provider)
+        if invoke_reasoning
+        else GeminiAssessment(
             payload=None,
-            raw_provider_output="Gemini reasoning skipped for text-only evidence.",
+            raw_provider_output=f"Gemini reasoning skipped by policy: {reasoning_call_basis}.",
             attempted=False,
             succeeded=False,
             error=None,
             latency_ms=0.0,
-        )
-        if perception.mode == "text_only"
-        else assess_gemini(
-            ReasoningInput(
-                incident=incident,
-                perception=perception,
-                evidence=evidence,
-                kb_candidates=retrieval.kb_retrieval.candidates,
-                gate_decision=retrieval.kb_retrieval.gate_decision,
-                missing_evidence=evidence.missing_evidence,
-            ),
-            provider=provider,
         )
     )
     resolution = synthesize_diagnosis(incident, perception, evidence, retrieval, gemini)
@@ -74,6 +79,8 @@ def run_diagnosis_with_debug(
         "kb_primary_candidate": retrieval.kb_retrieval.primary_candidate.canonical_file_name if retrieval.kb_retrieval.primary_candidate else None,
         "retrieval_provider": retrieval.kb_retrieval.provider_name,
         "retrieval_mode": retrieval.kb_retrieval.provider_mode,
+        "reasoning_call_policy": "invoked" if invoke_reasoning else "skipped",
+        "reasoning_call_basis": reasoning_call_basis,
     }
     logger.info(json.dumps({"event": "triage_gemini_attempt", **gemini_attempt}))
     debug = {
@@ -89,8 +96,17 @@ def run_diagnosis_with_debug(
         "structured_retrieval_text": evidence.retrieval_text,
         "retrieval_image_mode": retrieval.kb_retrieval.extra.get("image_mode") if retrieval.kb_retrieval.extra else None,
         "retrieval_signal_mode": retrieval.kb_retrieval.extra.get("retrieval_signal_mode") if retrieval.kb_retrieval.extra else None,
+        "retrieval_descriptor_schema_version": (
+            retrieval.kb_retrieval.extra.get("retrieval_descriptor_schema_version") if retrieval.kb_retrieval.extra else None
+        ),
         "retrieval_exact_image_fingerprint_enabled": (
             retrieval.kb_retrieval.extra.get("exact_image_fingerprint_enabled") if retrieval.kb_retrieval.extra else None
+        ),
+        "retrieval_exact_image_shortcut_mode": (
+            retrieval.kb_retrieval.extra.get("exact_image_shortcut_mode") if retrieval.kb_retrieval.extra else None
+        ),
+        "retrieval_exact_image_shortcut_used": (
+            retrieval.kb_retrieval.extra.get("exact_image_shortcut_used") if retrieval.kb_retrieval.extra else None
         ),
         "retrieval_warnings": retrieval.kb_retrieval.extra.get("warnings") if retrieval.kb_retrieval.extra else [],
     }

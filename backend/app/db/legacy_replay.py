@@ -142,6 +142,9 @@ def _extract_legacy_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_retrieval_provider"] = retrieval.get("provider_name")
         summary["latest_retrieval_provider_mode"] = kb_retrieval.get("provider_mode")
         summary["latest_retrieval_signal_mode"] = kb_extra.get("retrieval_signal_mode") if isinstance(kb_extra, dict) else None
+        summary["latest_exact_image_shortcut_mode"] = (
+            kb_extra.get("exact_image_shortcut_mode") if isinstance(kb_extra, dict) else None
+        )
         summary["latest_retrieval_warning"] = warnings[0] if isinstance(warnings, list) and warnings else None
         summary["latest_known_case"] = (
             (kb_retrieval.get("primary_candidate") or {}).get("canonical_file_name")
@@ -158,6 +161,7 @@ def _extract_legacy_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_retrieval_provider"] = None
         summary["latest_retrieval_provider_mode"] = None
         summary["latest_retrieval_signal_mode"] = None
+        summary["latest_exact_image_shortcut_mode"] = None
         summary["latest_retrieval_warning"] = None
         summary["latest_known_case"] = None
         summary["latest_kb_gate_decision"] = None
