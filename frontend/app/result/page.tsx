@@ -74,6 +74,12 @@ function formatPercent(value?: number | null) {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatGateDecision(value?: string | null) {
+  if (!value) return "Unavailable";
+  if (value === "contextual_only") return "Contextual Only";
+  return formatDiagnosisMethod(value);
+}
+
 export default function ResultAssessmentPage() {
   return (
     <Suspense
@@ -301,48 +307,91 @@ function ResultAssessment() {
               </div>
             ) : null}
 
-            {triage.diagnosis.known_case_hit || triage.diagnosis.retrieval_metadata ? (
+            {triage.kb_retrieval ? (
               <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
                 <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
-                  Retrieval Detail
+                  KB Retrieval
                 </h4>
-                {triage.diagnosis.known_case_hit ? (
+                <div className="space-y-2">
+                  <p className="text-slate-700 text-sm leading-relaxed">
+                    Gate: {formatGateDecision(triage.kb_retrieval.gate_decision)} | Provider:{" "}
+                    {triage.kb_retrieval.provider_name} ({triage.kb_retrieval.provider_mode})
+                  </p>
+                  <p className="text-slate-700 text-sm leading-relaxed">
+                    {triage.kb_retrieval.gate_reason}
+                  </p>
+                </div>
+                {triage.kb_retrieval.primary_candidate ? (
                   <div className="space-y-2">
                     <p className="text-slate-700 text-sm leading-relaxed">
-                      Known case: {triage.diagnosis.known_case_hit.canonical_file_name} (
-                      {Math.round(triage.diagnosis.known_case_hit.match_score * 100)}%) | Match:{" "}
-                      {triage.diagnosis.known_case_hit.match_reason}
+                      Primary candidate: {triage.kb_retrieval.primary_candidate.canonical_file_name} (
+                      {Math.round(triage.kb_retrieval.primary_candidate.match_score * 100)}%) | Match:{" "}
+                      {triage.kb_retrieval.primary_candidate.match_reason}
                     </p>
-                    {triage.diagnosis.known_case_hit.visible_abnormalities.length > 0 ? (
+                    {triage.kb_retrieval.primary_candidate.visible_abnormalities.length > 0 ? (
                       <p className="text-slate-700 text-sm leading-relaxed">
                         Visible abnormalities:{" "}
-                        {triage.diagnosis.known_case_hit.visible_abnormalities.map(formatFlagLabel).join(" | ")}
+                        {triage.kb_retrieval.primary_candidate.visible_abnormalities.map(formatFlagLabel).join(" | ")}
                       </p>
                     ) : null}
                   </div>
                 ) : null}
-                {triage.diagnosis.retrieval_metadata ? (
+                {triage.kb_retrieval.candidates.length > 0 ? (
                   <div className="space-y-1">
                     <p className="text-slate-700 text-sm leading-relaxed">
-                      Provider: {triage.diagnosis.retrieval_metadata.provider_name} ({triage.diagnosis.retrieval_metadata.provider_mode})
+                      Top candidates:{" "}
+                      {triage.kb_retrieval.candidates
+                        .map((candidate) => `${candidate.canonical_file_name} (${Math.round(candidate.match_score * 100)}%)`)
+                        .join(" | ")}
                     </p>
-                    <p className="text-slate-700 text-sm leading-relaxed">
-                      Match state: {formatDiagnosisMethod(triage.diagnosis.retrieval_metadata.match_state)} | Score:{" "}
-                      {formatPercent(triage.diagnosis.retrieval_metadata.selected_score)}
-                    </p>
-                    {triage.diagnosis.retrieval_metadata.match_state !== "accepted" &&
-                    triage.diagnosis.retrieval_metadata.match_state !== "exact_filename" ? (
+                    {triage.kb_retrieval.gate_decision !== "accepted" ? (
                       <p className="text-slate-700 text-sm leading-relaxed">
-                        Acceptance threshold: {formatPercent(triage.diagnosis.retrieval_metadata.rejection_threshold)}
-                        {typeof triage.diagnosis.retrieval_metadata.extra?.top_candidate === "string"
-                          ? ` | Top candidate: ${triage.diagnosis.retrieval_metadata.extra.top_candidate}`
-                          : ""}
+                        Acceptance threshold: {formatPercent(triage.kb_retrieval.rejection_threshold)}
+                        {triage.kb_retrieval.weak_threshold ? ` | Weak threshold: ${formatPercent(triage.kb_retrieval.weak_threshold)}` : ""}
                       </p>
                     ) : null}
                   </div>
                 ) : null}
               </div>
             ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8 text-left">
+            <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+                Perception
+              </h4>
+              <p className="font-bold text-slate-900 text-base">{triage.perception.scene_summary}</p>
+              <p className="text-slate-600 text-sm mt-2">
+                Mode: {formatDiagnosisMethod(triage.perception.mode)} | Evidence: {formatDiagnosisMethod(triage.perception.evidence_type)}
+              </p>
+              {triage.perception.components_visible.length > 0 ? (
+                <p className="text-slate-700 text-sm mt-2">
+                  Components: {triage.perception.components_visible.map(formatFlagLabel).join(" | ")}
+                </p>
+              ) : null}
+              {triage.perception.ocr_findings.length > 0 ? (
+                <p className="text-slate-700 text-sm mt-2">
+                  OCR: {triage.perception.ocr_findings.join(" | ")}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="bg-slate-50 border-l-4 border-slate-400 rounded-r-xl p-5 shadow-sm">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">
+                Reasoning
+              </h4>
+              <p className="text-slate-700 text-sm leading-relaxed">
+                {triage.diagnosis.reasoning_notes.length > 0
+                  ? triage.diagnosis.reasoning_notes.join(" ")
+                  : triage.confidence.rationale}
+              </p>
+              {triage.perception.uncertainty_notes.length > 0 ? (
+                <p className="text-slate-600 text-sm mt-2">
+                  Uncertainty: {triage.perception.uncertainty_notes.join(" | ")}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-8">

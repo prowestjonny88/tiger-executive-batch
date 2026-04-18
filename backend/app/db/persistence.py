@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any, Iterator
 
 DEFAULT_POSTGRES_URL = "postgresql://omnitriage:omnitriage@localhost:5432/omnitriage"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_POSTGRES_URL)
-LEGACY_SQLITE_PATH = Path(os.getenv("LEGACY_SQLITE_PATH", Path(__file__).resolve().parents[2] / "omnitriage.sqlite3"))
 
 try:
     import psycopg
@@ -37,14 +34,6 @@ def _pg_connection() -> Iterator[Any]:
         conn.commit()
     finally:
         conn.close()
-
-
-def _legacy_connect() -> sqlite3.Connection | None:
-    if not LEGACY_SQLITE_PATH.exists():
-        return None
-    conn = sqlite3.connect(LEGACY_SQLITE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def init_db() -> None:
@@ -184,58 +173,6 @@ def save_known_case_snapshot(case_key: str, payload: dict[str, Any], embedding: 
             )
 
 
-def _normalize_legacy_triage_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    if payload.get("routing") and payload.get("diagnosis", {}).get("issue_family"):
-        return payload
-
-    diagnosis = payload.get("diagnosis", {})
-    routing = payload.get("routing", {})
-    workflow = payload.get("workflow", {})
-    issue_family = diagnosis.get("issue_family") or diagnosis.get("issue_type") or workflow.get("issue_type") or "unknown_mixed"
-    hazard_level = "high" if diagnosis.get("hazard_flags") else "medium"
-    resolver_tier = routing.get("resolver_tier") or ("remote_ops" if workflow.get("outcome") == "escalate" else "driver")
-    recommended_next_step = routing.get("next_action") or workflow.get("next_action") or "Review the incident and collect clearer evidence."
-    fallback_action = routing.get("fallback_action") or workflow.get("fallback_action") or "Escalate to remote operations if unresolved."
-
-    return {
-        **payload,
-        "diagnosis": {
-            "issue_family": issue_family,
-            "fault_type": diagnosis.get("fault_type") or diagnosis.get("likely_fault") or "legacy_fault",
-            "evidence_type": diagnosis.get("evidence_type") or "unknown",
-            "hazard_level": diagnosis.get("hazard_level") or hazard_level,
-            "resolver_tier": diagnosis.get("resolver_tier") or resolver_tier,
-            "likely_fault": diagnosis.get("likely_fault") or diagnosis.get("fault_type") or "Legacy triage fault",
-            "evidence_summary": diagnosis.get("evidence_summary") or diagnosis.get("raw_provider_output") or "Legacy triage record.",
-            "required_proof_next": diagnosis.get("required_proof_next"),
-            "raw_provider_output": diagnosis.get("raw_provider_output") or "Legacy triage record normalized for replay.",
-            "raw_ocr_text": diagnosis.get("raw_ocr_text"),
-            "confidence_score": diagnosis.get("confidence_score") or payload.get("confidence", {}).get("score") or 0.5,
-            "confidence_band": diagnosis.get("confidence_band") or payload.get("confidence", {}).get("band") or "medium",
-            "unknown_flag": diagnosis.get("unknown_flag", issue_family == "unknown_mixed"),
-            "requires_follow_up": payload.get("confidence", {}).get("requires_follow_up", False),
-            "follow_up_prompts": [],
-            "diagnosis_source": diagnosis.get("diagnosis_source") or "legacy_normalization",
-            "branch_name": diagnosis.get("branch_name") or "legacy_normalization",
-            "hazard_flags": diagnosis.get("hazard_flags", []),
-            "known_case_hit": diagnosis.get("known_case_hit"),
-            "retrieval_metadata": diagnosis.get("retrieval_metadata"),
-            "confidence_reasoning": diagnosis.get("confidence_reasoning"),
-        },
-        "routing": {
-            "issue_family": issue_family,
-            "fault_type": diagnosis.get("fault_type") or diagnosis.get("likely_fault") or "legacy_fault",
-            "hazard_level": diagnosis.get("hazard_level") or hazard_level,
-            "resolver_tier": resolver_tier,
-            "routing_rationale": routing.get("routing_rationale") or workflow.get("rationale") or "Legacy triage record normalized for replay/history.",
-            "recommended_next_step": recommended_next_step,
-            "fallback_action": fallback_action,
-            "required_proof_next": diagnosis.get("required_proof_next"),
-            "escalation_required": resolver_tier in {"remote_ops", "technician"},
-        },
-    }
-
-
 def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
     summary = dict(row)
     latest_triage_payload_raw = summary.pop("latest_triage_payload_json", None)
@@ -246,11 +183,12 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
     summary["follow_up_answers"] = follow_up_answers_raw if isinstance(follow_up_answers_raw, dict) else follow_up_answers_raw
 
     if latest_triage_payload_raw:
-        latest_triage_payload = _normalize_legacy_triage_payload(latest_triage_payload_raw)
+        latest_triage_payload = latest_triage_payload_raw
         diagnosis = latest_triage_payload.get("diagnosis", {})
         routing = latest_triage_payload.get("routing", {})
         confidence = latest_triage_payload.get("confidence", {})
         retrieval = diagnosis.get("retrieval_metadata") or {}
+        kb_retrieval = latest_triage_payload.get("kb_retrieval") or {}
         summary["latest_issue_family"] = diagnosis.get("issue_family")
         summary["latest_resolver_tier"] = routing.get("resolver_tier")
         summary["latest_fault"] = diagnosis.get("fault_type") or diagnosis.get("likely_fault")
@@ -258,7 +196,11 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_hazard_level"] = diagnosis.get("hazard_level")
         summary["latest_diagnosis_source"] = diagnosis.get("diagnosis_source")
         summary["latest_retrieval_provider"] = retrieval.get("provider_name")
-        summary["latest_known_case"] = (diagnosis.get("known_case_hit") or {}).get("canonical_file_name")
+        summary["latest_known_case"] = (
+            (kb_retrieval.get("primary_candidate") or {}).get("canonical_file_name")
+            or (diagnosis.get("known_case_hit") or {}).get("canonical_file_name")
+        )
+        summary["latest_kb_gate_decision"] = kb_retrieval.get("gate_decision")
     else:
         summary["latest_issue_family"] = None
         summary["latest_resolver_tier"] = None
@@ -268,6 +210,7 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
         summary["latest_diagnosis_source"] = None
         summary["latest_retrieval_provider"] = None
         summary["latest_known_case"] = None
+        summary["latest_kb_gate_decision"] = None
 
     return summary
 
@@ -316,59 +259,7 @@ def list_recent_incidents(limit: int = 20) -> list[dict[str, Any]]:
             )
             rows = cur.fetchall()
 
-    results = [_extract_incident_history(row) for row in rows]
-    legacy_conn = _legacy_connect()
-    if legacy_conn is None:
-        return results
-    with legacy_conn as conn:
-        legacy_rows = conn.execute(
-            """
-            SELECT
-                incidents.id,
-                incidents.site_id,
-                incidents.charger_id,
-                json(photo_evidence_json) AS photo_evidence_json,
-                incidents.photo_hint,
-                incidents.symptom_text,
-                incidents.error_code,
-                incidents.demo_scenario_id,
-                incidents.created_at,
-                (
-                    SELECT stage
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_stage,
-                (
-                    SELECT created_at
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_stage_at,
-                (
-                    SELECT payload_json
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id AND triage_audits.stage = 'triage_result'
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_triage_payload_json
-            FROM incidents
-            ORDER BY incidents.id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        ).fetchall()
-        for row in legacy_rows:
-            item = dict(row)
-            if item.get("photo_evidence_json"):
-                item["photo_evidence_json"] = json.loads(item["photo_evidence_json"])
-            if item.get("latest_triage_payload_json"):
-                item["latest_triage_payload_json"] = json.loads(item["latest_triage_payload_json"])
-            results.append(_extract_incident_history(item))
-    results.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
-    return results[:limit]
+    return [_extract_incident_history(row) for row in rows]
 
 
 def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
@@ -414,65 +305,10 @@ def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
                 (incident_id,),
             )
             row = cur.fetchone()
-    if row is not None:
-        result = _extract_incident_history(row)
-        if row.get("latest_triage_payload_json"):
-            result["triage_payload"] = _normalize_legacy_triage_payload(row["latest_triage_payload_json"])
-        return result
-
-    legacy_conn = _legacy_connect()
-    if legacy_conn is None:
+    if row is None:
         return None
-    with legacy_conn as conn:
-        row = conn.execute(
-            """
-            SELECT
-                incidents.id,
-                incidents.site_id,
-                incidents.charger_id,
-                incidents.photo_evidence_json,
-                incidents.photo_hint,
-                incidents.symptom_text,
-                incidents.error_code,
-                incidents.follow_up_answers_json,
-                incidents.demo_scenario_id,
-                incidents.created_at,
-                (
-                    SELECT stage
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_stage,
-                (
-                    SELECT created_at
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_stage_at,
-                (
-                    SELECT payload_json
-                    FROM triage_audits
-                    WHERE triage_audits.incident_id = incidents.id AND triage_audits.stage = 'triage_result'
-                    ORDER BY triage_audits.id DESC
-                    LIMIT 1
-                ) AS latest_triage_payload_json
-            FROM incidents
-            WHERE incidents.id = ?
-            """,
-            (incident_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        item = dict(row)
-        if item.get("photo_evidence_json"):
-            item["photo_evidence_json"] = json.loads(item["photo_evidence_json"])
-        if item.get("follow_up_answers_json"):
-            item["follow_up_answers_json"] = json.loads(item["follow_up_answers_json"])
-        if item.get("latest_triage_payload_json"):
-            item["latest_triage_payload_json"] = json.loads(item["latest_triage_payload_json"])
-        result = _extract_incident_history(item)
-        if item.get("latest_triage_payload_json"):
-            result["triage_payload"] = _normalize_legacy_triage_payload(item["latest_triage_payload_json"])
-        return result
+
+    result = _extract_incident_history(row)
+    if row.get("latest_triage_payload_json"):
+        result["triage_payload"] = row["latest_triage_payload_json"]
+    return result

@@ -264,45 +264,44 @@ def build_follow_up_questions(
     quality_status: str,
 ) -> list[dict[str, str]]:
     """
-    Build follow-up questions. Uses Gemini when available; heuristic otherwise.
+    Build follow-up questions from the staged perception -> evidence -> KB pipeline.
     """
-    # Gemini path
-    if get_gemini_client() is not None:
-        try:
-            _, _, questions = _call_gemini_intake(incident, incident.photo_evidence)
-            if questions:
-                return questions
-        except Exception:  # noqa: BLE001
-            pass  # Fall through to heuristic
-
-    # Heuristic fallback
-    from app.services.diagnosis import run_diagnosis
+    from app.services.diagnosis_evidence import build_structured_evidence
+    from app.services.diagnosis_perception import assess_perception
+    from app.services.diagnosis_retrieval import assess_retrieval
+    from app.services.diagnosis_synthesis import synthesize_diagnosis
+    from app.services.diagnosis_gemini import assess_gemini
 
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
-    diagnosis = run_diagnosis(incident)
+    perception = assess_perception(incident)
+    evidence = build_structured_evidence(incident, perception)
+    retrieval = assess_retrieval(incident, perception, evidence)
+    synthesis = synthesize_diagnosis(incident, perception, evidence, retrieval, assess_gemini(incident))
 
-    if "required_proof_next" not in answered and diagnosis.required_proof_next:
-        questions.append({"question_id": "required_proof_next", "prompt": diagnosis.required_proof_next})
-    if (
-        "photo_request" not in answered
-        and diagnosis.requires_follow_up
-        and (quality_status != "usable" or diagnosis.evidence_type in {"symptom_report", "unknown"})
+    if "required_proof_next" not in answered and synthesis.required_proof_next:
+        questions.append({"question_id": "required_proof_next", "prompt": synthesis.required_proof_next})
+    if "photo_request" not in answered and (
+        quality_status != "usable" or "clear_photo_of_asset" in evidence.missing_evidence or perception.mode == "text_only"
     ):
         questions.append({"question_id": "photo_request", "prompt": FOLLOW_UP_QUESTION_BANK["photo_request"]})
-    if (
-        "power_context" not in answered
-        and diagnosis.requires_follow_up
-        and diagnosis.unknown_flag
-        and diagnosis.evidence_type in {"hardware_photo", "symptom_report", "symptom_heavy_photo", "screenshot", "unknown"}
-    ):
+    if "power_context" not in answered and "upstream_power_context" in evidence.missing_evidence:
         questions.append({"question_id": "power_context", "prompt": FOLLOW_UP_QUESTION_BANK["power_context"]})
-    if (
-        "error_text" not in answered
-        and diagnosis.requires_follow_up
-        and diagnosis.evidence_type == "screenshot"
-        and not incident.error_code
-    ):
+    if "error_text" not in answered and perception.evidence_type == "screenshot" and not perception.ocr_findings:
         questions.append({"question_id": "error_text", "prompt": FOLLOW_UP_QUESTION_BANK["error_text"]})
+    if "component_context" not in answered and "component_identification" in evidence.missing_evidence:
+        questions.append(
+            {
+                "question_id": "component_context",
+                "prompt": "Provide a clearer close-up showing the exact breaker, isolator, or termination point involved.",
+            }
+        )
+    if "diagnosis_uncertainty" not in answered and synthesis.requires_follow_up and synthesis.unknown_flag:
+        questions.append(
+            {
+                "question_id": "diagnosis_uncertainty",
+                "prompt": "Confirm what symptom was observed on site after the photo was taken, including power state and charger response.",
+            }
+        )
 
     return questions[:4]

@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
-from app.db.persistence import init_db, list_recent_incidents, save_audit, save_incident, update_incident
+from app.db.persistence import init_db, save_audit, save_incident, update_incident
 from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
+from app.services.history import get_incident_history_by_id, list_incident_history
 from app.services.triage import run_triage_with_debug
 
 app = FastAPI(title="OmniTriage API", version="0.1.0")
@@ -94,13 +95,12 @@ def demo_scenarios():
 
 @app.get("/api/v1/incidents")
 def incidents():
-    return list_recent_incidents()
+    return list_incident_history()
 
 
 @app.get("/api/v1/incidents/{incident_id}")
 def get_incident(incident_id: int):
-    from app.db.persistence import get_incident_by_id
-    incident = get_incident_by_id(incident_id)
+    incident = get_incident_history_by_id(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident

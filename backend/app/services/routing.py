@@ -3,9 +3,17 @@ from __future__ import annotations
 from app.core.models import ConfidenceAssessment, DiagnosisResult, IncidentInput, ResolverTier, RoutingDecision, SiteCapabilityProfile
 
 
-def _base_resolver(issue_family: str, hazard_level: str, unknown_flag: bool, required_proof_next: str | None) -> ResolverTier:
+def _base_resolver(
+    issue_family: str,
+    hazard_level: str,
+    unknown_flag: bool,
+    required_proof_next: str | None,
+    evidence_type: str,
+) -> ResolverTier:
     if hazard_level == "high":
         return "technician"
+    if evidence_type == "screenshot":
+        return "remote_ops"
     if unknown_flag or issue_family == "unknown_mixed":
         return "remote_ops"
     if issue_family == "tripping":
@@ -40,6 +48,7 @@ def route_incident(
         diagnosis.hazard_level,
         diagnosis.unknown_flag,
         diagnosis.required_proof_next,
+        diagnosis.evidence_type,
     )
     resolver_tier = _site_adjusted_resolver(base_resolver, site, diagnosis.hazard_level)
 
@@ -58,6 +67,7 @@ def route_incident(
         f"Issue family: {diagnosis.issue_family}.",
         f"Fault type: {diagnosis.fault_type}.",
         f"Hazard level: {diagnosis.hazard_level}.",
+        f"Evidence type: {diagnosis.evidence_type}.",
         f"Confidence band: {confidence.band.value if hasattr(confidence.band, 'value') else confidence.band}.",
         f"Base routing matrix selected {base_resolver}.",
     ]
@@ -72,6 +82,8 @@ def route_incident(
             rationale_parts.append("Remote ops unavailable, so the route was raised.")
     if diagnosis.required_proof_next:
         rationale_parts.append(f"Required proof next: {diagnosis.required_proof_next}")
+    if diagnosis.reasoning_notes:
+        rationale_parts.append(f"Diagnosis notes: {' '.join(diagnosis.reasoning_notes[:2])}")
 
     return RoutingDecision(
         issue_family=diagnosis.issue_family,

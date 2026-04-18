@@ -28,6 +28,7 @@ try:
     _genai_available = True
     _genai_import_error = None
 except Exception as exc:
+    _genai = None
     _genai_available = False
     _genai_import_error = exc
 
@@ -53,6 +54,7 @@ def get_gemini_client() -> object | None:
         return None
 
     try:
+        assert _genai is not None
         _client = _genai.Client(api_key=api_key)
         print("[gemini_client] Gemini client initialized successfully")
     except Exception as exc:

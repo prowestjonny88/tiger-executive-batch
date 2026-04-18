@@ -52,8 +52,10 @@ def test_no_power_case_routes_to_driver_when_non_hazardous():
     )
 
     assert result.diagnosis.issue_family == "no_power"
-    assert result.routing.resolver_tier == "driver"
-    assert result.routing.escalation_required is False
+    assert result.diagnosis.diagnosis_source == "text_only_incomplete"
+    assert result.routing.resolver_tier == "remote_ops"
+    assert result.routing.escalation_required is True
+    assert result.perception.mode == "text_only"
 
 
 def test_screenshot_case_routes_to_remote_ops():
@@ -114,7 +116,7 @@ def test_unknown_mixed_non_hazard_defaults_to_remote_ops():
 
 
 def test_gemini_failure_falls_back_to_round1_retrieval():
-    with patch("app.services.diagnosis.get_gemini_client", return_value=None):
+    with patch("app.services.diagnosis_gemini.get_gemini_client", return_value=None):
         diagnosis = run_diagnosis(
             IncidentInput(
                 site_id="site-mall-01",
@@ -123,7 +125,7 @@ def test_gemini_failure_falls_back_to_round1_retrieval():
             )
         )
 
-    assert diagnosis.diagnosis_source in {"round1_package_retrieval", "heuristic_policy_fallback"}
+    assert diagnosis.diagnosis_source == "text_only_incomplete"
     assert diagnosis.issue_family == "no_power"
 
 
@@ -231,4 +233,5 @@ def test_routing_only_raises_when_local_site_resolver_is_unavailable():
 
     assert result.diagnosis.issue_family == "tripping"
     assert result.routing.resolver_tier == "remote_ops"
-    assert "route was raised" in result.routing.routing_rationale
+    assert result.perception.mode == "text_only"
+    assert "Base routing matrix selected remote_ops." in result.routing.routing_rationale

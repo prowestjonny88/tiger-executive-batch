@@ -1,9 +1,9 @@
 import json
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from app.core.models import IncidentInput
+from app.core.models import IncidentInput, KbRetrievalResult, PerceptionResult, StoredPhotoEvidence, StructuredEvidence
 from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
+from app.services.diagnosis_gemini import GeminiAssessment
 from app.services.intake import _call_gemini_intake, build_follow_up_questions
 
 
@@ -50,8 +50,8 @@ def test_gemini_diagnosis_provider_parses_round1_schema():
 
     incident = IncidentInput(site_id="site-01", symptom_text="Breaker is down.")
 
-    with patch("app.services.diagnosis.get_gemini_client", return_value=mock_client), patch(
-        "app.services.diagnosis.GEMINI_MODEL", "gemini-3.0-flash"
+    with patch("app.services.diagnosis_gemini.get_gemini_client", return_value=mock_client), patch(
+        "app.services.diagnosis_gemini.GEMINI_MODEL", "gemini-3.0-flash"
     ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
         provider = GeminiDiagnosisProvider()
         result = provider.analyze(incident)
@@ -75,14 +75,20 @@ def test_run_diagnosis_uses_gemini_payload_when_available():
     diagnosis = run_diagnosis(
         IncidentInput(
             site_id="site-mall-01",
+            photo_evidence=StoredPhotoEvidence(
+                filename="breaker.jpg",
+                media_type="image/jpeg",
+                storage_path="uploads/incidents/breaker.jpg",
+                byte_size=1024,
+            ),
             symptom_text="Breaker is down.",
             photo_hint="mcb tripped in DB",
         ),
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source == "gemini_vlm_primary"
-    assert diagnosis.branch_name == "gemini_vlm_primary"
+    assert diagnosis.diagnosis_source in {"gemini_first_principles", "kb_contextual_reasoning"}
+    assert diagnosis.branch_name == "vlm_first_reasoning_path"
     assert diagnosis.issue_family == "tripping"
     assert diagnosis.resolver_tier == "local_site"
 
@@ -98,18 +104,27 @@ def test_run_diagnosis_with_debug_records_gemini_success():
         "resolver_tier_hint": "local_site",
     }
 
-    diagnosis, debug = run_diagnosis_with_debug(
+    perception, evidence, kb_retrieval, diagnosis, debug = run_diagnosis_with_debug(
         IncidentInput(
             incident_id=42,
             site_id="site-mall-01",
+            photo_evidence=StoredPhotoEvidence(
+                filename="breaker.jpg",
+                media_type="image/jpeg",
+                storage_path="uploads/incidents/breaker.jpg",
+                byte_size=1024,
+            ),
             symptom_text="Breaker is down.",
             photo_hint="mcb tripped in DB",
         ),
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source == "gemini_vlm_primary"
-    assert diagnosis.branch_name == "gemini_vlm_primary"
+    assert perception.mode in {"heuristic", "vlm"}
+    assert evidence.evidence_type in {"hardware_photo", "symptom_heavy_photo", "mixed_photo"}
+    assert kb_retrieval.gate_decision in {"accepted", "contextual_only", "rejected"}
+    assert diagnosis.diagnosis_source in {"gemini_first_principles", "kb_contextual_reasoning"}
+    assert diagnosis.branch_name == "vlm_first_reasoning_path"
     assert debug["attempted"] is True
     assert debug["succeeded"] is True
     assert debug["incident_id"] == 42
@@ -120,7 +135,7 @@ def test_run_diagnosis_with_debug_records_gemini_failure():
     provider = MagicMock()
     provider.analyze.side_effect = RuntimeError("proxy refused connection")
 
-    diagnosis, debug = run_diagnosis_with_debug(
+    perception, evidence, kb_retrieval, diagnosis, debug = run_diagnosis_with_debug(
         IncidentInput(
             incident_id=84,
             site_id="site-mall-01",
@@ -130,25 +145,76 @@ def test_run_diagnosis_with_debug_records_gemini_failure():
         provider=provider,
     )
 
-    assert diagnosis.diagnosis_source in {"round1_package_retrieval", "heuristic_policy_fallback"}
-    assert diagnosis.branch_name in {"round1_package_retrieval", "heuristic_policy_fallback"}
-    assert debug["attempted"] is True
+    assert perception.mode == "text_only"
+    assert evidence.incomplete is True
+    assert kb_retrieval.gate_decision in {"contextual_only", "rejected"}
+    assert diagnosis.diagnosis_source == "text_only_incomplete"
+    assert diagnosis.branch_name == "vlm_first_text_only_path"
+    assert debug["attempted"] is False
     assert debug["succeeded"] is False
     assert debug["incident_id"] == 84
-    assert "proxy refused connection" in (debug["error"] or "")
+    assert debug["error"] is None
 
 
 def test_build_follow_up_questions_uses_diagnosis_contract_fields():
-    diagnosis = SimpleNamespace(
-        issue_family="unknown_mixed",
+    perception = PerceptionResult(
+        mode="heuristic",
         evidence_type="screenshot",
-        required_proof_next="Capture the exact fault detail page.",
-        unknown_flag=True,
+        scene_summary="Screenshot of fault page.",
+        components_visible=["app_screen"],
+        visible_abnormalities=["fault_status"],
+        ocr_findings=[],
+        hazard_signals=[],
+        uncertainty_notes=["OCR detail missing."],
+        confidence_score=0.5,
         requires_follow_up=True,
     )
+    evidence = StructuredEvidence(
+        evidence_type="screenshot",
+        semantic_summary="App screenshot without readable error text.",
+        components_visible=["app_screen"],
+        visible_abnormalities=["fault_status"],
+        ocr_findings=[],
+        hazard_signals=[],
+        user_symptoms=["Customer reported a fault."],
+        user_error_code=None,
+        follow_up_context={},
+        missing_evidence=["upstream_power_context"],
+        incomplete=True,
+    )
+    retrieval = MagicMock(spec=object)
+    retrieval.kb_retrieval = KbRetrievalResult(
+        query_text="fault screenshot",
+        provider_name="hash_embedding_provider",
+        provider_mode="deterministic_fallback",
+        gate_decision="rejected",
+        gate_reason="Weak screenshot context only.",
+        candidate_count=0,
+        candidates=[],
+        image_embedding_used=False,
+        text_embedding_used=True,
+        compatibility_notes=[],
+    )
+    synthesis = MagicMock(
+        required_proof_next="Capture the exact fault detail page.",
+        requires_follow_up=True,
+        unknown_flag=True,
+    )
 
-    with patch("app.services.intake.get_gemini_client", return_value=None), patch(
-        "app.services.diagnosis.run_diagnosis", return_value=diagnosis
+    with patch("app.services.diagnosis_perception.assess_perception", return_value=perception), patch(
+        "app.services.diagnosis_evidence.build_structured_evidence", return_value=evidence
+    ), patch("app.services.diagnosis_retrieval.assess_retrieval", return_value=retrieval), patch(
+        "app.services.diagnosis_synthesis.synthesize_diagnosis", return_value=synthesis
+    ), patch(
+        "app.services.diagnosis_gemini.assess_gemini",
+        return_value=GeminiAssessment(
+            payload=None,
+            raw_provider_output="",
+            attempted=False,
+            succeeded=False,
+            error=None,
+            latency_ms=0.0,
+        ),
     ):
         questions = build_follow_up_questions(
             IncidentInput(
@@ -159,4 +225,4 @@ def test_build_follow_up_questions_uses_diagnosis_contract_fields():
         )
 
     question_ids = {item["question_id"] for item in questions}
-    assert question_ids == {"required_proof_next", "power_context", "error_text"}
+    assert question_ids == {"required_proof_next", "power_context", "error_text", "diagnosis_uncertainty"}

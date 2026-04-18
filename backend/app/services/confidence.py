@@ -6,7 +6,7 @@ from app.core.models import ConfidenceAssessment, ConfidenceBand, DiagnosisResul
 def assess_confidence(diagnosis: DiagnosisResult) -> ConfidenceAssessment:
     score = diagnosis.confidence_score
     band = diagnosis.confidence_band
-    novelty_detected = diagnosis.unknown_flag or diagnosis.known_case_hit is None
+    novelty_detected = diagnosis.novelty_flag or diagnosis.unknown_flag or diagnosis.known_case_hit is None
     requires_follow_up = diagnosis.requires_follow_up or band == ConfidenceBand.LOW
 
     rationale_parts = [diagnosis.confidence_reasoning or "Confidence derived from Round 1 retrieval alignment."]
@@ -14,10 +14,14 @@ def assess_confidence(diagnosis: DiagnosisResult) -> ConfidenceAssessment:
         rationale_parts.append(
             f"Matched {diagnosis.known_case_hit.canonical_file_name} with score {diagnosis.known_case_hit.match_score:.2f}."
         )
+    elif diagnosis.known_case_match_score is not None:
+        rationale_parts.append(f"Best contextual KB score was {diagnosis.known_case_match_score:.2f}.")
     if diagnosis.hazard_level == "high":
         rationale_parts.append("High hazard level keeps the case on the conservative path.")
     if novelty_detected:
         rationale_parts.append("Novel or weakly matched evidence requires follow-up or higher-tier review.")
+    if diagnosis.reasoning_notes:
+        rationale_parts.append(" ".join(diagnosis.reasoning_notes[:2]))
 
     return ConfidenceAssessment(
         score=score,
@@ -26,4 +30,3 @@ def assess_confidence(diagnosis: DiagnosisResult) -> ConfidenceAssessment:
         novelty_detected=novelty_detected,
         rationale=" ".join(rationale_parts),
     )
-

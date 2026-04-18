@@ -19,16 +19,18 @@ def run_triage_with_debug(incident: IncidentInput) -> tuple[TriageResult, dict[s
     sites = {site.site_id: site for site in load_sites()}
     site = sites[incident.site_id]
 
-    diagnosis, diagnosis_debug = run_diagnosis_with_debug(incident)
+    perception, evidence, kb_retrieval, diagnosis, diagnosis_debug = run_diagnosis_with_debug(incident)
     confidence = assess_confidence(diagnosis)
     routing = route_incident(incident, diagnosis, confidence, site)
     artifact = build_artifact(routing, diagnosis, load_snippets())
 
     result = TriageResult(
         incident=incident,
+        perception=perception,
+        kb_retrieval=kb_retrieval,
         diagnosis=diagnosis,
         confidence=confidence,
         routing=routing,
         artifact=artifact,
     )
-    return result, {"diagnosis_debug": diagnosis_debug}
+    return result, {"diagnosis_debug": diagnosis_debug, "structured_evidence": evidence.model_dump()}

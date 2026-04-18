@@ -113,6 +113,9 @@ export default function HistoryPage() {
                         {incident.latest_diagnosis_source ? (
                           <div className="text-xs text-slate-500 truncate">
                             <div>{incident.latest_diagnosis_source}</div>
+                            {incident.latest_kb_gate_decision ? (
+                              <div>KB gate: {incident.latest_kb_gate_decision}</div>
+                            ) : null}
                             {incident.latest_retrieval_provider ? (
                               <div>{incident.latest_retrieval_provider}</div>
                             ) : null}

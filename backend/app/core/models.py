@@ -9,6 +9,7 @@ IssueFamily = Literal["no_power", "tripping", "charging_slow", "not_responding",
 HazardLevel = Literal["low", "medium", "high"]
 ResolverTier = Literal["driver", "local_site", "remote_ops", "technician"]
 EvidenceType = Literal["hardware_photo", "screenshot", "symptom_report", "symptom_heavy_photo", "mixed_photo", "unknown"]
+KbGateDecision = Literal["accepted", "contextual_only", "rejected"]
 
 
 class ConfidenceBand(str, Enum):
@@ -89,6 +90,73 @@ class RetrievalMetadata(BaseModel):
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 
+class PerceptionResult(BaseModel):
+    mode: Literal["vlm", "heuristic", "text_only"]
+    evidence_type: EvidenceType
+    scene_summary: str
+    components_visible: List[str] = Field(default_factory=list)
+    visible_abnormalities: List[str] = Field(default_factory=list)
+    ocr_findings: List[str] = Field(default_factory=list)
+    hazard_signals: List[str] = Field(default_factory=list)
+    uncertainty_notes: List[str] = Field(default_factory=list)
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    requires_follow_up: bool = False
+    raw_provider_output: Optional[str] = None
+
+
+class StructuredEvidence(BaseModel):
+    evidence_type: EvidenceType
+    semantic_summary: str
+    components_visible: List[str] = Field(default_factory=list)
+    visible_abnormalities: List[str] = Field(default_factory=list)
+    ocr_findings: List[str] = Field(default_factory=list)
+    hazard_signals: List[str] = Field(default_factory=list)
+    user_symptoms: List[str] = Field(default_factory=list)
+    user_error_code: Optional[str] = None
+    follow_up_context: Dict[str, str] = Field(default_factory=dict)
+    missing_evidence: List[str] = Field(default_factory=list)
+    incomplete: bool = False
+
+
+class KbCandidateHit(BaseModel):
+    canonical_file_name: str
+    match_score: float = Field(ge=0.0, le=1.0)
+    compatibility_score: float = Field(ge=0.0, le=1.0)
+    fault_type: str
+    issue_family: IssueFamily
+    evidence_type: EvidenceType
+    hazard_level: HazardLevel
+    resolver_tier: ResolverTier
+    recommended_next_step: str
+    required_proof_next: str
+    visual_observation: str
+    engineering_rationale: Optional[str] = None
+    match_reason: str
+    component_primary: Optional[str] = None
+    visible_abnormalities: List[str] = Field(default_factory=list)
+    retrieval_source: str = "package_seed"
+    text_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    image_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    compatibility_notes: List[str] = Field(default_factory=list)
+
+
+class KbRetrievalResult(BaseModel):
+    query_text: str
+    provider_name: str
+    provider_mode: str
+    gate_decision: KbGateDecision
+    gate_reason: str
+    candidate_count: int = 0
+    primary_candidate: Optional[KbCandidateHit] = None
+    candidates: List[KbCandidateHit] = Field(default_factory=list)
+    rejection_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    weak_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    image_embedding_used: bool = False
+    text_embedding_used: bool = False
+    compatibility_notes: List[str] = Field(default_factory=list)
+    extra: Dict[str, Any] = Field(default_factory=dict)
+
+
 class DiagnosisResult(BaseModel):
     raw_provider_output: str
     issue_family: IssueFamily
@@ -111,6 +179,9 @@ class DiagnosisResult(BaseModel):
     known_case_hit: Optional[KnownCaseHit] = None
     retrieval_metadata: Optional[RetrievalMetadata] = None
     confidence_reasoning: Optional[str] = None
+    novelty_flag: bool = False
+    known_case_match_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    reasoning_notes: List[str] = Field(default_factory=list)
 
 
 class ConfidenceAssessment(BaseModel):
@@ -164,6 +235,8 @@ class KnowledgeSnippet(BaseModel):
 
 class TriageResult(BaseModel):
     incident: IncidentInput
+    perception: PerceptionResult
+    kb_retrieval: KbRetrievalResult
     diagnosis: DiagnosisResult
     confidence: ConfidenceAssessment
     routing: RoutingDecision

@@ -23,6 +23,75 @@ export type ApiTriageResponse = {
     follow_up_answers?: Record<string, string>;
     demo_scenario_id?: string;
   };
+  perception: {
+    mode: "vlm" | "heuristic" | "text_only";
+    evidence_type: EvidenceType;
+    scene_summary: string;
+    components_visible: string[];
+    visible_abnormalities: string[];
+    ocr_findings: string[];
+    hazard_signals: string[];
+    uncertainty_notes: string[];
+    confidence_score: number;
+    requires_follow_up: boolean;
+    raw_provider_output?: string | null;
+  };
+  kb_retrieval: {
+    query_text: string;
+    provider_name: string;
+    provider_mode: string;
+    gate_decision: "accepted" | "contextual_only" | "rejected";
+    gate_reason: string;
+    candidate_count: number;
+    primary_candidate?: {
+      canonical_file_name: string;
+      match_score: number;
+      compatibility_score: number;
+      fault_type: string;
+      issue_family: IssueFamily;
+      evidence_type: EvidenceType;
+      hazard_level: HazardLevel;
+      resolver_tier: ResolverTier;
+      recommended_next_step: string;
+      required_proof_next: string;
+      visual_observation: string;
+      engineering_rationale?: string | null;
+      match_reason: string;
+      component_primary?: string | null;
+      visible_abnormalities: string[];
+      retrieval_source: string;
+      text_score?: number | null;
+      image_score?: number | null;
+      compatibility_notes: string[];
+    } | null;
+    candidates: Array<{
+      canonical_file_name: string;
+      match_score: number;
+      compatibility_score: number;
+      fault_type: string;
+      issue_family: IssueFamily;
+      evidence_type: EvidenceType;
+      hazard_level: HazardLevel;
+      resolver_tier: ResolverTier;
+      recommended_next_step: string;
+      required_proof_next: string;
+      visual_observation: string;
+      engineering_rationale?: string | null;
+      match_reason: string;
+      component_primary?: string | null;
+      visible_abnormalities: string[];
+      retrieval_source: string;
+      text_score?: number | null;
+      image_score?: number | null;
+      compatibility_notes: string[];
+    }>;
+    rejection_threshold?: number | null;
+    weak_threshold?: number | null;
+    image_embedding_used: boolean;
+    text_embedding_used: boolean;
+    compatibility_notes: string[];
+    extra?: Record<string, unknown>;
+  };
   diagnosis: {
     issue_family: IssueFamily;
     fault_type: string;
@@ -73,6 +142,9 @@ export type ApiTriageResponse = {
       extra?: Record<string, unknown>;
     } | null;
     confidence_reasoning?: string | null;
+    novelty_flag: boolean;
+    known_case_match_score?: number | null;
+    reasoning_notes: string[];
   };
   confidence: {
     score: number;
@@ -159,6 +231,7 @@ export type IncidentHistoryItem = {
   latest_diagnosis_source?: string | null;
   latest_retrieval_provider?: string | null;
   latest_known_case?: string | null;
+  latest_kb_gate_decision?: "accepted" | "contextual_only" | "rejected" | null;
 };
 
 export type IncidentHistoryDetailItem = IncidentHistoryItem & {
