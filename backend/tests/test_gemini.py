@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput, KbRetrievalResult, PerceptionResult, StoredPhotoEvidence, StructuredEvidence
 from app.services.diagnosis import GeminiDiagnosisProvider, run_diagnosis, run_diagnosis_with_debug
-from app.services.diagnosis_gemini import GeminiAssessment
+from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput
 from app.services.intake import _call_gemini_intake, build_follow_up_questions
 
 
@@ -54,7 +54,25 @@ def test_gemini_diagnosis_provider_parses_round1_schema():
         "app.services.diagnosis_gemini.GEMINI_MODEL", "gemini-3.0-flash"
     ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
         provider = GeminiDiagnosisProvider()
-        result = provider.analyze(incident)
+        result = provider.analyze(
+            ReasoningInput(
+                incident=incident,
+                perception=PerceptionResult(
+                    mode="text_only",
+                    evidence_type="symptom_report",
+                    scene_summary="Breaker is down.",
+                    confidence_score=0.25,
+                ),
+                evidence=StructuredEvidence(
+                    evidence_type="symptom_report",
+                    human_summary="Breaker is down.",
+                    retrieval_text="Breaker is down.",
+                ),
+                kb_candidates=[],
+                gate_decision="rejected",
+                missing_evidence=["clear_photo_of_asset"],
+            )
+        )
 
     assert result["issue_family"] == "tripping"
     assert result["fault_type"] == "mcb_tripped"
@@ -90,7 +108,7 @@ def test_run_diagnosis_uses_gemini_payload_when_available():
     assert diagnosis.diagnosis_source in {"gemini_first_principles", "kb_contextual_reasoning"}
     assert diagnosis.branch_name == "vlm_first_reasoning_path"
     assert diagnosis.issue_family == "tripping"
-    assert diagnosis.resolver_tier == "local_site"
+    assert diagnosis.resolver_tier_proposed == "local_site"
 
 
 def test_run_diagnosis_with_debug_records_gemini_success():
@@ -171,7 +189,8 @@ def test_build_follow_up_questions_uses_diagnosis_contract_fields():
     )
     evidence = StructuredEvidence(
         evidence_type="screenshot",
-        semantic_summary="App screenshot without readable error text.",
+        human_summary="App screenshot without readable error text.",
+        retrieval_text="App screenshot without readable error text.",
         components_visible=["app_screen"],
         visible_abnormalities=["fault_status"],
         ocr_findings=[],
@@ -188,11 +207,13 @@ def test_build_follow_up_questions_uses_diagnosis_contract_fields():
         provider_name="hash_embedding_provider",
         provider_mode="deterministic_fallback",
         gate_decision="rejected",
-        gate_reason="Weak screenshot context only.",
+        gate_basis="Weak screenshot context only.",
         candidate_count=0,
         candidates=[],
         image_embedding_used=False,
         text_embedding_used=True,
+        top_family_consensus=[],
+        stable_neighborhood=False,
         compatibility_notes=[],
     )
     synthesis = MagicMock(

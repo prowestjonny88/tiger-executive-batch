@@ -51,6 +51,10 @@ def route_incident(
         diagnosis.evidence_type,
     )
     resolver_tier = _site_adjusted_resolver(base_resolver, site, diagnosis.hazard_level)
+    resolver_decision = "confirmed" if diagnosis.resolver_tier_proposed == resolver_tier else "overridden"
+    resolver_override_reason = None if resolver_decision == "confirmed" else (
+        f"Routing matrix overrode diagnosis proposal {diagnosis.resolver_tier_proposed} with {resolver_tier}."
+    )
 
     recommended_next_step = (
         diagnosis.known_case_hit.recommended_next_step
@@ -69,6 +73,7 @@ def route_incident(
         f"Hazard level: {diagnosis.hazard_level}.",
         f"Evidence type: {diagnosis.evidence_type}.",
         f"Confidence band: {confidence.band.value if hasattr(confidence.band, 'value') else confidence.band}.",
+        f"Diagnosis proposed {diagnosis.resolver_tier_proposed}.",
         f"Base routing matrix selected {base_resolver}.",
     ]
     if diagnosis.known_case_hit is not None:
@@ -90,6 +95,8 @@ def route_incident(
         fault_type=diagnosis.fault_type,
         hazard_level=diagnosis.hazard_level,
         resolver_tier=resolver_tier,
+        resolver_decision=resolver_decision,  # type: ignore[arg-type]
+        resolver_override_reason=resolver_override_reason,
         routing_rationale=" ".join(rationale_parts),
         recommended_next_step=recommended_next_step,
         fallback_action=fallback_action,

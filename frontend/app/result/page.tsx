@@ -289,6 +289,10 @@ function ResultAssessment() {
                 Routing Rationale
               </h4>
               <p className="text-slate-700 text-sm leading-relaxed">{triage.routing.routing_rationale}</p>
+              <p className="text-slate-600 text-sm mt-2">
+                Routing decision: {formatDiagnosisMethod(triage.routing.resolver_decision)}
+                {triage.routing.resolver_override_reason ? ` | ${triage.routing.resolver_override_reason}` : ""}
+              </p>
             </div>
 
             {triage.diagnosis.diagnosis_source || triage.diagnosis.branch_name ? (
@@ -318,8 +322,14 @@ function ResultAssessment() {
                     {triage.kb_retrieval.provider_name} ({triage.kb_retrieval.provider_mode})
                   </p>
                   <p className="text-slate-700 text-sm leading-relaxed">
-                    {triage.kb_retrieval.gate_reason}
+                    {triage.kb_retrieval.gate_basis}
                   </p>
+                  {triage.kb_retrieval.score_margin_top2 !== undefined && triage.kb_retrieval.score_margin_top2 !== null ? (
+                    <p className="text-slate-700 text-sm leading-relaxed">
+                      Top-1 margin: {formatPercent(triage.kb_retrieval.score_margin_top2)} | Stable neighborhood:{" "}
+                      {triage.kb_retrieval.stable_neighborhood ? "Yes" : "No"}
+                    </p>
+                  ) : null}
                 </div>
                 {triage.kb_retrieval.primary_candidate ? (
                   <div className="space-y-2">
@@ -365,6 +375,10 @@ function ResultAssessment() {
               <p className="text-slate-600 text-sm mt-2">
                 Mode: {formatDiagnosisMethod(triage.perception.mode)} | Evidence: {formatDiagnosisMethod(triage.perception.evidence_type)}
               </p>
+              <p className="text-slate-600 text-sm mt-2">
+                Provider attempted: {triage.perception.provider_attempted ? "Yes" : "No"} | Fallback used:{" "}
+                {triage.perception.fallback_used ? "Yes" : "No"}
+              </p>
               {triage.perception.components_visible.length > 0 ? (
                 <p className="text-slate-700 text-sm mt-2">
                   Components: {triage.perception.components_visible.map(formatFlagLabel).join(" | ")}
@@ -373,6 +387,12 @@ function ResultAssessment() {
               {triage.perception.ocr_findings.length > 0 ? (
                 <p className="text-slate-700 text-sm mt-2">
                   OCR: {triage.perception.ocr_findings.join(" | ")}
+                </p>
+              ) : null}
+              {triage.perception.error_type ? (
+                <p className="text-slate-600 text-sm mt-2">
+                  Perception error: {formatDiagnosisMethod(triage.perception.error_type)}
+                  {triage.perception.error_message ? ` | ${triage.perception.error_message}` : ""}
                 </p>
               ) : null}
             </div>

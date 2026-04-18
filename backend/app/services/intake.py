@@ -270,14 +270,35 @@ def build_follow_up_questions(
     from app.services.diagnosis_perception import assess_perception
     from app.services.diagnosis_retrieval import assess_retrieval
     from app.services.diagnosis_synthesis import synthesize_diagnosis
-    from app.services.diagnosis_gemini import assess_gemini
+    from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput, assess_gemini
 
     questions: list[dict[str, str]] = []
     answered = set(incident.follow_up_answers.keys())
     perception = assess_perception(incident)
     evidence = build_structured_evidence(incident, perception)
     retrieval = assess_retrieval(incident, perception, evidence)
-    synthesis = synthesize_diagnosis(incident, perception, evidence, retrieval, assess_gemini(incident))
+    gemini_assessment = (
+        assess_gemini(
+            ReasoningInput(
+                incident=incident,
+                perception=perception,
+                evidence=evidence,
+                kb_candidates=retrieval.kb_retrieval.candidates,
+                gate_decision=retrieval.kb_retrieval.gate_decision,
+                missing_evidence=evidence.missing_evidence,
+            )
+        )
+        if perception.mode != "text_only"
+        else GeminiAssessment(
+            payload=None,
+            raw_provider_output="Gemini reasoning skipped for text-only evidence.",
+            attempted=False,
+            succeeded=False,
+            error=None,
+            latency_ms=0.0,
+        )
+    )
+    synthesis = synthesize_diagnosis(incident, perception, evidence, retrieval, gemini_assessment)
 
     if "required_proof_next" not in answered and synthesis.required_proof_next:
         questions.append({"question_id": "required_proof_next", "prompt": synthesis.required_proof_next})

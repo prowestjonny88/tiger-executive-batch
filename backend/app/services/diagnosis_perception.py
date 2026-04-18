@@ -91,12 +91,12 @@ def _call_gemini_perception(incident: IncidentInput) -> PerceptionResult | None:
         return None
     client = get_gemini_client()
     if client is None:
-        return None
+        raise RuntimeError("gemini_client_unavailable")
 
     try:
         from google.genai import types as genai_types  # type: ignore[import-untyped]
     except ImportError:
-        return None
+        raise RuntimeError("gemini_sdk_unavailable")
 
     prompt = (
         "You are OmniTriage perception. Inspect the evidence image first and return JSON only.\n"
@@ -117,7 +117,7 @@ def _call_gemini_perception(incident: IncidentInput) -> PerceptionResult | None:
     contents: list[object] = [prompt]
     image_path = _photo_path(incident)
     if image_path is None:
-        return None
+        raise FileNotFoundError("image_path_unresolved")
     contents.insert(
         0,
         genai_types.Part.from_bytes(
@@ -160,8 +160,26 @@ def _call_gemini_perception(incident: IncidentInput) -> PerceptionResult | None:
         uncertainty_notes=uncertainty_notes,
         confidence_score=max(min(float(data.get("confidence_score", 0.72) or 0.72), 1.0), 0.0),
         requires_follow_up=bool(uncertainty_notes),
+        provider_attempted=True,
+        fallback_used=False,
         raw_provider_output=raw,
     )
+
+
+def _classify_perception_error(exc: Exception) -> tuple[str, str]:
+    message = str(exc) or exc.__class__.__name__
+    lowered = message.lower()
+    if "image_path_unresolved" in lowered:
+        return "image_path_failure", message
+    if "gemini_client_unavailable" in lowered:
+        return "gemini_client_unavailable", message
+    if "google-genai" in lowered or "sdk" in lowered:
+        return "sdk_unavailable", message
+    if "timeout" in lowered:
+        return "timeout", message
+    if isinstance(exc, json.JSONDecodeError):
+        return "schema_mismatch", message
+    return "sdk_call_error", message
 
 
 def assess_perception(incident: IncidentInput) -> PerceptionResult:
@@ -181,15 +199,21 @@ def assess_perception(incident: IncidentInput) -> PerceptionResult:
             uncertainty_notes=["No photo evidence available for visual perception."],
             confidence_score=0.25,
             requires_follow_up=True,
+            provider_attempted=False,
+            fallback_used=True,
+            error_type="text_only_no_photo",
+            error_message="No photo evidence was provided.",
             raw_provider_output=None,
         )
 
+    error_type: str | None = None
+    error_message: str | None = None
     try:
         gemini_result = _call_gemini_perception(incident)
         if gemini_result is not None:
             return gemini_result
-    except Exception:
-        pass
+    except Exception as exc:
+        error_type, error_message = _classify_perception_error(exc)
 
     text = build_incident_text(incident)
     abnormalities = _fallback_abnormalities(text)
@@ -202,8 +226,12 @@ def assess_perception(incident: IncidentInput) -> PerceptionResult:
         visible_abnormalities=abnormalities,
         ocr_findings=_fallback_ocr_findings(incident),
         hazard_signals=hazard_signals,
-        uncertainty_notes=["Gemini perception unavailable; using heuristic visual interpretation."],
-        confidence_score=0.46 if incident.photo_evidence else 0.25,
+        uncertainty_notes=["Gemini perception unavailable; using heuristic visual interpretation.", *(["Perception fallback reduced certainty."] if error_type else [])],
+        confidence_score=0.38 if incident.photo_evidence else 0.25,
         requires_follow_up=not abnormalities and not _fallback_components(text),
+        provider_attempted=True,
+        fallback_used=True,
+        error_type=error_type or "fallback_without_error_detail",
+        error_message=error_message or "Gemini perception did not produce a usable structured response.",
         raw_provider_output=None,
     )

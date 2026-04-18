@@ -15,7 +15,7 @@ class DiagnosisResolution:
     fault_type: str
     evidence_summary: str
     hazard_level: HazardLevel
-    resolver_tier: ResolverTier
+    resolver_tier_proposed: ResolverTier
     required_proof_next: str | None
     diagnosis_source: str
     branch_name: str
@@ -42,9 +42,9 @@ def _text_only_resolution(
     return DiagnosisResolution(
         issue_family=issue_family,
         fault_type="unknown_fault",
-        evidence_summary=evidence.semantic_summary,
+        evidence_summary=evidence.human_summary,
         hazard_level=hazard_level,
-        resolver_tier=resolver_tier,
+        resolver_tier_proposed=resolver_tier,
         required_proof_next="Provide a clear charger photo and upstream power context.",
         diagnosis_source="text_only_incomplete",
         branch_name="vlm_first_text_only_path",
@@ -67,10 +67,13 @@ def synthesize_diagnosis(
 ) -> DiagnosisResolution:
     primary_candidate = retrieval.kb_retrieval.primary_candidate
     gate_decision = retrieval.kb_retrieval.gate_decision
+    consensus_families = retrieval.kb_retrieval.top_family_consensus
     notes: list[str] = [
         f"Perception ran first in {perception.mode} mode.",
         f"KB gate decision: {gate_decision}.",
     ]
+    if consensus_families:
+        notes.append(f"Top candidate families: {', '.join(consensus_families)}.")
 
     if perception.mode == "text_only":
         return _text_only_resolution(retrieval, evidence)
@@ -80,7 +83,7 @@ def synthesize_diagnosis(
         fault_type = primary_candidate.fault_type
         evidence_summary = primary_candidate.visual_observation or perception.scene_summary
         hazard_level = max_hazard_level(primary_candidate.hazard_level, "high" if evidence.hazard_signals else None)
-        resolver_tier: ResolverTier = "technician" if hazard_level == "high" else primary_candidate.resolver_tier
+        resolver_tier_proposed: ResolverTier = "technician" if hazard_level == "high" else primary_candidate.resolver_tier
         required_proof_next = primary_candidate.required_proof_next
         diagnosis_source = "kb_accepted"
         branch_name = "vlm_first_kb_accepted"
@@ -102,6 +105,8 @@ def synthesize_diagnosis(
                 notes.append("Gemini reasoning did not align tightly enough to replace the accepted KB candidate.")
     elif gemini.payload is not None:
         issue_family = str(gemini.payload.get("issue_family") or retrieval.issue_family_hint or "unknown_mixed")
+        if gate_decision == "contextual_only" and len(consensus_families) == 1:
+            issue_family = consensus_families[0]
         fallback_fault = primary_candidate.fault_type if primary_candidate is not None and gate_decision == "contextual_only" else "unknown_fault"
         fault_type = str(gemini.payload.get("fault_type") or fallback_fault)
         evidence_summary = str(gemini.payload.get("evidence_summary") or perception.scene_summary)
@@ -111,7 +116,7 @@ def synthesize_diagnosis(
             "high" if evidence.hazard_signals else None,
         )
         resolver_tier_hint = str(gemini.payload.get("resolver_tier_hint") or "").strip()
-        resolver_tier = (
+        resolver_tier_proposed = (
             cast(ResolverTier, resolver_tier_hint)
             if resolver_tier_hint in {"driver", "local_site", "remote_ops", "technician"}
             else fallback_resolver(issue_family, hazard_level)
@@ -130,6 +135,8 @@ def synthesize_diagnosis(
         novelty_flag = True
     else:
         issue_family = retrieval.issue_family_hint
+        if gate_decision == "contextual_only" and len(consensus_families) == 1:
+            issue_family = consensus_families[0]
         if "tripped_breaker" in perception.visible_abnormalities or "breaker" in evidence.components_visible:
             issue_family = "tripping"
         elif evidence.hazard_signals:
@@ -137,7 +144,7 @@ def synthesize_diagnosis(
         fault_type = primary_candidate.fault_type if primary_candidate is not None and gate_decision == "contextual_only" else "unknown_fault"
         evidence_summary = perception.scene_summary
         hazard_level = max_hazard_level(primary_candidate.hazard_level if primary_candidate is not None else None, "high" if evidence.hazard_signals else None)
-        resolver_tier = fallback_resolver(issue_family, hazard_level)
+        resolver_tier_proposed = fallback_resolver(issue_family, hazard_level)
         required_proof_next = primary_candidate.required_proof_next if primary_candidate is not None and gate_decision == "contextual_only" else None
         diagnosis_source = "first_principles_fallback"
         branch_name = "vlm_first_fallback"
@@ -147,7 +154,7 @@ def synthesize_diagnosis(
 
     if evidence.hazard_signals:
         hazard_level = "high"
-        resolver_tier = "technician"
+        resolver_tier_proposed = "technician"
         score = max(score, 0.78)
         notes.append("Hazard signals forced the conservative technician path.")
 
@@ -164,7 +171,7 @@ def synthesize_diagnosis(
         fault_type=fault_type,
         evidence_summary=evidence_summary,
         hazard_level=hazard_level,
-        resolver_tier=resolver_tier,  # type: ignore[arg-type]
+        resolver_tier_proposed=resolver_tier_proposed,  # type: ignore[arg-type]
         required_proof_next=required_proof_next,
         diagnosis_source=diagnosis_source,
         branch_name=branch_name,

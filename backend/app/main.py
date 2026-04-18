@@ -146,6 +146,19 @@ def triage(incident: IncidentInput):
         **debug["diagnosis_debug"],
         "incident_id": incident_id,
     }
+    save_audit(
+        "triage_perception_attempt",
+        {
+            "incident_id": incident_id,
+            "provider_attempted": result.perception.provider_attempted,
+            "fallback_used": result.perception.fallback_used,
+            "error_type": result.perception.error_type,
+            "error_message": result.perception.error_message,
+            "mode": result.perception.mode,
+            "confidence_score": result.perception.confidence_score,
+        },
+        incident_id,
+    )
     save_audit("triage_gemini_attempt", diagnosis_debug, incident_id)
     save_audit("triage_result", result.model_dump(), incident_id)
     return {"incident_id": incident_id, **result.model_dump()}

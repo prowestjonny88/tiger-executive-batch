@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from app.core.models import (
@@ -9,14 +9,14 @@ from app.core.models import (
     KbCandidateHit,
     KbRetrievalResult,
     KnownCaseHit,
-    PerceptionResult,
     RetrievalMetadata,
     StructuredEvidence,
 )
+from app.db.persistence import fetch_known_case_candidates, get_known_case_index_status, init_db, upsert_known_case_index_entry
 from app.services.diagnosis_fallback import infer_issue_family
 from app.services.diagnosis_gate import decide_kb_gate
-from app.services.embeddings import cosine_similarity, get_embedding_provider
-from app.services.round1_dataset import round1_case_text_index, round1_image_path, round1_known_cases
+from app.services.embeddings import EMBEDDING_DIMENSION, get_embedding_provider
+from app.services.round1_dataset import round1_case_text, round1_image_path, round1_known_case_map, round1_known_cases
 
 
 @dataclass(frozen=True)
@@ -29,23 +29,6 @@ class RetrievalAssessment:
     retrieval_metadata: RetrievalMetadata | None
     strong_retrieval: bool
     default_summary: str
-
-
-@lru_cache(maxsize=8)
-def _cached_text_vectors(provider_name: str, provider_mode: str) -> dict[str, list[float]]:
-    provider = get_embedding_provider()
-    return {filename: provider.embed_text(indexed_text) for filename, indexed_text in round1_case_text_index().items()}
-
-
-@lru_cache(maxsize=8)
-def _cached_image_vectors(provider_name: str, provider_mode: str) -> dict[str, list[float]]:
-    provider = get_embedding_provider()
-    vectors: dict[str, list[float]] = {}
-    for case in round1_known_cases():
-        image_path = round1_image_path(case.canonical_file_name)
-        if image_path is not None:
-            vectors[case.canonical_file_name] = provider.embed_image(image_path)
-    return vectors
 
 
 def _resolve_query_image_path(storage_path: str | None) -> Path | None:
@@ -61,6 +44,20 @@ def _resolve_query_image_path(storage_path: str | None) -> Path | None:
         if resolved.exists():
             return resolved
     return None
+
+
+def _compatible_evidence_types(evidence_type: str) -> list[str]:
+    if evidence_type == "hardware_photo":
+        return ["hardware_photo", "symptom_heavy_photo", "mixed_photo"]
+    if evidence_type == "symptom_heavy_photo":
+        return ["symptom_heavy_photo", "hardware_photo", "mixed_photo"]
+    if evidence_type == "mixed_photo":
+        return ["mixed_photo", "hardware_photo", "symptom_heavy_photo"]
+    if evidence_type == "screenshot":
+        return ["screenshot"]
+    if evidence_type == "symptom_report":
+        return ["symptom_report", "symptom_heavy_photo", "screenshot", "unknown"]
+    return ["hardware_photo", "symptom_heavy_photo", "screenshot", "mixed_photo", "unknown"]
 
 
 def _compatible_bonus(evidence: StructuredEvidence, case: KnownCaseHit) -> tuple[float, float, list[str]]:
@@ -114,12 +111,12 @@ def _compatible_bonus(evidence: StructuredEvidence, case: KnownCaseHit) -> tuple
 
 def _candidate_from_case(
     case: KnownCaseHit,
+    *,
     match_score: float,
     compatibility_score: float,
     text_score: float,
     image_score: float,
     notes: list[str],
-    match_reason: str,
 ) -> KbCandidateHit:
     return KbCandidateHit(
         canonical_file_name=case.canonical_file_name,
@@ -134,7 +131,7 @@ def _candidate_from_case(
         required_proof_next=case.required_proof_next,
         visual_observation=case.visual_observation,
         engineering_rationale=case.engineering_rationale,
-        match_reason=match_reason,
+        match_reason="pgvector_hybrid_retrieval",
         component_primary=case.component_primary,
         visible_abnormalities=case.visible_abnormalities,
         retrieval_source=case.retrieval_source,
@@ -166,30 +163,69 @@ def _kb_to_known_case(candidate: KbCandidateHit | None) -> KnownCaseHit | None:
     )
 
 
-def assess_retrieval(incident: IncidentInput, perception: PerceptionResult, evidence: StructuredEvidence) -> RetrievalAssessment:
+def _ensure_known_case_index(provider_name: str, provider_mode: str) -> dict[str, object]:
+    init_db()
+    status = get_known_case_index_status()
+    cases = round1_known_cases()
+    if (
+        status.get("row_count") == len(cases)
+        and status.get("embedding_provider") == provider_name
+        and status.get("embedding_mode") == provider_mode
+        and status.get("embedding_dimension") == EMBEDDING_DIMENSION
+    ):
+        return status
+
     provider = get_embedding_provider()
-    text_vectors = _cached_text_vectors(provider.name, provider.mode)
-    image_vectors = _cached_image_vectors(provider.name, provider.mode)
-    query_text = evidence.semantic_summary or incident.site_id
-    query_vector = provider.embed_text(query_text)
+    for case in cases:
+        image_path = round1_image_path(case.canonical_file_name)
+        upsert_known_case_index_entry(
+            case_key=case.canonical_file_name,
+            payload=case.model_dump(),
+            text_embedding=provider.embed_text(round1_case_text(case)),
+            image_embedding=provider.embed_image(image_path) if image_path is not None else None,
+            evidence_type=case.evidence_type,
+            issue_family=case.issue_family,
+            hazard_level=case.hazard_level,
+            component_primary=case.component_primary,
+            abnormalities=case.visible_abnormalities,
+            embedding_provider=provider.name,
+            embedding_mode=provider.mode,
+        )
+    return get_known_case_index_status()
+
+
+def assess_retrieval(incident: IncidentInput, perception, evidence: StructuredEvidence) -> RetrievalAssessment:
+    provider = get_embedding_provider()
+    index_status = _ensure_known_case_index(provider.name, provider.mode)
+    query_text = evidence.retrieval_text or incident.site_id
+    query_text_vector = provider.embed_text(query_text)
     query_image_path = _resolve_query_image_path(incident.photo_evidence.storage_path) if incident.photo_evidence else None
     query_image_vector = provider.embed_image(query_image_path) if query_image_path is not None else None
 
+    exact_case = None
+    if incident.photo_evidence and incident.photo_evidence.filename:
+        exact_case = round1_known_case_map().get(incident.photo_evidence.filename)
+
+    raw_rows = fetch_known_case_candidates(
+        query_text_embedding=query_text_vector,
+        query_image_embedding=query_image_vector,
+        evidence_types=_compatible_evidence_types(evidence.evidence_type),
+        limit=6,
+    )
+
     candidates: list[KbCandidateHit] = []
-    for case in round1_known_cases():
-        text_score = cosine_similarity(query_vector, text_vectors.get(case.canonical_file_name, []))
-        image_score = (
-            cosine_similarity(query_image_vector, image_vectors.get(case.canonical_file_name, []))
-            if query_image_vector is not None
-            else 0.0
-        )
+    for row in raw_rows:
+        payload = row.get("payload_json") or {}
+        case = KnownCaseHit.model_validate(payload)
+        text_score = float(row.get("text_score") or 0.0)
+        image_score = float(row.get("image_score") or 0.0)
         image_weight = 0.55 if query_image_vector is not None and evidence.evidence_type != "screenshot" else 0.15
         if evidence.evidence_type == "screenshot":
             image_weight = 0.05
         text_weight = 1.0 - image_weight
         semantic_bonus, compatibility_score, notes = _compatible_bonus(evidence, case)
-        score = (text_score * text_weight) + (image_score * image_weight) + semantic_bonus
-        if incident.photo_evidence and incident.photo_evidence.filename == case.canonical_file_name:
+        score = max(min((text_score * text_weight) + (image_score * image_weight) + semantic_bonus, 1.0), 0.0)
+        if exact_case is not None and case.canonical_file_name == exact_case.canonical_file_name:
             score = max(score, 0.99)
             compatibility_score = max(compatibility_score, 0.9)
             notes.append("Exact filename shortcut matched the KB image.")
@@ -201,37 +237,39 @@ def assess_retrieval(incident: IncidentInput, perception: PerceptionResult, evid
             score = max(score, 0.72)
             compatibility_score = max(compatibility_score, 0.7)
             notes.append("Image similarity materially supported the KB case.")
-        score = max(min(score, 1.0), 0.0)
-        match_reason = "hybrid_semantic_retrieval" if query_image_vector is not None else "semantic_text_retrieval"
         candidates.append(
             _candidate_from_case(
-                case=case,
+                case,
                 match_score=score,
                 compatibility_score=compatibility_score,
                 text_score=text_score,
                 image_score=image_score,
                 notes=notes,
-                match_reason=match_reason,
             )
         )
 
     candidates.sort(key=lambda item: (item.match_score, item.compatibility_score), reverse=True)
     top_candidates = candidates[:3]
     primary = top_candidates[0] if top_candidates else None
-    gate_decision, gate_reason, accept_threshold, weak_threshold, gate_notes = decide_kb_gate(
+    gate_decision, gate_basis, accept_threshold, weak_threshold, gate_notes, margin, stable_neighborhood, consensus = decide_kb_gate(
         evidence,
-        primary,
+        top_candidates,
         query_image_vector is not None,
     )
     if primary is not None:
         primary.compatibility_notes.extend(note for note in gate_notes if note not in primary.compatibility_notes)
+
+    warnings: list[str] = []
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    if provider.name == "hash_embedding_provider" and app_env not in {"development", "dev", "test"}:
+        warnings.append("Hash embeddings are active outside development.")
 
     kb_retrieval = KbRetrievalResult(
         query_text=query_text,
         provider_name=provider.name,
         provider_mode=provider.mode,
         gate_decision=gate_decision,
-        gate_reason=gate_reason,
+        gate_basis=gate_basis,
         candidate_count=len(candidates),
         primary_candidate=primary,
         candidates=top_candidates,
@@ -239,10 +277,17 @@ def assess_retrieval(incident: IncidentInput, perception: PerceptionResult, evid
         weak_threshold=weak_threshold,
         image_embedding_used=query_image_vector is not None,
         text_embedding_used=True,
+        top_family_consensus=consensus,  # type: ignore[arg-type]
+        score_margin_top2=round(margin, 4) if margin is not None else None,
+        stable_neighborhood=stable_neighborhood,
         compatibility_notes=gate_notes,
         extra={
             "query_image_path": str(query_image_path) if query_image_path is not None else None,
             "perception_mode": perception.mode,
+            "retrieval_backend": "postgres_pgvector",
+            "index_row_count": index_status.get("row_count"),
+            "embedding_dimension": EMBEDDING_DIMENSION,
+            "warnings": warnings,
         },
     )
 
@@ -269,6 +314,10 @@ def assess_retrieval(incident: IncidentInput, perception: PerceptionResult, evid
             "top_candidate_issue_family": primary.issue_family if primary is not None else None,
             "weak_threshold": weak_threshold,
             "gate_decision": gate_decision,
+            "gate_basis": gate_basis,
+            "retrieval_backend": "postgres_pgvector",
+            "score_margin_top2": round(margin, 4) if margin is not None else None,
+            "top_family_consensus": consensus,
         },
     )
 

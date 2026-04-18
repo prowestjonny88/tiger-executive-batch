@@ -5,6 +5,8 @@ import os
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from app.services.embeddings import EMBEDDING_DIMENSION
+
 DEFAULT_POSTGRES_URL = "postgresql://omnitriage:omnitriage@localhost:5432/omnitriage"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_POSTGRES_URL)
 
@@ -68,15 +70,35 @@ def init_db() -> None:
                 """
             )
             cur.execute(
-                """
+                f"""
                 CREATE TABLE IF NOT EXISTS known_case_index (
                     case_key TEXT PRIMARY KEY,
                     payload_json JSONB NOT NULL,
                     embedding vector(32),
+                    text_embedding vector({EMBEDDING_DIMENSION}),
+                    image_embedding vector({EMBEDDING_DIMENSION}),
+                    evidence_type TEXT,
+                    issue_family TEXT,
+                    hazard_level TEXT,
+                    component_primary TEXT,
+                    abnormalities_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    embedding_provider TEXT,
+                    embedding_mode TEXT,
+                    embedding_dimension INTEGER,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
                 """
             )
+            cur.execute(f"ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS text_embedding vector({EMBEDDING_DIMENSION})")
+            cur.execute(f"ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS image_embedding vector({EMBEDDING_DIMENSION})")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS evidence_type TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS issue_family TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS hazard_level TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS component_primary TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS abnormalities_json JSONB NOT NULL DEFAULT '[]'::jsonb")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS embedding_provider TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS embedding_mode TEXT")
+            cur.execute("ALTER TABLE known_case_index ADD COLUMN IF NOT EXISTS embedding_dimension INTEGER")
 
 
 def save_incident(incident: dict[str, Any]) -> int:
@@ -171,6 +193,162 @@ def save_known_case_snapshot(case_key: str, payload: dict[str, Any], embedding: 
                 """,
                 (case_key, json.dumps(payload), embedding_literal),
             )
+
+
+def upsert_known_case_index_entry(
+    case_key: str,
+    payload: dict[str, Any],
+    *,
+    text_embedding: list[float],
+    image_embedding: list[float] | None,
+    evidence_type: str,
+    issue_family: str,
+    hazard_level: str,
+    component_primary: str | None,
+    abnormalities: list[str],
+    embedding_provider: str,
+    embedding_mode: str,
+) -> None:
+    text_literal = "[" + ",".join(f"{value:.8f}" for value in text_embedding) + "]"
+    image_literal = None if image_embedding is None else "[" + ",".join(f"{value:.8f}" for value in image_embedding) + "]"
+    legacy_embedding_literal = None
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                INSERT INTO known_case_index (
+                    case_key,
+                    payload_json,
+                    embedding,
+                    text_embedding,
+                    image_embedding,
+                    evidence_type,
+                    issue_family,
+                    hazard_level,
+                    component_primary,
+                    abnormalities_json,
+                    embedding_provider,
+                    embedding_mode,
+                    embedding_dimension
+                )
+                VALUES (%s, %s::jsonb, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s)
+                ON CONFLICT (case_key)
+                DO UPDATE SET
+                    payload_json = EXCLUDED.payload_json,
+                    embedding = EXCLUDED.embedding,
+                    text_embedding = EXCLUDED.text_embedding,
+                    image_embedding = EXCLUDED.image_embedding,
+                    evidence_type = EXCLUDED.evidence_type,
+                    issue_family = EXCLUDED.issue_family,
+                    hazard_level = EXCLUDED.hazard_level,
+                    component_primary = EXCLUDED.component_primary,
+                    abnormalities_json = EXCLUDED.abnormalities_json,
+                    embedding_provider = EXCLUDED.embedding_provider,
+                    embedding_mode = EXCLUDED.embedding_mode,
+                    embedding_dimension = EXCLUDED.embedding_dimension
+                """,
+                (
+                    case_key,
+                    json.dumps(payload),
+                    legacy_embedding_literal,
+                    text_literal,
+                    image_literal,
+                    evidence_type,
+                    issue_family,
+                    hazard_level,
+                    component_primary,
+                    json.dumps(abnormalities),
+                    embedding_provider,
+                    embedding_mode,
+                    EMBEDDING_DIMENSION,
+                ),
+            )
+
+
+def get_known_case_index_status() -> dict[str, Any]:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*)::INT AS row_count,
+                    MAX(created_at) AS latest_created_at,
+                    MAX(embedding_provider) AS embedding_provider,
+                    MAX(embedding_mode) AS embedding_mode,
+                    MAX(embedding_dimension) AS embedding_dimension
+                FROM known_case_index
+                """
+            )
+            row = cur.fetchone()
+    return dict(row or {})
+
+
+def fetch_known_case_candidates(
+    *,
+    query_text_embedding: list[float],
+    query_image_embedding: list[float] | None,
+    evidence_types: list[str],
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    text_literal = "[" + ",".join(f"{value:.8f}" for value in query_text_embedding) + "]"
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            if query_image_embedding is None:
+                cur.execute(
+                    """
+                    SELECT
+                        case_key,
+                        payload_json,
+                        evidence_type,
+                        issue_family,
+                        hazard_level,
+                        component_primary,
+                        abnormalities_json,
+                        GREATEST(0.0, 1 - (text_embedding <=> %s::vector)) AS text_score,
+                        0.0 AS image_score
+                    FROM known_case_index
+                    WHERE evidence_type = ANY(%s)
+                    ORDER BY
+                        GREATEST(0.0, 1 - (text_embedding <=> %s::vector)) DESC,
+                        case_key ASC
+                    LIMIT %s
+                    """,
+                    (text_literal, evidence_types, text_literal, limit),
+                )
+            else:
+                image_literal = "[" + ",".join(f"{value:.8f}" for value in query_image_embedding) + "]"
+                cur.execute(
+                    """
+                    SELECT
+                        case_key,
+                        payload_json,
+                        evidence_type,
+                        issue_family,
+                        hazard_level,
+                        component_primary,
+                        abnormalities_json,
+                        GREATEST(0.0, 1 - (text_embedding <=> %s::vector)) AS text_score,
+                        CASE
+                            WHEN image_embedding IS NULL THEN 0.0
+                            ELSE GREATEST(0.0, 1 - (image_embedding <=> %s::vector))
+                        END AS image_score
+                    FROM known_case_index
+                    WHERE evidence_type = ANY(%s)
+                    ORDER BY
+                        (
+                            GREATEST(0.0, 1 - (text_embedding <=> %s::vector))
+                            + CASE
+                                WHEN image_embedding IS NULL THEN 0.0
+                                ELSE GREATEST(0.0, 1 - (image_embedding <=> %s::vector))
+                              END
+                        ) DESC,
+                        case_key ASC
+                    LIMIT %s
+                    """,
+                    (text_literal, image_literal, evidence_types, text_literal, image_literal, limit),
+                )
+            rows = cur.fetchall()
+    return [dict(row) for row in rows]
 
 
 def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:

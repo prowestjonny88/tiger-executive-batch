@@ -38,20 +38,39 @@ def compatibility_penalty(evidence: StructuredEvidence, candidate: KbCandidateHi
     return penalty, notes
 
 
+def _family_consensus(candidates: list[KbCandidateHit]) -> list[str]:
+    ordered: list[str] = []
+    for candidate in candidates:
+        if candidate.issue_family not in ordered:
+            ordered.append(candidate.issue_family)
+    return ordered
+
+
 def decide_kb_gate(
     evidence: StructuredEvidence,
-    primary_candidate: KbCandidateHit | None,
+    candidates: list[KbCandidateHit],
     has_image_vector: bool,
-) -> tuple[KbGateDecision, str, float, float, list[str]]:
+) -> tuple[KbGateDecision, str, float, float, list[str], float | None, bool, list[str]]:
     accept_threshold, weak_threshold = score_thresholds(evidence.evidence_type, has_image_vector)
-    if primary_candidate is None:
-        return "rejected", "No compatible KB candidate was retrieved.", accept_threshold, weak_threshold, []
+    if not candidates:
+        return "rejected", "No compatible KB candidate was retrieved.", accept_threshold, weak_threshold, [], None, False, []
 
+    primary_candidate = candidates[0]
+    secondary_candidate = candidates[1] if len(candidates) > 1 else None
     penalty, notes = compatibility_penalty(evidence, primary_candidate)
     effective_score = max(primary_candidate.match_score - penalty, 0.0)
+    margin = max(primary_candidate.match_score - (secondary_candidate.match_score if secondary_candidate else 0.0), 0.0)
+    consensus = _family_consensus(candidates[:3])
+    stable_neighborhood = len(consensus) == 1 and margin <= 0.22
 
-    if effective_score >= accept_threshold and primary_candidate.compatibility_score >= 0.55:
-        return "accepted", "Primary KB candidate passed score and compatibility thresholds.", accept_threshold, weak_threshold, notes
+    if effective_score >= accept_threshold and primary_candidate.compatibility_score >= 0.55 and margin >= 0.05:
+        basis = "Top candidate passed score, compatibility, and separation thresholds."
+        if stable_neighborhood:
+            basis += " Nearby candidates also agreed on the same family."
+        return "accepted", basis, accept_threshold, weak_threshold, notes, margin, stable_neighborhood, consensus
     if effective_score >= weak_threshold:
-        return "contextual_only", "Primary KB candidate is relevant context but not strong enough to anchor the diagnosis.", accept_threshold, weak_threshold, notes
-    return "rejected", "Nearest KB candidate did not pass the decision gate.", accept_threshold, weak_threshold, notes
+        basis = "Candidate set provides contextual guidance but not a trustworthy anchor."
+        if stable_neighborhood:
+            basis += " Top candidates clustered on the same family, so family-level context is preserved."
+        return "contextual_only", basis, accept_threshold, weak_threshold, notes, margin, stable_neighborhood, consensus
+    return "rejected", "Nearest KB candidates did not pass the decision gate.", accept_threshold, weak_threshold, notes, margin, stable_neighborhood, consensus

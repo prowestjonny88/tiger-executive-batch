@@ -15,7 +15,7 @@ from app.services.diagnosis_fallback import (
     infer_evidence_type,
     infer_issue_family,
 )
-from app.services.diagnosis_gemini import GeminiAssessment, GeminiDiagnosisProvider, assess_gemini
+from app.services.diagnosis_gemini import GeminiAssessment, GeminiDiagnosisProvider, ReasoningInput, assess_gemini
 from app.services.diagnosis_perception import assess_perception
 from app.services.diagnosis_retrieval import RetrievalAssessment, assess_retrieval
 from app.services.diagnosis_synthesis import synthesize_diagnosis
@@ -41,7 +41,17 @@ def run_diagnosis_with_debug(
             latency_ms=0.0,
         )
         if perception.mode == "text_only"
-        else assess_gemini(incident, provider=provider)
+        else assess_gemini(
+            ReasoningInput(
+                incident=incident,
+                perception=perception,
+                evidence=evidence,
+                kb_candidates=retrieval.kb_retrieval.candidates,
+                gate_decision=retrieval.kb_retrieval.gate_decision,
+                missing_evidence=evidence.missing_evidence,
+            ),
+            provider=provider,
+        )
     )
     resolution = synthesize_diagnosis(incident, perception, evidence, retrieval, gemini)
     diagnosis = _build_diagnosis_result(incident, perception, retrieval, gemini, resolution)
@@ -57,7 +67,7 @@ def run_diagnosis_with_debug(
         "charger_id": incident.charger_id,
         "diagnosis_source": diagnosis.diagnosis_source,
         "issue_family": diagnosis.issue_family,
-        "resolver_tier": diagnosis.resolver_tier,
+        "resolver_tier_proposed": diagnosis.resolver_tier_proposed,
         "evidence_type": diagnosis.evidence_type,
         "has_photo_evidence": incident.photo_evidence is not None,
         "kb_gate_decision": retrieval.kb_retrieval.gate_decision,
@@ -70,8 +80,13 @@ def run_diagnosis_with_debug(
         **gemini_attempt,
         "perception_mode": perception.mode,
         "perception_confidence": perception.confidence_score,
+        "perception_provider_attempted": perception.provider_attempted,
+        "perception_fallback_used": perception.fallback_used,
+        "perception_error_type": perception.error_type,
+        "perception_error_message": perception.error_message,
         "missing_evidence": evidence.missing_evidence,
-        "structured_evidence_summary": evidence.semantic_summary,
+        "structured_evidence_summary": evidence.human_summary,
+        "structured_retrieval_text": evidence.retrieval_text,
     }
     return perception, evidence, retrieval.kb_retrieval, diagnosis, debug
 
@@ -100,7 +115,7 @@ def _build_diagnosis_result(
         fault_type=resolution.fault_type,
         evidence_type=perception.evidence_type,
         hazard_level=resolution.hazard_level,  # type: ignore[arg-type]
-        resolver_tier=resolution.resolver_tier,  # type: ignore[arg-type]
+        resolver_tier_proposed=resolution.resolver_tier_proposed,  # type: ignore[arg-type]
         likely_fault=resolution.fault_type.replace("_", " ").strip() or "Unknown fault",
         evidence_summary=resolution.evidence_summary,
         required_proof_next=resolution.required_proof_next,

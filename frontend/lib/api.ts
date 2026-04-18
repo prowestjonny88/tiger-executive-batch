@@ -34,6 +34,10 @@ export type ApiTriageResponse = {
     uncertainty_notes: string[];
     confidence_score: number;
     requires_follow_up: boolean;
+    provider_attempted: boolean;
+    fallback_used: boolean;
+    error_type?: string | null;
+    error_message?: string | null;
     raw_provider_output?: string | null;
   };
   kb_retrieval: {
@@ -41,7 +45,7 @@ export type ApiTriageResponse = {
     provider_name: string;
     provider_mode: string;
     gate_decision: "accepted" | "contextual_only" | "rejected";
-    gate_reason: string;
+    gate_basis: string;
     candidate_count: number;
     primary_candidate?: {
       canonical_file_name: string;
@@ -89,6 +93,9 @@ export type ApiTriageResponse = {
     weak_threshold?: number | null;
     image_embedding_used: boolean;
     text_embedding_used: boolean;
+    top_family_consensus: IssueFamily[];
+    score_margin_top2?: number | null;
+    stable_neighborhood: boolean;
     compatibility_notes: string[];
     extra?: Record<string, unknown>;
   };
@@ -97,7 +104,7 @@ export type ApiTriageResponse = {
     fault_type: string;
     evidence_type: EvidenceType;
     hazard_level: HazardLevel;
-    resolver_tier: ResolverTier;
+    resolver_tier_proposed: ResolverTier;
     likely_fault: string;
     evidence_summary: string;
     required_proof_next?: string | null;
@@ -158,6 +165,8 @@ export type ApiTriageResponse = {
     fault_type: string;
     hazard_level: HazardLevel;
     resolver_tier: ResolverTier;
+    resolver_decision: "confirmed" | "overridden";
+    resolver_override_reason?: string | null;
     routing_rationale: string;
     recommended_next_step: string;
     fallback_action: string;

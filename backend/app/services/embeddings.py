@@ -7,7 +7,7 @@ from typing import Protocol
 
 from app.services.gemini_client import get_gemini_client
 
-EMBEDDING_DIMENSION = 32
+EMBEDDING_DIMENSION = 256
 
 
 class EmbeddingProvider(Protocol):
@@ -42,6 +42,26 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     if left_norm == 0 or right_norm == 0:
         return 0.0
     return max(min(dot / (left_norm * right_norm), 1.0), -1.0)
+
+
+def _project_vector(values: list[float], target_dimension: int = EMBEDDING_DIMENSION) -> list[float]:
+    if len(values) == target_dimension:
+        return [float(value) for value in values]
+    if not values:
+        return [0.0] * target_dimension
+    if len(values) < target_dimension:
+        padded = [float(value) for value in values]
+        padded.extend([0.0] * (target_dimension - len(values)))
+        return padded
+
+    projected: list[float] = []
+    stride = len(values) / target_dimension
+    for index in range(target_dimension):
+        start = int(index * stride)
+        end = int((index + 1) * stride)
+        bucket = values[start:max(end, start + 1)]
+        projected.append(sum(float(value) for value in bucket) / len(bucket))
+    return projected
 
 
 class HashEmbeddingProvider:
@@ -84,8 +104,8 @@ class GeminiEmbeddingProvider:
                 contents=text,
             )
             values = list(getattr(response.embeddings[0], "values", []))
-            if len(values) >= EMBEDDING_DIMENSION:
-                return [float(value) for value in values[:EMBEDDING_DIMENSION]]
+            if values:
+                return _project_vector(values)
         except Exception:
             return self._fallback.embed_text(text)
         return self._fallback.embed_text(text)

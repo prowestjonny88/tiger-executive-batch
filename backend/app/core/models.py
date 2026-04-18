@@ -101,12 +101,17 @@ class PerceptionResult(BaseModel):
     uncertainty_notes: List[str] = Field(default_factory=list)
     confidence_score: float = Field(ge=0.0, le=1.0)
     requires_follow_up: bool = False
+    provider_attempted: bool = False
+    fallback_used: bool = False
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
     raw_provider_output: Optional[str] = None
 
 
 class StructuredEvidence(BaseModel):
     evidence_type: EvidenceType
-    semantic_summary: str
+    human_summary: str
+    retrieval_text: str
     components_visible: List[str] = Field(default_factory=list)
     visible_abnormalities: List[str] = Field(default_factory=list)
     ocr_findings: List[str] = Field(default_factory=list)
@@ -145,7 +150,7 @@ class KbRetrievalResult(BaseModel):
     provider_name: str
     provider_mode: str
     gate_decision: KbGateDecision
-    gate_reason: str
+    gate_basis: str
     candidate_count: int = 0
     primary_candidate: Optional[KbCandidateHit] = None
     candidates: List[KbCandidateHit] = Field(default_factory=list)
@@ -153,6 +158,9 @@ class KbRetrievalResult(BaseModel):
     weak_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     image_embedding_used: bool = False
     text_embedding_used: bool = False
+    top_family_consensus: List[IssueFamily] = Field(default_factory=list)
+    score_margin_top2: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    stable_neighborhood: bool = False
     compatibility_notes: List[str] = Field(default_factory=list)
     extra: Dict[str, Any] = Field(default_factory=dict)
 
@@ -163,7 +171,7 @@ class DiagnosisResult(BaseModel):
     fault_type: str
     evidence_type: EvidenceType
     hazard_level: HazardLevel
-    resolver_tier: ResolverTier
+    resolver_tier_proposed: ResolverTier
     likely_fault: str
     evidence_summary: str
     required_proof_next: Optional[str] = None
@@ -207,6 +215,8 @@ class RoutingDecision(BaseModel):
     fault_type: str
     hazard_level: HazardLevel
     resolver_tier: ResolverTier
+    resolver_decision: Literal["confirmed", "overridden"]
+    resolver_override_reason: Optional[str] = None
     routing_rationale: str
     recommended_next_step: str
     fallback_action: str
