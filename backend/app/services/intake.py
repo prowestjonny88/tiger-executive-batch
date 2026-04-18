@@ -155,12 +155,14 @@ def _call_gemini_intake(
         config=genai_types.GenerateContentConfig(
             system_instruction=_INTAKE_SYSTEM_PROMPT,
             temperature=0.0,
-            max_output_tokens=512,
+            max_output_tokens=2048,
+            response_mime_type="application/json",
         ),
     )
     raw = (response.text or "").strip()
-    raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.MULTILINE)
-    raw = re.sub(r"```$", "", raw.strip())
+    if raw.startswith("```"):
+        raw = re.sub(r"^```[a-z]*\n?", "", raw)
+        raw = re.sub(r"\n?```$", "", raw.strip())
 
     try:
         data = json.loads(raw)

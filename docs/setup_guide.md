@@ -58,7 +58,7 @@ Recommended `backend/.env`:
 DATABASE_URL=postgresql://omnitriage:omnitriage@localhost:5432/omnitriage
 LEGACY_SQLITE_PATH=backend/omnitriage.sqlite3
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-3.0-flash
 OMNITRIAGE_EMBEDDING_PROVIDER=hash
 ```
 

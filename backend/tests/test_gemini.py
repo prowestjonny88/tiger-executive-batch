@@ -23,7 +23,7 @@ def test_gemini_intake_provider_usable():
     incident = IncidentInput(site_id="site-01", photo_hint="clear")
 
     with patch("app.services.intake.get_gemini_client", return_value=mock_client), patch(
-        "app.services.intake.GEMINI_MODEL", "gemini-2.0-flash"
+        "app.services.intake.GEMINI_MODEL", "gemini-3.0-flash"
     ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
         status, notes, questions = _call_gemini_intake(incident, None)
 
@@ -51,7 +51,7 @@ def test_gemini_diagnosis_provider_parses_round1_schema():
     incident = IncidentInput(site_id="site-01", symptom_text="Breaker is down.")
 
     with patch("app.services.diagnosis.get_gemini_client", return_value=mock_client), patch(
-        "app.services.diagnosis.GEMINI_MODEL", "gemini-2.0-flash"
+        "app.services.diagnosis.GEMINI_MODEL", "gemini-3.0-flash"
     ), patch("google.genai.types.GenerateContentConfig", MagicMock(), create=True):
         provider = GeminiDiagnosisProvider()
         result = provider.analyze(incident)

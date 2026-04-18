@@ -199,25 +199,22 @@ class GeminiDiagnosisProvider:
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("google-genai not installed") from exc
 
-        prompt = f"""Return JSON only.
-Schema:
-{{
-  "issue_family": "no_power|tripping|charging_slow|not_responding|unknown_mixed",
-  "fault_type": "short phrase",
-  "evidence_summary": "short summary",
-  "hazard_level": "low|medium|high",
-  "required_proof_next": "short instruction",
-  "resolver_tier_hint": "driver|local_site|remote_ops|technician"
-}}
-
-Incident:
-- site_id: {incident.site_id}
-- charger_id: {incident.charger_id or ""}
-- photo_hint: {incident.photo_hint or ""}
-- symptom_text: {incident.symptom_text or ""}
-- error_code: {incident.error_code or ""}
-- follow_up_answers: {json.dumps(incident.follow_up_answers)}
-"""
+        prompt = (
+            "You are an EV charger diagnostic engine. Analyse the incident and return a JSON object.\n"
+            "The JSON must have exactly these keys:\n"
+            '  issue_family: one of no_power, tripping, charging_slow, not_responding, unknown_mixed\n'
+            '  fault_type: short phrase (under 10 words)\n'
+            '  evidence_summary: one sentence describing what the evidence shows\n'
+            '  hazard_level: one of low, medium, high\n'
+            '  required_proof_next: one sentence describing the next piece of evidence needed\n'
+            '  resolver_tier_hint: one of driver, local_site, remote_ops, technician\n\n'
+            f"site_id: {incident.site_id}\n"
+            f"charger_id: {incident.charger_id or ''}\n"
+            f"photo_hint: {incident.photo_hint or ''}\n"
+            f"symptom_text: {incident.symptom_text or ''}\n"
+            f"error_code: {incident.error_code or ''}\n"
+            f"follow_up_answers: {json.dumps(incident.follow_up_answers)}\n"
+        )
 
         contents: list[object] = [prompt]
         if incident.photo_evidence:
@@ -236,12 +233,15 @@ Incident:
             contents=contents,
             config=genai_types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=512,
+                max_output_tokens=2048,
+                response_mime_type="application/json",
             ),
         )
         raw = (response.text or "").strip()
-        raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.MULTILINE)
-        raw = re.sub(r"```$", "", raw.strip())
+        # Strip markdown fences if the model adds them despite response_mime_type
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw.strip())
         return json.loads(raw)
 
 
