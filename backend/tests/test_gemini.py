@@ -366,6 +366,31 @@ def test_should_invoke_reasoning_skips_clean_accepted_case():
     assert basis == "accepted_kb_without_material_uncertainty"
 
 
+def test_should_invoke_reasoning_invokes_for_low_confidence_vlm():
+    invoke, basis = should_invoke_reasoning(
+        ReasoningInput(
+            incident=IncidentInput(site_id="site-01"),
+            perception=PerceptionResult(
+                mode="vlm",
+                evidence_type="hardware_photo",
+                scene_summary="Unclear breaker photo.",
+                confidence_score=0.52,
+            ),
+            evidence=StructuredEvidence(
+                evidence_type="hardware_photo",
+                human_summary="Unclear breaker photo.",
+                retrieval_text="unclear breaker photo",
+            ),
+            kb_candidates=[],
+            gate_decision="accepted",
+            missing_evidence=[],
+        )
+    )
+
+    assert invoke is True
+    assert basis == "perception_low_confidence"
+
+
 def test_run_diagnosis_with_debug_skips_reasoning_for_clean_accepted_case():
     retrieval = RetrievalAssessment(
         issue_family_hint="tripping",

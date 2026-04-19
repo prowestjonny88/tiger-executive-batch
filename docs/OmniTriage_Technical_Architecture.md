@@ -43,7 +43,8 @@ Legacy note:
 - Persistence: Postgres + pgvector
 - File storage: local filesystem under backend uploads
 - Knowledge layer: normalized Round 1 dataset package plus retrieval metadata
-- AI path: Gemini VLM and embedding provider when configured, deterministic fallback behavior when unavailable
+- AI path: Gemini VLM (gemini-2.5-flash) enforcing strict schemas via native `response_mime_type="application/json"` with 2048-token limits to accommodate internal reasoning headers without truncating outputs.
+- Intelligence Fallbacks: Deterministic parsing behaviors when AI providers are unavailable locally.
 
 ## 4. High-Level Component Map
 ```text

@@ -1,20 +1,18 @@
-﻿# OmniTriage
+# OmniTriage
 
-OmniTriage is a confidence-aware EV charger troubleshooting MVP. It combines a Next.js frontend, a FastAPI backend, seeded demo data, SQLite-backed audit history, and a hybrid diagnosis layer that can route between hardware-visual, OCR/text, and symptom-first branches.
+OmniTriage is a confidence-aware EV charger troubleshooting MVP. It combines a Next.js frontend, a FastAPI backend, seeded demo data, Postgres-backed audit history, and a hybrid diagnosis layer that combines VLM, OCR, and known-case retrieval.
 
-The current implementation is centered on the organizer decision tree:
+The current implementation is centered on a taxonomy-first approach:
 
-- identify one of four issue types: `no_power`, `tripping_mcb_rccb`, `charging_slow`, `not_responding`
-- assess the shared basic checks: main power supply, cable condition, indicator/error code
-- produce branch SOP guidance
-- finish with a single workflow outcome: `resolved` or `escalate`
+- identify one of five issue families: `no_power`, `tripping`, `charging_slow`, `not_responding`, `unknown_mixed`
+- identify the fault type and hazard level
+- produce resolver-specific SOP guidance
+- route the incident to the appropriate resolver: `driver`, `local_site`, `remote_ops`, or `technician`
 
-The current diagnosis path is additive, not routing-authoritative:
-
-- `hardware_visual_branch` for in-scope hardware photos using the Round 1 5-class classifier bundle
-- `ocr_text_branch` for screenshot / app-log / display-text evidence
-- `symptom_multimodal_branch` for symptom-heavy cases such as `Charger No Pulse`
-- fallback to Gemini or organizer heuristics if a branch is unavailable
+The current diagnosis path relies on:
+- `data/round1/` package for known-case semantic retrieval
+- `Gemini Diagnosis Provider` acting as an intelligent VLM assist
+- Heuristic deterministic fallback policies when AI reasoning is unavailable
 
 ## Repo Structure
 
@@ -28,14 +26,12 @@ The current diagnosis path is additive, not routing-authoritative:
 The repo currently includes:
 
 - real upload handling with backend-served evidence files
-- SQLite-backed incident and triage audit persistence
+- Postgres-backed incident and triage audit persistence with full JSONB payload replay tracking
 - four seeded organizer-aligned demo scenarios and sites
-- frontend result/guidance/escalation flows wired to live backend data
-- organizer-native diagnosis fields: `issue_type`, `basic_conditions`, `workflow.outcome`, `workflow.rationale`
-- additive diagnosis metadata: `branch_name`, `diagnosis_source`, classifier metadata, and OCR metadata
-- integrated Round 1 classifier bundle and temporary classifier-use policy
-- Gemini client support with heuristic fallback when the VLM is unavailable or fails
-- replay/history support through persisted incident records
+- frontend result/guidance/escalation/history flows wired to live backend data powered by the new `issue_family` paradigm
+- Gemini client support enforcing `application/json` models over `gemini-2.5-flash` natively.
+- deterministic resolver routing engine
+- deterministic fallback heuristic paths for offline scenarios
 
 ## Verified
 
@@ -83,37 +79,21 @@ Create `backend/.env` with:
 
 ```env
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 Useful checks:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe .\vlm_doctor.py
-.\.venv\Scripts\python.exe .\test_live_api.py
-```
+Terminal will print `[gemini_client] Gemini client initialized successfully` on backend boot if everything is properly connected.
 
 If Gemini is unavailable, the backend falls back to the heuristic diagnosis path.
 
-## Visual Classifier Runtime
+## Dataset-Backed Intelligence Runtime
 
-The backend now ships with a hardware-visual classifier integration that expects:
+The backend now ships with a knowledge package integration that expects a taxonomy layout mapping located strictly at:
+- `data/round1/label_map.yaml`
+- `data/round1/known_cases_seed.jsonl`
 
-- `backend/app/services/diagnosis_assets/model_5class_logreg.pkl`
-- `backend/app/services/diagnosis_assets/label_encoder_5class.pkl`
-- `backend/app/services/diagnosis_assets/classifier_policy_temp.json`
-
-The DINOv2 embedding runtime uses `torch` and `transformers`. On first live hardware-branch use, Hugging Face weights may need to download unless they are already cached locally.
-
-Useful environment toggles:
-
-```env
-OMNITRIAGE_CLASSIFIER_ENABLED=true
-OMNITRIAGE_OCR_ENABLED=true
-OMNITRIAGE_OCR_GEMINI_ASSIST=false
-OMNITRIAGE_DINO_MODEL_NAME=facebook/dinov2-base
-```
+Postgres is required because `pgvector` dependencies track known-case anomaly overlaps.
 
 ## Frontend -> Backend Wiring
 

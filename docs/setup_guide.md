@@ -77,7 +77,6 @@ Verify:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8001/api/v1/health
-.\.venv\Scripts\python.exe .\vlm_doctor.py
 .\.venv\Scripts\python.exe -m pytest -q backend/tests/test_api.py backend/tests/test_triage.py backend/tests/test_gemini.py
 .\.venv\Scripts\pyright.exe -p .\pyrightconfig.json
 ```
@@ -121,7 +120,7 @@ Important:
 
 Configuration checks:
 - `backend/.env` contains a valid `GEMINI_API_KEY`
-- `.\.venv\Scripts\python.exe .\vlm_doctor.py` reports successful client initialization
+- The Python terminal output immediately reports `[gemini_client] Gemini client initialized successfully` automatically on boot if the key is valid.
 
 Runtime checks:
 - `diagnosis.diagnosis_source` should switch from retrieval-only fallback to a Gemini-assisted source when Gemini is actually used

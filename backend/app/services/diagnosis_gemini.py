@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from typing import Any
 
 from app.core.models import IncidentInput, KbCandidateHit, PerceptionResult, StructuredEvidence
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
+
+LOW_CONFIDENCE_REASONING_THRESHOLD = float(os.getenv("OMNITRIAGE_REASONING_LOW_CONFIDENCE_THRESHOLD", "0.7"))
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,8 @@ def should_invoke_reasoning(reasoning_input: ReasoningInput) -> tuple[bool, str]
         return True, f"kb_gate_{reasoning_input.gate_decision}"
     if reasoning_input.perception.mode == "heuristic":
         return True, "perception_heuristic_fallback"
+    if reasoning_input.perception.confidence_score < LOW_CONFIDENCE_REASONING_THRESHOLD:
+        return True, "perception_low_confidence"
     if reasoning_input.perception.uncertainty_notes:
         return True, "perception_uncertainty"
     if reasoning_input.missing_evidence:

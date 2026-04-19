@@ -20,9 +20,9 @@ Validated:
 ## 2. Highest-Priority Remaining Work
 
 ### A. Documentation cleanup
-- align legacy PRD/spec/briefing docs to the current runtime
-- explicitly mark archival classifier-era materials as historical
-- remove dead references to organizer-native contract fields
+- [x] align legacy PRD/spec/briefing docs to the current runtime
+- [x] explicitly mark archival classifier-era materials as historical
+- [x] remove dead references to organizer-native contract fields
 
 ### B. Runtime hardening
 - replace FastAPI startup event with lifespan

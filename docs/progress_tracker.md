@@ -60,18 +60,16 @@ Current frontend truth:
 - Legacy replay/history normalization for older SQLite-era records
 
 ## Remaining Gaps
-- update repo docs broadly so they stop describing the retired organizer/classifier runtime
+- expand retrieval evaluation and report artifacts for judging/demo evidence
 - replace FastAPI startup hook with lifespan
 - decide whether to keep archival classifier findings/docs as historical reference or move them under an explicit archive section
-- add stronger live OCR extraction beyond current text extraction and VLM assist
-- expand retrieval evaluation and report artifacts for judging/demo evidence
 - clean repo noise and outdated generated artifacts from version control
 
 ## Current Verification Snapshot
 - `backend`: `pytest -q backend/tests/test_api.py backend/tests/test_triage.py backend/tests/test_gemini.py` -> `17 passed`
 - `backend`: `pyright -p backend/pyrightconfig.json` -> `0 errors`
 - `frontend`: `npm.cmd run build` -> `PASS`
-- Dockerized Postgres container was used for API verification
+- Gemini Integration: `gemini-2.5-flash` stabilized via native generic JSON `response_mime_type` ensuring parsing resilience without manual prompt hacking or truncation.
 
 ## Notes
 - The old classifier branch files remain only as archival/compatibility stubs. They are not part of the active runtime path.
