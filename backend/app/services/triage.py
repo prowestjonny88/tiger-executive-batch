@@ -8,6 +8,7 @@ from app.services.confidence import assess_confidence
 from app.services.diagnosis import run_diagnosis_with_debug
 from app.services.guidance import build_artifact
 from app.services.routing import route_incident
+from app.services.theme2_mapper import build_competition_output
 
 
 def run_triage(incident: IncidentInput) -> TriageResult:
@@ -23,6 +24,7 @@ def run_triage_with_debug(incident: IncidentInput) -> tuple[TriageResult, dict[s
     confidence = assess_confidence(diagnosis)
     routing = route_incident(incident, diagnosis, confidence, site)
     artifact = build_artifact(routing, diagnosis, load_snippets())
+    competition_output = build_competition_output(incident, perception, diagnosis)
 
     result = TriageResult(
         incident=incident,
@@ -32,5 +34,10 @@ def run_triage_with_debug(incident: IncidentInput) -> tuple[TriageResult, dict[s
         confidence=confidence,
         routing=routing,
         artifact=artifact,
+        competition_output=competition_output,
     )
-    return result, {"diagnosis_debug": diagnosis_debug, "structured_evidence": evidence.model_dump()}
+    return result, {
+        "diagnosis_debug": diagnosis_debug,
+        "structured_evidence": evidence.model_dump(),
+        "competition_output": competition_output.model_dump(),
+    }

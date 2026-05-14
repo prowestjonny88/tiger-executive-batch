@@ -1,0 +1,120 @@
+{
+  "version": "2026-05-theme2-round2-v1",
+  "after_sales_team_id": "AS_TEAM_01",
+  "rules": {
+    "charger_red_light": {
+      "fault_type_v2": "charger_issue",
+      "recipient_type": "after_sales_team",
+      "assigned_team_id": "AS_TEAM_01",
+      "action_message": "Screenshot the app if available and send to after-sales team.",
+      "required_proof_next": "App screenshot or charger app error page if available."
+    },
+    "charger_blinking_red_light": {
+      "fault_type_v2": "unknown",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Please provide the app error log or red-light flash count.",
+      "required_proof_next": "App error log screenshot or red-light flash count."
+    },
+    "charger_no_light": {
+      "fault_type_v2": "supply_issue",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Please check whether the breaker in the EVDB has tripped.",
+      "required_proof_next": "Photo of EVDB breaker state if the charger remains off."
+    },
+    "charger_serial_brand_visible": {
+      "fault_type_v2": "identification_only",
+      "recipient_type": "none",
+      "assigned_team_id": null,
+      "action_message": "Charger identity captured. Continue troubleshooting with fault evidence if needed.",
+      "required_proof_next": null
+    },
+    "evdb_single_phase": {
+      "fault_type_v2": "unknown",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Single-phase EVDB detected. Verify RCCB 40A Type A 2P and MCB 40A 2P are present.",
+      "required_proof_next": "Clear close-up of RCCB and MCB labels."
+    },
+    "evdb_three_phase": {
+      "fault_type_v2": "unknown",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Three-phase EVDB detected. Verify MCB 40A 4P and RCCB 40A Type A 4P are present.",
+      "required_proof_next": "Clear close-up of RCCB and MCB labels."
+    },
+    "mcb_tripped": {
+      "fault_type_v2": "protection_issue",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "MCB/RCCB appears tripped. Please check or reset only if safe, and escalate if it trips repeatedly.",
+      "required_proof_next": "Photo showing breaker state after reset attempt."
+    },
+    "missing_mcb_rccb": {
+      "fault_type_v2": "protection_issue",
+      "recipient_type": "after_sales_team",
+      "assigned_team_id": "AS_TEAM_01",
+      "action_message": "Contact after-sales team to repair or replace missing breakers.",
+      "required_proof_next": "Clear photo of the full EVDB."
+    },
+    "wrong_component_specs": {
+      "fault_type_v2": "protection_issue",
+      "recipient_type": "after_sales_team",
+      "assigned_team_id": "AS_TEAM_01",
+      "action_message": "Contact after-sales team to repair or replace incorrectly specified breakers.",
+      "required_proof_next": "Clear photo of RCCB/MCB ratings and type labels."
+    },
+    "isolator_on": {
+      "fault_type_v2": "unknown",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Isolator appears ON. Continue checking charger indicator and EVDB breaker state.",
+      "required_proof_next": "Photo of charger indicator and EVDB breaker state."
+    },
+    "isolator_off_open_circuit": {
+      "fault_type_v2": "power_cut",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Please turn ON the isolator and check whether the breaker in the EVDB has tripped.",
+      "required_proof_next": "Photo after turning isolator ON if the charger still has no power."
+    },
+    "unknown": {
+      "fault_type_v2": "unknown",
+      "recipient_type": "unknown",
+      "assigned_team_id": null,
+      "action_message": "Unable to confirm the Theme 2 observation. Please retake a clear photo of the charger, EVDB, or isolator.",
+      "required_proof_next": "Clear photo of the relevant charger, EVDB, or isolator evidence."
+    }
+  },
+  "error_log_rules": {
+    "red_light_flashes_6": {
+      "fault_type_v2": "installation_issue",
+      "recipient_type": "after_sales_team",
+      "assigned_team_id": "AS_TEAM_01",
+      "action_message": "Contact after-sales team for installation issue review.",
+      "required_proof_next": "App error log screenshot or video showing six red flashes."
+    },
+    "red_light_flashes_7": {
+      "fault_type_v2": "manual_error",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Please release the emergency stop button and retry the charger.",
+      "required_proof_next": "Photo confirming the emergency stop button is released."
+    },
+    "red_light_flashes_8": {
+      "fault_type_v2": "charger_issue",
+      "recipient_type": "after_sales_team",
+      "assigned_team_id": "AS_TEAM_01",
+      "action_message": "Contact after-sales team for charger short-circuit review.",
+      "required_proof_next": "App error log screenshot or video showing eight red flashes."
+    },
+    "red_light_flashes_9": {
+      "fault_type_v2": "charger_issue",
+      "recipient_type": "customer",
+      "assigned_team_id": null,
+      "action_message": "Please shut down the charger for a while, then restart the charger.",
+      "required_proof_next": "Photo or app screenshot after the restart attempt."
+    }
+  }
+}

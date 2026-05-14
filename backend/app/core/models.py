@@ -10,6 +10,32 @@ HazardLevel = Literal["low", "medium", "high"]
 ResolverTier = Literal["driver", "local_site", "remote_ops", "technician"]
 EvidenceType = Literal["hardware_photo", "screenshot", "symptom_report", "symptom_heavy_photo", "mixed_photo", "unknown"]
 KbGateDecision = Literal["accepted", "contextual_only", "rejected"]
+InputComponent = Literal["charger", "evdb", "isolator", "unknown"]
+ObservationResultV2 = Literal[
+    "charger_red_light",
+    "charger_blinking_red_light",
+    "charger_no_light",
+    "charger_serial_brand_visible",
+    "evdb_single_phase",
+    "evdb_three_phase",
+    "mcb_tripped",
+    "missing_mcb_rccb",
+    "wrong_component_specs",
+    "isolator_on",
+    "isolator_off_open_circuit",
+    "unknown",
+]
+FaultTypeV2 = Literal[
+    "protection_issue",
+    "charger_issue",
+    "supply_issue",
+    "installation_issue",
+    "manual_error",
+    "power_cut",
+    "identification_only",
+    "unknown",
+]
+RecipientType = Literal["customer", "after_sales_team", "none", "unknown"]
 
 
 class ConfidenceBand(str, Enum):
@@ -90,6 +116,24 @@ class RetrievalMetadata(BaseModel):
     extra: Dict[str, Any] = Field(default_factory=dict)
 
 
+class Theme2VisualExtraction(BaseModel):
+    input_component: InputComponent = "unknown"
+    observation_result: ObservationResultV2 = "unknown"
+    charger_serial_number: Optional[str] = None
+    charger_brand_model: Optional[str] = None
+    indicator_status: Literal["red_light", "blinking_red_light", "no_light", "unknown"] = "unknown"
+    evdb_phase_type: Literal["single_phase", "three_phase", "unknown"] = "unknown"
+    mcb_visible: Optional[bool] = None
+    rccb_visible: Optional[bool] = None
+    mcb_rating: Optional[str] = None
+    rccb_rating: Optional[str] = None
+    rccb_type: Literal["type_a", "type_ac", "unknown"] = "unknown"
+    isolator_state: Literal["on", "off", "unknown"] = "unknown"
+    raw_visible_text: List[str] = Field(default_factory=list)
+    confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    uncertainty_notes: List[str] = Field(default_factory=list)
+
+
 class PerceptionResult(BaseModel):
     mode: Literal["vlm", "heuristic", "text_only"]
     evidence_type: EvidenceType
@@ -106,6 +150,7 @@ class PerceptionResult(BaseModel):
     error_type: Optional[str] = None
     error_message: Optional[str] = None
     raw_provider_output: Optional[str] = None
+    theme2: Optional[Theme2VisualExtraction] = None
 
 
 class StructuredEvidence(BaseModel):
@@ -243,6 +288,21 @@ class KnowledgeSnippet(BaseModel):
     body: List[str]
 
 
+class CompetitionOutput(BaseModel):
+    input_component: InputComponent
+    observation_result: ObservationResultV2
+    charger_serial_number: Optional[str] = None
+    charger_brand_model: Optional[str] = None
+    fault_type_v2: FaultTypeV2
+    recipient_type: RecipientType
+    assigned_team_id: Optional[str] = None
+    action_message: str
+    required_proof_next: Optional[str] = None
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    evidence_notes: List[str] = Field(default_factory=list)
+    source: Literal["theme2_rule_mapper", "fallback"] = "theme2_rule_mapper"
+
+
 class TriageResult(BaseModel):
     incident: IncidentInput
     perception: PerceptionResult
@@ -251,6 +311,7 @@ class TriageResult(BaseModel):
     confidence: ConfidenceAssessment
     routing: RoutingDecision
     artifact: ActionArtifact
+    competition_output: Optional[CompetitionOutput] = None
 
 
 class DemoScenario(BaseModel):
