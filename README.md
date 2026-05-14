@@ -1,45 +1,38 @@
-# OmniTriage
+# RExharge Theme 2 Triage
 
-OmniTriage is a confidence-aware EV charger troubleshooting MVP. It combines a Next.js frontend, a FastAPI backend, seeded demo data, Postgres-backed audit history, and a hybrid diagnosis layer that combines VLM, OCR, and known-case retrieval.
+RExharge Theme 2 Triage is a VLM-assisted EV charger troubleshooting prototype for the organizer-scoped ESUM Theme 2 dataset. It inspects charger, EVDB, and isolator evidence; extracts visible observations and charger identity fields; maps the result to official Theme 2 fault types; and routes each case to either the customer or an after-sales team identifier.
 
-The current implementation is centered on a taxonomy-first approach:
+The live runtime is now centered on:
 
-- identify one of five issue families: `no_power`, `tripping`, `charging_slow`, `not_responding`, `unknown_mixed`
-- identify the fault type and hazard level
-- produce resolver-specific SOP guidance
-- route the incident to the appropriate resolver: `driver`, `local_site`, `remote_ops`, or `technician`
-
-The current diagnosis path relies on:
-- `data/round1/` package for known-case semantic retrieval
-- `Gemini Diagnosis Provider` acting as an intelligent VLM assist
-- Heuristic deterministic fallback policies when AI reasoning is unavailable
+- `input_component`: `charger`, `evdb`, `isolator`, or `unknown`
+- `observation_result`: charger light state, EVDB protection state/spec, or isolator state
+- `fault_type_v2`: organizer fault type such as `charger_issue`, `supply_issue`, `protection_issue`, or `power_cut`
+- `recipient_type`: `customer`, `after_sales_team`, `none`, or `unknown`
+- `assigned_team_id`: currently `AS_TEAM_01` for after-sales routing
 
 ## Repo Structure
 
-- `frontend/` - Next.js app for upload, questions, result, guidance, escalation, intake, history, and demo flows
-- `backend/` - FastAPI backend for intake preview, branch-orchestrated diagnosis, confidence, organizer workflow decisioning, guidance, uploads, and persistence
-- `data/` - Seeded sites, demo scenarios, and knowledge snippets
-- `docs/` - Product, architecture, planning, and setup documentation
+- `frontend/` - Next.js app for upload, follow-up questions, result, guidance, escalation, history, and demo flows
+- `backend/` - FastAPI backend for uploads, Theme 2 perception, organizer rule mapping, audit history, and persistence
+- `data/round2/` - Theme 2 rule table and future manifest/evaluation assets
+- `data/demo/` - text-first Theme 2 demo scenarios
+- `docs/` - current Theme 2 setup and runtime notes
+- `_archive/round1/` - archived Round 1 known-case retrieval runtime, tests, data, and old docs
 
-## Current State
+## Current Runtime
 
-The repo currently includes:
+The active path is:
 
-- real upload handling with backend-served evidence files
-- Postgres-backed incident and triage audit persistence with full JSONB payload replay tracking
-- four seeded organizer-aligned demo scenarios and sites
-- frontend result/guidance/escalation/history flows wired to live backend data powered by the new `issue_family` paradigm
-- Gemini client support enforcing `application/json` models over `gemini-2.5-flash` natively.
-- deterministic resolver routing engine
-- deterministic fallback heuristic paths for offline scenarios
+```text
+Upload / demo evidence
+-> Theme 2 VLM or heuristic perception
+-> deterministic organizer rule mapping
+-> follow-up prompt generation
+-> customer or after-sales output
+-> Postgres incident/audit history
+```
 
-## Verified
-
-Latest local verification completed in this workspace:
-
-- `frontend`: `npm.cmd run build` -> PASS
-- `backend`: `pytest -q backend/tests` -> 24 passed
-- `backend`: `pyright` -> 0 errors
+The live path no longer uses Round 1 known-case retrieval, pgvector indexing, issue-family routing, resolver tiers, or KB gates.
 
 ## Quick Start
 
@@ -58,6 +51,15 @@ Health check:
 Invoke-RestMethod http://127.0.0.1:8001/api/v1/health
 ```
 
+Expected health payload includes:
+
+```json
+{
+  "runtime_mode": "theme2_round2_clean",
+  "round1_runtime_enabled": false
+}
+```
+
 ### Frontend
 
 ```powershell
@@ -70,8 +72,7 @@ Open:
 
 - `http://localhost:3000/`
 - `http://localhost:3000/upload`
-- `http://localhost:3000/intake`
-- `http://localhost:3000/demo`
+- `http://localhost:3000/history`
 
 ## Gemini / VLM Setup
 
@@ -82,20 +83,9 @@ GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Useful checks:
-Terminal will print `[gemini_client] Gemini client initialized successfully` on backend boot if everything is properly connected.
+If Gemini is unavailable, the backend falls back to deterministic Theme 2 heuristics based on the uploaded metadata, symptom text, and follow-up answers.
 
-If Gemini is unavailable, the backend falls back to the heuristic diagnosis path.
-
-## Dataset-Backed Intelligence Runtime
-
-The backend now ships with a knowledge package integration that expects a taxonomy layout mapping located strictly at:
-- `data/round1/label_map.yaml`
-- `data/round1/known_cases_seed.jsonl`
-
-Postgres is required because `pgvector` dependencies track known-case anomaly overlaps.
-
-## Frontend -> Backend Wiring
+## Frontend Backend Wiring
 
 Create `frontend/.env.local`:
 
@@ -104,8 +94,12 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
 API_BASE_URL=http://127.0.0.1:8001
 ```
 
-Then restart the frontend dev server.
+## Dataset Policy
 
-## Setup Guide
+Full raw Dataset 2 images should stay outside Git. The repo stores rules, demo scenarios, docs, and later may store manifests, pseudo-labels, evaluation cases, and a small curated `data/round2/sample_images/` set.
 
-A fuller setup and verification guide lives in [docs/setup_guide.md](docs/setup_guide.md).
+See:
+
+- [Theme 2 runtime contract](docs/theme2_runtime_contract.md)
+- [Round 2 dataset strategy](docs/round2_dataset_strategy.md)
+- [Setup guide](docs/setup_guide.md)

@@ -224,7 +224,7 @@ def assess_image_quality(
     if photo_evidence:
         if photo_evidence.byte_size < 15_000:
             status = "retake_required"
-            notes.append("Uploaded image file is too small for reliable diagnosis; capture a clearer close-up.")
+            notes.append("Uploaded image file is too small for reliable Theme 2 triage; capture a clearer close-up.")
         elif photo_evidence.byte_size < 40_000:
             status = "weak"
             notes.append("Uploaded image is stored, but quality looks weak from file size; use follow-up answers.")
@@ -233,7 +233,7 @@ def assess_image_quality(
 
     if any(word in hint for word in ["dark", "blurry", "cropped"]):
         status = "retake_required"
-        notes.append("Operator notes suggest the image appears too weak for reliable diagnosis.")
+        notes.append("Operator notes suggest the image appears too weak for reliable Theme 2 triage.")
     elif any(word in hint for word in ["dim", "partial", "far", "weak"]):
         if status != "retake_required":
             status = "weak"
@@ -263,66 +263,27 @@ def build_follow_up_questions(
     incident: IncidentInput,
     quality_status: str,
 ) -> list[dict[str, str]]:
-    """
-    Build follow-up questions from the staged perception -> evidence -> KB pipeline.
-    """
-    from app.services.diagnosis_evidence import build_structured_evidence
-    from app.services.diagnosis_perception import assess_perception
-    from app.services.diagnosis_retrieval import assess_retrieval
-    from app.services.diagnosis_synthesis import synthesize_diagnosis
-    from app.services.diagnosis_gemini import GeminiAssessment, ReasoningInput, assess_gemini, should_invoke_reasoning
+    """Build Theme 2 follow-up questions from perception and organizer-rule gaps."""
+    from app.services.theme2_perception import assess_theme2_perception
+    from app.services.theme2_triage import build_theme2_followups
 
-    questions: list[dict[str, str]] = []
-    answered = set(incident.follow_up_answers.keys())
-    perception = assess_perception(incident)
-    evidence = build_structured_evidence(incident, perception)
-    retrieval = assess_retrieval(incident, perception, evidence)
-    reasoning_input = ReasoningInput(
-        incident=incident,
-        perception=perception,
-        evidence=evidence,
-        kb_candidates=retrieval.kb_retrieval.candidates,
-        gate_decision=retrieval.kb_retrieval.gate_decision,
-        missing_evidence=evidence.missing_evidence,
-    )
-    invoke_reasoning, reasoning_call_basis = should_invoke_reasoning(reasoning_input)
-    gemini_assessment = (
-        assess_gemini(reasoning_input)
-        if invoke_reasoning
-        else GeminiAssessment(
-            payload=None,
-            raw_provider_output=f"Gemini reasoning skipped by policy: {reasoning_call_basis}.",
-            attempted=False,
-            succeeded=False,
-            error=None,
-            latency_ms=0.0,
-        )
-    )
-    synthesis = synthesize_diagnosis(incident, perception, evidence, retrieval, gemini_assessment)
-
-    if "required_proof_next" not in answered and synthesis.required_proof_next:
-        questions.append({"question_id": "required_proof_next", "prompt": synthesis.required_proof_next})
-    if "photo_request" not in answered and (
-        quality_status != "usable" or "clear_photo_of_asset" in evidence.missing_evidence or perception.mode == "text_only"
-    ):
-        questions.append({"question_id": "photo_request", "prompt": FOLLOW_UP_QUESTION_BANK["photo_request"]})
-    if "power_context" not in answered and "upstream_power_context" in evidence.missing_evidence:
-        questions.append({"question_id": "power_context", "prompt": FOLLOW_UP_QUESTION_BANK["power_context"]})
-    if "error_text" not in answered and perception.evidence_type == "screenshot" and not perception.ocr_findings:
-        questions.append({"question_id": "error_text", "prompt": FOLLOW_UP_QUESTION_BANK["error_text"]})
-    if "component_context" not in answered and "component_identification" in evidence.missing_evidence:
-        questions.append(
+    perception = assess_theme2_perception(incident)
+    theme2_questions = build_theme2_followups(incident, perception)
+    questions = [
+        {
+            "question_id": item.question_id,
+            "prompt": item.prompt,
+            **({"reason": item.reason} if item.reason else {}),
+        }
+        for item in theme2_questions
+    ]
+    if quality_status != "usable" and "photo_request" not in {item["question_id"] for item in questions}:
+        questions.insert(
+            0,
             {
-                "question_id": "component_context",
-                "prompt": "Provide a clearer close-up showing the exact breaker, isolator, or termination point involved.",
-            }
+                "question_id": "photo_request",
+                "prompt": "Please upload a clearer photo of the charger indicator, EVDB labels, or isolator switch.",
+                "reason": "The uploaded image quality is not strong enough for reliable Theme 2 triage.",
+            },
         )
-    if "diagnosis_uncertainty" not in answered and synthesis.requires_follow_up and synthesis.unknown_flag:
-        questions.append(
-            {
-                "question_id": "diagnosis_uncertainty",
-                "prompt": "Confirm what symptom was observed on site after the photo was taken, including power state and charger response.",
-            }
-        )
-
     return questions[:4]

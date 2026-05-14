@@ -8,6 +8,8 @@ __pycache__/
 .venv/
 venv/
 uploads/
+!frontend/app/api/uploads/
+!frontend/app/api/uploads/route.ts
 *.sqlite3
 *.db
 frontend/.env.local
@@ -17,3 +19,16 @@ UI prototype/
 .vscode/
 backend/.env.example
 backend/.env
+
+# Raw datasets stay outside Git
+data/raw/
+data/datasets/
+data/round2/raw/
+data/round2/images/
+*.mp4
+*.mov
+*.avi
+
+# Allow curated Round 2 samples if added later
+!data/round2/sample_images/
+!data/round2/sample_images/**

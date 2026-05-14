@@ -5,10 +5,70 @@ export type UploadedPhotoEvidence = {
   byte_size: number;
 };
 
-export type IssueFamily = "no_power" | "tripping" | "charging_slow" | "not_responding" | "unknown_mixed";
-export type ResolverTier = "driver" | "local_site" | "remote_ops" | "technician";
-export type HazardLevel = "low" | "medium" | "high";
 export type EvidenceType = "hardware_photo" | "screenshot" | "symptom_report" | "symptom_heavy_photo" | "mixed_photo" | "unknown";
+export type InputComponent = "charger" | "evdb" | "isolator" | "unknown";
+export type ObservationResultV2 =
+  | "charger_red_light"
+  | "charger_blinking_red_light"
+  | "charger_no_light"
+  | "charger_serial_brand_visible"
+  | "evdb_single_phase"
+  | "evdb_three_phase"
+  | "mcb_tripped"
+  | "missing_mcb_rccb"
+  | "wrong_component_specs"
+  | "isolator_on"
+  | "isolator_off_open_circuit"
+  | "unknown";
+export type FaultTypeV2 =
+  | "protection_issue"
+  | "charger_issue"
+  | "supply_issue"
+  | "installation_issue"
+  | "manual_error"
+  | "power_cut"
+  | "identification_only"
+  | "unknown";
+export type RecipientType = "customer" | "after_sales_team" | "none" | "unknown";
+
+export type Theme2VisualExtraction = {
+  input_component: InputComponent;
+  observation_result: ObservationResultV2;
+  charger_serial_number?: string | null;
+  charger_brand_model?: string | null;
+  indicator_status: "red_light" | "blinking_red_light" | "no_light" | "unknown";
+  evdb_phase_type: "single_phase" | "three_phase" | "unknown";
+  mcb_visible?: boolean | null;
+  rccb_visible?: boolean | null;
+  mcb_rating?: string | null;
+  rccb_rating?: string | null;
+  rccb_type: "type_a" | "type_ac" | "unknown";
+  isolator_state: "on" | "off" | "unknown";
+  raw_visible_text: string[];
+  confidence_score: number;
+  uncertainty_notes: string[];
+};
+
+export type CompetitionOutput = {
+  input_component: InputComponent;
+  observation_result: ObservationResultV2;
+  charger_serial_number?: string | null;
+  charger_brand_model?: string | null;
+  fault_type_v2: FaultTypeV2;
+  recipient_type: RecipientType;
+  assigned_team_id?: string | null;
+  action_message: string;
+  required_proof_next?: string | null;
+  confidence_score: number;
+  evidence_notes: string[];
+  source: "theme2_rule_mapper" | "fallback";
+};
+
+export type Theme2FollowUpPrompt = {
+  question_id: string;
+  prompt: string;
+  reason?: string | null;
+};
 
 export type ApiTriageResponse = {
   incident_id: number;
@@ -39,148 +99,20 @@ export type ApiTriageResponse = {
     error_type?: string | null;
     error_message?: string | null;
     raw_provider_output?: string | null;
+    extraction: Theme2VisualExtraction;
   };
-  kb_retrieval: {
-    query_text: string;
-    provider_name: string;
-    provider_mode: string;
-    gate_decision: "accepted" | "contextual_only" | "rejected";
-    gate_basis: string;
-    candidate_count: number;
-    primary_candidate?: {
-      canonical_file_name: string;
-      match_score: number;
-      compatibility_score: number;
-      fault_type: string;
-      issue_family: IssueFamily;
-      evidence_type: EvidenceType;
-      hazard_level: HazardLevel;
-      resolver_tier: ResolverTier;
-      recommended_next_step: string;
-      required_proof_next: string;
-      visual_observation: string;
-      engineering_rationale?: string | null;
-      match_reason: string;
-      component_primary?: string | null;
-      visible_abnormalities: string[];
-      retrieval_source: string;
-      text_score?: number | null;
-      image_score?: number | null;
-      compatibility_notes: string[];
-    } | null;
-    candidates: Array<{
-      canonical_file_name: string;
-      match_score: number;
-      compatibility_score: number;
-      fault_type: string;
-      issue_family: IssueFamily;
-      evidence_type: EvidenceType;
-      hazard_level: HazardLevel;
-      resolver_tier: ResolverTier;
-      recommended_next_step: string;
-      required_proof_next: string;
-      visual_observation: string;
-      engineering_rationale?: string | null;
-      match_reason: string;
-      component_primary?: string | null;
-      visible_abnormalities: string[];
-      retrieval_source: string;
-      text_score?: number | null;
-      image_score?: number | null;
-      compatibility_notes: string[];
-    }>;
-    rejection_threshold?: number | null;
-    weak_threshold?: number | null;
-    image_embedding_used: boolean;
-    text_embedding_used: boolean;
-    top_family_consensus: IssueFamily[];
-    score_margin_top2?: number | null;
-    stable_neighborhood: boolean;
-    compatibility_notes: string[];
+  competition_output: CompetitionOutput;
+  follow_up_prompts: Theme2FollowUpPrompt[];
+  debug: {
+    perception_mode: string;
+    provider_attempted: boolean;
+    fallback_used: boolean;
+    raw_provider_output?: string | null;
+    rule_version?: string | null;
+    rule_key?: string | null;
+    error_log_key?: string | null;
+    folder_weak_label?: string | null;
     extra?: Record<string, unknown>;
-  };
-  diagnosis: {
-    issue_family: IssueFamily;
-    fault_type: string;
-    evidence_type: EvidenceType;
-    hazard_level: HazardLevel;
-    resolver_tier_proposed: ResolverTier;
-    likely_fault: string;
-    evidence_summary: string;
-    required_proof_next?: string | null;
-    raw_provider_output: string;
-    raw_ocr_text?: string | null;
-    confidence_score: number;
-    confidence_band: "high" | "medium" | "low";
-    unknown_flag: boolean;
-    requires_follow_up: boolean;
-    follow_up_prompts: Array<{ question_id: string; prompt: string }>;
-    diagnosis_source?: string;
-    branch_name?: string;
-    hazard_flags: string[];
-    known_case_hit?: {
-      canonical_file_name: string;
-      match_score: number;
-      fault_type: string;
-      issue_family: IssueFamily;
-      evidence_type: EvidenceType;
-      hazard_level: HazardLevel;
-      resolver_tier: ResolverTier;
-      recommended_next_step: string;
-      required_proof_next: string;
-      visual_observation: string;
-      engineering_rationale?: string | null;
-      match_reason: string;
-      component_primary?: string | null;
-      visible_abnormalities: string[];
-      retrieval_source: string;
-    } | null;
-    retrieval_metadata?: {
-      provider_name: string;
-      provider_mode: string;
-      query_text: string;
-      image_embedding_used: boolean;
-      text_embedding_used: boolean;
-      candidate_count: number;
-      match_state: "exact_filename" | "accepted" | "weak" | "rejected";
-      selected_case?: string | null;
-      selected_score?: number | null;
-      rejection_threshold?: number | null;
-      extra?: Record<string, unknown>;
-    } | null;
-    confidence_reasoning?: string | null;
-    novelty_flag: boolean;
-    known_case_match_score?: number | null;
-    reasoning_notes: string[];
-  };
-  confidence: {
-    score: number;
-    band: "high" | "medium" | "low";
-    requires_follow_up: boolean;
-    novelty_detected: boolean;
-    rationale: string;
-  };
-  routing: {
-    issue_family: IssueFamily;
-    fault_type: string;
-    hazard_level: HazardLevel;
-    resolver_tier: ResolverTier;
-    resolver_decision: "confirmed" | "overridden";
-    resolver_override_reason?: string | null;
-    routing_rationale: string;
-    recommended_next_step: string;
-    fallback_action: string;
-    required_proof_next?: string | null;
-    escalation_required: boolean;
-  };
-  artifact: {
-    issue_family: IssueFamily;
-    resolver_tier: ResolverTier;
-    title: string;
-    summary?: string;
-    steps: string[];
-    safety_note: string;
-    evidence_focus?: string[];
   };
 };
 
@@ -194,7 +126,7 @@ export type PreviewResponse = {
     quality_status: "usable" | "weak" | "retake_required";
     notes: string[];
   };
-  follow_up_questions: Array<{ question_id: string; prompt: string }>;
+  follow_up_questions: Theme2FollowUpPrompt[];
 };
 
 export type SiteOption = {
@@ -216,8 +148,10 @@ export type ScenarioOption = {
   symptom_text: string;
   error_code: string;
   follow_up_answers: Record<string, string>;
-  expected_issue_family: IssueFamily;
-  expected_resolver_tier: ResolverTier;
+  expected_input_component: InputComponent;
+  expected_observation_result: ObservationResultV2;
+  expected_fault_type_v2: FaultTypeV2;
+  expected_recipient_type: RecipientType;
 };
 
 export type IncidentHistoryItem = {
@@ -232,19 +166,14 @@ export type IncidentHistoryItem = {
   created_at: string;
   latest_stage?: string | null;
   latest_stage_at?: string | null;
-  latest_issue_family?: IssueFamily | null;
-  latest_resolver_tier?: ResolverTier | null;
-  latest_fault?: string | null;
-  latest_confidence_band?: "high" | "medium" | "low" | null;
-  latest_hazard_level?: HazardLevel | null;
-  latest_diagnosis_source?: string | null;
-  latest_retrieval_provider?: string | null;
-  latest_retrieval_provider_mode?: string | null;
-  latest_retrieval_signal_mode?: string | null;
-  latest_exact_image_shortcut_mode?: string | null;
-  latest_retrieval_warning?: string | null;
-  latest_known_case?: string | null;
-  latest_kb_gate_decision?: "accepted" | "contextual_only" | "rejected" | null;
+  latest_input_component?: InputComponent | null;
+  latest_observation_result?: ObservationResultV2 | null;
+  latest_fault_type_v2?: FaultTypeV2 | null;
+  latest_recipient_type?: RecipientType | null;
+  latest_assigned_team_id?: string | null;
+  latest_confidence_score?: number | null;
+  latest_action_message?: string | null;
+  latest_rule_key?: string | null;
 };
 
 export type IncidentHistoryDetailItem = IncidentHistoryItem & {
@@ -334,46 +263,77 @@ export async function uploadIncidentPhoto(file: File) {
   });
 }
 
-export function formatIssueType(issueFamily?: string | null) {
-  switch (issueFamily) {
-    case "no_power":
-      return "No Power";
-    case "tripping":
-      return "Tripping";
-    case "charging_slow":
-      return "Charging Slow";
-    case "not_responding":
-      return "Not Responding";
-    case "unknown_mixed":
-      return "Unknown / Mixed";
+function titleize(value: string) {
+  return value
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+export function formatInputComponent(value?: string | null) {
+  if (!value || value === "unknown") return "Unknown";
+  if (value === "evdb") return "EVDB";
+  return titleize(value);
+}
+
+export function formatObservationResult(value?: string | null) {
+  switch (value) {
+    case "charger_red_light":
+      return "Charger Red Light";
+    case "charger_blinking_red_light":
+      return "Charger Blinking Red Light";
+    case "charger_no_light":
+      return "Charger No Light";
+    case "charger_serial_brand_visible":
+      return "Charger Serial / Brand Visible";
+    case "evdb_single_phase":
+      return "EVDB Single Phase";
+    case "evdb_three_phase":
+      return "EVDB Three Phase";
+    case "mcb_tripped":
+      return "MCB Tripped";
+    case "missing_mcb_rccb":
+      return "Missing MCB / RCCB";
+    case "wrong_component_specs":
+      return "Wrong Component / Specs";
+    case "isolator_on":
+      return "Isolator ON";
+    case "isolator_off_open_circuit":
+      return "Isolator OFF / Open Circuit";
     default:
       return "Unknown";
   }
 }
 
-export function formatResolverTier(resolverTier?: string | null) {
-  switch (resolverTier) {
-    case "driver":
-      return "Driver";
-    case "local_site":
-      return "Local Site";
-    case "remote_ops":
-      return "Remote Ops";
-    case "technician":
-      return "Technician";
+export function formatFaultTypeV2(value?: string | null) {
+  switch (value) {
+    case "protection_issue":
+      return "Protection Issue";
+    case "charger_issue":
+      return "Charger Issue";
+    case "supply_issue":
+      return "Supply Issue";
+    case "installation_issue":
+      return "Installation Issue";
+    case "manual_error":
+      return "Manual Error";
+    case "power_cut":
+      return "Power Cut";
+    case "identification_only":
+      return "Identification Only";
     default:
       return "Unknown";
   }
 }
 
-export function formatHazardLevel(hazardLevel?: string | null) {
-  switch (hazardLevel) {
-    case "low":
-      return "Low";
-    case "medium":
-      return "Medium";
-    case "high":
-      return "High";
+export function formatRecipientType(value?: string | null) {
+  switch (value) {
+    case "customer":
+      return "Customer";
+    case "after_sales_team":
+      return "After-sales Team";
+    case "none":
+      return "No Routing Required";
     default:
       return "Unknown";
   }

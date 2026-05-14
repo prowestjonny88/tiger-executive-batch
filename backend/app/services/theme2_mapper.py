@@ -1,35 +1,32 @@
 from __future__ import annotations
 
 import re
-from typing import cast
+from typing import Any, cast
 
 from app.core.models import (
     CompetitionOutput,
-    DiagnosisResult,
-    InputComponent,
     IncidentInput,
     ObservationResultV2,
-    PerceptionResult,
+    Theme2PerceptionAssessment,
     Theme2VisualExtraction,
 )
-from app.services.theme2_rules import get_error_log_rule, get_theme2_rule, rule_fault_type, rule_recipient
+from app.services.theme2_rules import get_error_log_rule, get_theme2_rule, load_theme2_rules, rule_fault_type, rule_recipient
 
 
-def _combined_text(incident: IncidentInput, perception: PerceptionResult) -> str:
+def _combined_text(incident: IncidentInput, perception: Theme2PerceptionAssessment) -> str:
     parts = [
         incident.photo_hint or "",
         incident.symptom_text or "",
         incident.error_code or "",
         perception.scene_summary,
         " ".join(perception.ocr_findings),
+        " ".join(perception.extraction.raw_visible_text),
         " ".join(f"{key} {value}" for key, value in incident.follow_up_answers.items()),
     ]
-    if perception.theme2 is not None:
-        parts.extend(perception.theme2.raw_visible_text)
     return " ".join(part for part in parts if part).lower()
 
 
-def _detect_error_log_key(incident: IncidentInput, perception: PerceptionResult) -> str | None:
+def detect_error_log_key(incident: IncidentInput, perception: Theme2PerceptionAssessment) -> str | None:
     text = _combined_text(incident, perception)
     flash_match = re.search(r"(?:red\s*)?(?:flash(?:es|ing)?|blink(?:s|ing)?)\D{0,12}([6-9])\b", text)
     if not flash_match:
@@ -72,84 +69,71 @@ def _maybe_refine_observation(theme2: Theme2VisualExtraction) -> ObservationResu
     return observation
 
 
-def _fallback_observation(diagnosis: DiagnosisResult) -> ObservationResultV2:
-    if diagnosis.issue_family == "tripping":
-        return "mcb_tripped"
-    if diagnosis.issue_family == "no_power":
-        return "charger_no_light"
-    return "unknown"
-
-
 def _evidence_notes(
-    theme2: Theme2VisualExtraction | None,
-    perception: PerceptionResult,
-    diagnosis: DiagnosisResult,
+    perception: Theme2PerceptionAssessment,
+    observation: ObservationResultV2,
     error_log_key: str | None,
 ) -> list[str]:
+    extraction = perception.extraction
     notes: list[str] = []
-    if theme2 is None:
-        notes.append("Theme 2 extraction unavailable; mapped from existing diagnosis fallback.")
-    else:
-        notes.extend(theme2.uncertainty_notes)
-        if theme2.charger_serial_number is None and theme2.observation_result == "charger_serial_brand_visible":
+    notes.extend(extraction.uncertainty_notes)
+    notes.extend(perception.uncertainty_notes[:2])
+    if observation == "charger_serial_brand_visible":
+        if extraction.charger_serial_number is None:
             notes.append("Charger serial number was not readable.")
-        if theme2.charger_brand_model is None and theme2.observation_result == "charger_serial_brand_visible":
+        if extraction.charger_brand_model is None:
             notes.append("Charger brand/model was not readable.")
-        if theme2.confidence_score < 0.55:
-            notes.append("Theme 2 extraction confidence is low; request clearer proof.")
-    if perception.uncertainty_notes:
-        notes.extend(perception.uncertainty_notes[:2])
-    if diagnosis.reasoning_notes:
-        notes.append(diagnosis.reasoning_notes[0])
+    if observation in {"evdb_single_phase", "evdb_three_phase"}:
+        if not extraction.mcb_rating or not extraction.rccb_rating:
+            notes.append("EVDB MCB/RCCB labels were not fully readable.")
+        if extraction.rccb_type == "unknown":
+            notes.append("RCCB type was not readable.")
+    if perception.confidence_score < 0.55 or extraction.confidence_score < 0.55:
+        notes.append("Theme 2 extraction confidence is low; request clearer proof.")
     if error_log_key:
         notes.append(f"Blinking red light refined by {error_log_key}.")
     return list(dict.fromkeys(note for note in notes if note))
 
 
-def _confidence(theme2: Theme2VisualExtraction | None, diagnosis: DiagnosisResult) -> float:
-    if theme2 is None:
-        return round(max(min(diagnosis.confidence_score, 0.35), 0.0), 4)
-    theme_score = theme2.confidence_score if theme2.confidence_score > 0 else 0.35
-    return round(max(min(min(theme_score, diagnosis.confidence_score), 1.0), 0.0), 4)
+def _rule_metadata(observation: ObservationResultV2, error_log_key: str | None) -> tuple[dict[str, Any], str, str, str | None]:
+    payload = load_theme2_rules()
+    rule_version = str(payload.get("version") or "unknown")
+    if error_log_key:
+        error_rule = get_error_log_rule(error_log_key)
+        if error_rule is not None:
+            return error_rule, rule_version, error_log_key, error_log_key
+    return get_theme2_rule(observation), rule_version, observation, None
 
 
 def build_competition_output(
     incident: IncidentInput,
-    perception: PerceptionResult,
-    diagnosis: DiagnosisResult,
-) -> CompetitionOutput:
-    theme2 = perception.theme2
-    source = "theme2_rule_mapper"
-    if theme2 is None:
-        observation = _fallback_observation(diagnosis)
-        input_component = "unknown"
-        serial_number = None
-        brand_model = None
-        source = "fallback"
-    else:
-        observation = _maybe_refine_observation(theme2)
-        input_component = theme2.input_component
-        serial_number = theme2.charger_serial_number
-        brand_model = theme2.charger_brand_model
-
-    error_log_key = _detect_error_log_key(incident, perception) if observation == "charger_blinking_red_light" else None
-    rule = get_error_log_rule(error_log_key) or get_theme2_rule(observation)
-    confidence_score = _confidence(theme2, diagnosis)
-    required_proof_next = rule.get("required_proof_next") or diagnosis.required_proof_next
+    perception: Theme2PerceptionAssessment,
+) -> tuple[CompetitionOutput, dict[str, str | None]]:
+    extraction = perception.extraction
+    observation = _maybe_refine_observation(extraction)
+    error_log_key = detect_error_log_key(incident, perception) if observation == "charger_blinking_red_light" else None
+    rule, rule_version, rule_key, applied_error_log_key = _rule_metadata(observation, error_log_key)
+    confidence_score = round(max(min(min(perception.confidence_score, extraction.confidence_score or perception.confidence_score), 1.0), 0.0), 4)
+    required_proof_next = rule.get("required_proof_next")
     if confidence_score < 0.55 and not required_proof_next:
         required_proof_next = "Retake a clear photo of the relevant charger, EVDB, or isolator evidence."
 
-    return CompetitionOutput(
-        input_component=cast(InputComponent, input_component),
-        observation_result=observation,
-        charger_serial_number=serial_number,
-        charger_brand_model=brand_model,
+    output = CompetitionOutput(
+        input_component=extraction.input_component,
+        observation_result=cast(ObservationResultV2, observation),
+        charger_serial_number=extraction.charger_serial_number,
+        charger_brand_model=extraction.charger_brand_model,
         fault_type_v2=rule_fault_type(rule),
         recipient_type=rule_recipient(rule),
         assigned_team_id=str(rule["assigned_team_id"]) if rule.get("assigned_team_id") is not None else None,
         action_message=str(rule.get("action_message") or "Review the Theme 2 evidence and collect clearer proof."),
         required_proof_next=str(required_proof_next) if required_proof_next else None,
         confidence_score=confidence_score,
-        evidence_notes=_evidence_notes(theme2, perception, diagnosis, error_log_key),
-        source=source,  # type: ignore[arg-type]
+        evidence_notes=_evidence_notes(perception, observation, applied_error_log_key),
+        source="theme2_rule_mapper" if observation != "unknown" else "fallback",
     )
+    return output, {
+        "rule_version": rule_version,
+        "rule_key": rule_key,
+        "error_log_key": applied_error_log_key,
+    }

@@ -10,13 +10,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
-from app.db.persistence import get_known_case_index_status, init_db, save_audit, save_incident, update_incident
-from app.services.embeddings import enforce_embedding_runtime_policy, get_embedding_provider, get_embedding_runtime_status
-from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
+from app.db.persistence import init_db, save_audit, save_incident, update_incident
 from app.services.history import get_incident_history_by_id, list_incident_history
-from app.services.triage import run_triage_with_debug
+from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
+from app.services.theme2_rules import load_theme2_rules
+from app.services.theme2_triage import run_theme2_triage_with_debug
 
-app = FastAPI(title="OmniTriage API", version="0.1.0")
+app = FastAPI(title="RExharge Theme 2 API", version="0.2.0")
 app.mount("/uploads", StaticFiles(directory=get_upload_root(), check_dir=False), name="uploads")
 request_logger = logging.getLogger("omnitriage.request")
 runtime_logger = logging.getLogger("omnitriage.runtime")
@@ -35,60 +35,22 @@ def _persist_incident(incident: IncidentInput) -> int:
     return save_incident(payload)
 
 
-def _isoformat_or_value(value: object) -> object:
-    if hasattr(value, "isoformat"):
-        return value.isoformat()  # type: ignore[attr-defined]
-    return value
-
-
 def _runtime_health_payload() -> dict[str, object]:
-    provider = get_embedding_provider()
-    runtime_status = get_embedding_runtime_status(provider)
-    index_status = get_known_case_index_status()
+    rules = load_theme2_rules()
     return {
         "status": "ok",
-        "retrieval_backend": "postgres_pgvector",
-        "embedding_provider": runtime_status["provider_name"],
-        "embedding_mode": runtime_status["provider_mode"],
-        "image_mode": runtime_status["image_mode"],
-        "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
-        "exact_image_shortcut_mode": runtime_status["exact_image_shortcut_mode"],
-        "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
-        "semantic_descriptor_enabled": runtime_status["semantic_descriptor_enabled"],
-        "retrieval_descriptor_schema_version": runtime_status["retrieval_descriptor_schema_version"],
-        "embedding_dimension": runtime_status["embedding_dimension"],
-        "index_row_count": index_status.get("row_count"),
-        "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
-        "warnings": runtime_status["warnings"],
+        "runtime_mode": "theme2_round2_clean",
+        "vlm_provider": "gemini",
+        "rule_file": "data/round2/theme2_rules.json",
+        "rule_version": rules.get("version"),
+        "round1_runtime_enabled": False,
     }
 
 
 @app.on_event("startup")
 def startup() -> None:
     init_db()
-    provider = get_embedding_provider()
-    runtime_status = enforce_embedding_runtime_policy(provider)
-    index_status = get_known_case_index_status()
-    runtime_logger.info(
-        json.dumps(
-            {
-                "event": "runtime_startup",
-                "retrieval_backend": "postgres_pgvector",
-                "embedding_provider": runtime_status["provider_name"],
-                "embedding_mode": runtime_status["provider_mode"],
-                "image_mode": runtime_status["image_mode"],
-                "retrieval_signal_mode": runtime_status["retrieval_signal_mode"],
-                "exact_image_shortcut_mode": runtime_status["exact_image_shortcut_mode"],
-                "exact_image_fingerprint_enabled": runtime_status["exact_image_fingerprint_enabled"],
-                "semantic_descriptor_enabled": runtime_status["semantic_descriptor_enabled"],
-                "retrieval_descriptor_schema_version": runtime_status["retrieval_descriptor_schema_version"],
-                "embedding_dimension": runtime_status["embedding_dimension"],
-                "index_row_count": index_status.get("row_count"),
-                "index_latest_created_at": _isoformat_or_value(index_status.get("latest_created_at")),
-                "warnings": runtime_status["warnings"],
-            }
-        )
-    )
+    runtime_logger.info(json.dumps({"event": "runtime_startup", **_runtime_health_payload()}))
 
 
 @app.middleware("http")
@@ -148,12 +110,12 @@ def demo_scenarios():
 
 @app.get("/api/v1/incidents")
 def incidents():
-    return list_incident_history()
+    return list_incident_history(include_legacy=False)
 
 
 @app.get("/api/v1/incidents/{incident_id}")
 def get_incident(incident_id: int):
-    incident = get_incident_history_by_id(incident_id)
+    incident = get_incident_history_by_id(incident_id, include_legacy=False)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
@@ -194,24 +156,8 @@ def triage(incident: IncidentInput):
 
     incident_id = _persist_incident(incident)
     incident.incident_id = incident_id
-    result, debug = run_triage_with_debug(incident)
-    diagnosis_debug = {
-        **debug["diagnosis_debug"],
-        "incident_id": incident_id,
-    }
-    save_audit(
-        "triage_perception_attempt",
-        {
-            "incident_id": incident_id,
-            "provider_attempted": result.perception.provider_attempted,
-            "fallback_used": result.perception.fallback_used,
-            "error_type": result.perception.error_type,
-            "error_message": result.perception.error_message,
-            "mode": result.perception.mode,
-            "confidence_score": result.perception.confidence_score,
-        },
-        incident_id,
-    )
-    save_audit("triage_gemini_attempt", diagnosis_debug, incident_id)
+    result, debug = run_theme2_triage_with_debug(incident)
+    save_audit("theme2_perception", result.perception.model_dump(), incident_id)
+    save_audit("theme2_mapping", {**result.competition_output.model_dump(), "debug": debug}, incident_id)
     save_audit("triage_result", result.model_dump(), incident_id)
     return {"incident_id": incident_id, **result.model_dump()}

@@ -1,58 +1,130 @@
 [
   {
-    "scenario_id": "demo-no-power",
-    "name": "No power supply issue",
+    "scenario_id": "demo-charger-red-light",
+    "name": "Charger Red Light",
     "site_id": "site-mall-01",
-    "headline": "Charger is dark and the customer reports no power at the bay",
-    "photo_hint": "display off, no lights, breaker suspected off",
-    "symptom_text": "Charger has no lights and the session cannot start because the unit appears unpowered.",
+    "headline": "Charger indicator is solid red",
+    "photo_hint": "charger red light indicator visible",
+    "symptom_text": "Customer reports the charger indicator is red and charging cannot start.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "charger",
+    "expected_observation_result": "charger_red_light",
+    "expected_fault_type_v2": "charger_issue",
+    "expected_recipient_type": "after_sales_team"
+  },
+  {
+    "scenario_id": "demo-charger-no-light",
+    "name": "Charger No Light",
+    "site_id": "site-mall-01",
+    "headline": "Charger has no indicator light",
+    "photo_hint": "charger no light display off",
+    "symptom_text": "The charger has no light and appears unpowered.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "charger",
+    "expected_observation_result": "charger_no_light",
+    "expected_fault_type_v2": "supply_issue",
+    "expected_recipient_type": "customer"
+  },
+  {
+    "scenario_id": "demo-charger-serial-brand",
+    "name": "Charger Serial / Brand",
+    "site_id": "site-mall-01",
+    "headline": "Charger identity label is visible",
+    "photo_hint": "charger serial number label visible brand model label visible",
+    "symptom_text": "Serial SN 260301982 and brand Proton eMAS are visible on the charger.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "charger",
+    "expected_observation_result": "charger_serial_brand_visible",
+    "expected_fault_type_v2": "identification_only",
+    "expected_recipient_type": "none"
+  },
+  {
+    "scenario_id": "demo-evdb-single-phase",
+    "name": "EVDB Single Phase",
+    "site_id": "site-mall-01",
+    "headline": "Single-phase EVDB with 40A 2P labels",
+    "photo_hint": "EVDB single phase MCB 40A 2P RCCB 40A Type A 2P",
+    "symptom_text": "Single phase EVDB labels are visible for MCB 40A 2P and RCCB 40A Type A 2P.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "evdb",
+    "expected_observation_result": "evdb_single_phase",
+    "expected_fault_type_v2": "unknown",
+    "expected_recipient_type": "customer"
+  },
+  {
+    "scenario_id": "demo-evdb-three-phase",
+    "name": "EVDB Three Phase",
+    "site_id": "site-condo-01",
+    "headline": "Three-phase EVDB with 40A 4P labels",
+    "photo_hint": "EVDB three phase MCB 40A 4P RCCB 40A Type A 4P",
+    "symptom_text": "Three phase EVDB labels are visible for MCB 40A 4P and RCCB 40A Type A 4P.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "evdb",
+    "expected_observation_result": "evdb_three_phase",
+    "expected_fault_type_v2": "unknown",
+    "expected_recipient_type": "customer"
+  },
+  {
+    "scenario_id": "demo-mcb-tripped",
+    "name": "MCB Tripped",
+    "site_id": "site-mall-01",
+    "headline": "EVDB breaker appears tripped",
+    "photo_hint": "EVDB MCB tripped breaker down",
+    "symptom_text": "The MCB in the EVDB appears tripped and the charger has stopped.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "evdb",
+    "expected_observation_result": "mcb_tripped",
+    "expected_fault_type_v2": "protection_issue",
+    "expected_recipient_type": "customer"
+  },
+  {
+    "scenario_id": "demo-missing-mcb-rccb",
+    "name": "Missing MCB / RCCB",
+    "site_id": "site-condo-01",
+    "headline": "EVDB appears to be missing protection components",
+    "photo_hint": "EVDB missing RCCB no RCCB visible",
+    "symptom_text": "The EVDB photo appears to show a missing RCCB protection component.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "evdb",
+    "expected_observation_result": "missing_mcb_rccb",
+    "expected_fault_type_v2": "protection_issue",
+    "expected_recipient_type": "after_sales_team"
+  },
+  {
+    "scenario_id": "demo-isolator-off",
+    "name": "Isolator OFF",
+    "site_id": "site-mall-01",
+    "headline": "Isolator is OFF / open circuit",
+    "photo_hint": "isolator off open circuit switch off",
+    "symptom_text": "The isolator switch is OFF and the charger has no power.",
+    "error_code": "",
+    "follow_up_answers": {},
+    "expected_input_component": "isolator",
+    "expected_observation_result": "isolator_off_open_circuit",
+    "expected_fault_type_v2": "power_cut",
+    "expected_recipient_type": "customer"
+  },
+  {
+    "scenario_id": "demo-blinking-red-7",
+    "name": "Blinking Red - Emergency Stop",
+    "site_id": "site-mall-01",
+    "headline": "Charger has blinking red light with seven flashes",
+    "photo_hint": "charger blinking red light",
+    "symptom_text": "The red indicator is blinking and the customer counted 7 flashes.",
     "error_code": "",
     "follow_up_answers": {
-      "power_context": "Incoming voltage is missing at the charger."
+      "red_light_flash_count": "7 flashes"
     },
-    "expected_issue_family": "no_power",
-    "expected_resolver_tier": "driver"
-  },
-  {
-    "scenario_id": "demo-tripping",
-    "name": "Tripping case",
-    "site_id": "site-mall-01",
-    "headline": "Breaker trips when charging starts",
-    "photo_hint": "protector trips, no burn marks visible",
-    "symptom_text": "The MCB trips shortly after charging begins and the connector feels slightly warm.",
-    "error_code": "TRIP-02",
-    "follow_up_answers": {
-      "required_proof_next": "Photo of the DB with the breaker reset to ON position."
-    },
-    "expected_issue_family": "tripping",
-    "expected_resolver_tier": "local_site"
-  },
-  {
-    "scenario_id": "demo-charging-slow",
-    "name": "Charging slow investigation",
-    "site_id": "site-condo-01",
-    "headline": "Charging is much slower than expected",
-    "photo_hint": "display on, current limited, no visible damage",
-    "symptom_text": "Charging starts but the current is much lower than usual for this vehicle.",
-    "error_code": "SLOW-11",
-    "follow_up_answers": {
-      "required_proof_next": "Photo or screenshot showing the configured current output."
-    },
-    "expected_issue_family": "charging_slow",
-    "expected_resolver_tier": "remote_ops"
-  },
-  {
-    "scenario_id": "demo-not-responding",
-    "name": "Not responding charger",
-    "site_id": "site-condo-01",
-    "headline": "Charger is powered but controls do not respond",
-    "photo_hint": "WC Apps screenshot shows charger faulted status",
-    "symptom_text": "App screen captured after failed session.",
-    "error_code": "Faulted",
-    "follow_up_answers": {
-      "error_text": "Provide a clear screenshot of the error text."
-    },
-    "expected_issue_family": "not_responding",
-    "expected_resolver_tier": "remote_ops"
+    "expected_input_component": "charger",
+    "expected_observation_result": "charger_blinking_red_light",
+    "expected_fault_type_v2": "manual_error",
+    "expected_recipient_type": "customer"
   }
 ]

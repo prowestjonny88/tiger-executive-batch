@@ -1,76 +1,47 @@
-# OmniTriage Progress Tracker
+# Theme 2 Progress Tracker
 
-_Last updated: 2026-04-17_
+_Last updated: 2026-05-14_
 
 ## Direction Lock
-The repo is now aligned to the Round 1 hard-replacement direction:
-- runtime contract is taxonomy-first
-- primary workflow is `evidence intake -> diagnosis -> confidence -> resolver-tier routing -> next action`
-- dataset source of truth is `data/round1/`
-- primary store is Postgres + pgvector
-- replay/history keep legacy compatibility only at read time
 
-Primary direction documents:
-1. `docs/OmniTriage_Comprehensive_Execution_Plan.md`
-2. `docs/progress_tracker.md`
-3. `docs/prd_task_breakdown.md`
+The live repo is now aligned to the ESUM Theme 2 / Round 2 scope:
+
+- input component detection: charger, EVDB, isolator
+- organizer observation result
+- charger serial number and brand/model when visible
+- official Theme 2 fault type
+- customer or after-sales recipient routing
 
 ## Current Implementation Truth
-The live repo is no longer organizer-native.
 
-Current backend contract is centered on:
-- `diagnosis.issue_family`
-- `diagnosis.fault_type`
-- `diagnosis.evidence_type`
-- `diagnosis.hazard_level`
-- `diagnosis.resolver_tier`
-- `routing.resolver_tier`
-- `routing.routing_rationale`
-- `routing.recommended_next_step`
-- `routing.fallback_action`
+Active runtime:
 
-Current diagnosis path:
-- Round 1 package-backed retrieval
-- Gemini VLM assist when available
-- OCR/text extraction support
-- embedding-backed known-case matching
+```text
+intake -> Theme 2 perception -> organizer rule mapping -> follow-up prompts -> audit/history
+```
 
-Current storage/runtime:
-- Postgres + pgvector as the primary store
-- Dockerized local Postgres for development
-- SQLite compatibility only for old replay/history reads
+Archived runtime:
 
-Current frontend truth:
-- result/guidance/escalation/history are wired to the new Round 1 contract
-- demo/fallback shell is also aligned to the new issue-family + resolver-tier model
+```text
+Round 1 known-case retrieval, issue_family, resolver_tier, pgvector KB index
+```
 
-## What Is Already Implemented
-- `round1_v1/` normalized into `data/round1/`
-- Round 1 dataset loaders for manifest, ROI annotations, ontology, label map, and known-case seeds
-- Embedding provider abstraction
-- Gemini embedding provider interface with deterministic fallback provider
-- Known-case retrieval service with match metadata
-- New taxonomy-first diagnosis synthesis
-- New confidence model based on uncertainty / novelty / retrieval strength
-- Deterministic resolver-tier routing
-- Resolver-tier guidance artifact generation
-- Postgres-backed incidents/audits/known-case index tables
-- Docker Compose file for local pgvector-backed Postgres
-- Frontend contract cutover across result, guidance, escalation, history, confirmation, upload/demo shell
-- Legacy replay/history normalization for older SQLite-era records
+Archived files live under `_archive/round1/`.
 
-## Remaining Gaps
-- expand retrieval evaluation and report artifacts for judging/demo evidence
-- replace FastAPI startup hook with lifespan
-- decide whether to keep archival classifier findings/docs as historical reference or move them under an explicit archive section
-- clean repo noise and outdated generated artifacts from version control
+## Implemented
 
-## Current Verification Snapshot
-- `backend`: `pytest -q backend/tests/test_api.py backend/tests/test_triage.py backend/tests/test_gemini.py` -> `17 passed`
-- `backend`: `pyright -p backend/pyrightconfig.json` -> `0 errors`
-- `frontend`: `npm.cmd run build` -> `PASS`
-- Gemini Integration: `gemini-2.5-flash` stabilized via native generic JSON `response_mime_type` ensuring parsing resilience without manual prompt hacking or truncation.
+- Theme 2 backend response contract
+- Theme 2 perception service with Gemini and deterministic fallback paths
+- Organizer rule mapper backed by `data/round2/theme2_rules.json`
+- Theme 2 triage orchestrator
+- FastAPI route rewiring while preserving `/api/v1/*` paths
+- Theme 2 frontend API types and pages
+- Theme 2 demo scenarios
+- Upload proxy route at `/api/uploads`
+- Theme 2 tests replacing old Round 1 tests
 
-## Notes
-- The old classifier branch files remain only as archival/compatibility stubs. They are not part of the active runtime path.
-- Any doc that still describes `issue_type`, `basic_conditions`, `workflow.outcome`, or classifier-first runtime behavior should be treated as outdated unless explicitly marked historical.
+## Remaining Follow-Ups
+
+- Add Drive-backed manifest generation when dataset access is available.
+- Add optional curated `data/round2/sample_images/`.
+- Add end-to-end browser tests if a Playwright setup is introduced.

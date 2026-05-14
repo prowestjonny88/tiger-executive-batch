@@ -1,9 +1,11 @@
 import json
+import sys
+import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput, StoredPhotoEvidence
-from app.services.diagnosis_perception import assess_perception
+from app.services.theme2_perception import assess_theme2_perception
 
 
 TEST_UPLOAD_ROOT = Path(__file__).parent / "test-uploads"
@@ -23,6 +25,15 @@ def _photo_incident(response_filename: str = "theme2.jpg") -> IncidentInput:
         ),
         photo_hint="charger red light",
     )
+
+
+def _fake_genai_modules() -> dict[str, object]:
+    fake_types = types.SimpleNamespace(
+        GenerateContentConfig=MagicMock(),
+        Part=types.SimpleNamespace(from_bytes=MagicMock(return_value="image-part")),
+    )
+    fake_genai = types.SimpleNamespace(types=fake_types)
+    return {"google.genai": fake_genai, "google.genai.types": fake_types}
 
 
 def test_gemini_perception_parses_theme2_fields():
@@ -48,17 +59,16 @@ def test_gemini_perception_parses_theme2_fields():
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch("app.services.diagnosis_perception.get_gemini_client", return_value=mock_client), patch(
-        "google.genai.types.GenerateContentConfig", MagicMock(), create=True
-    ), patch("google.genai.types.Part.from_bytes", MagicMock(return_value="image-part"), create=True):
-        result = assess_perception(_photo_incident())
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident())
 
-    assert result.theme2 is not None
-    assert result.theme2.input_component == "charger"
-    assert result.theme2.observation_result == "charger_red_light"
-    assert result.theme2.charger_serial_number == "260301982"
-    assert result.theme2.charger_brand_model == "Proton eMAS"
-    assert result.theme2.indicator_status == "red_light"
+    assert result.extraction.input_component == "charger"
+    assert result.extraction.observation_result == "charger_red_light"
+    assert result.extraction.charger_serial_number == "260301982"
+    assert result.extraction.charger_brand_model == "Proton eMAS"
+    assert result.extraction.indicator_status == "red_light"
 
 
 def test_bad_gemini_theme2_enums_normalize_to_unknown():
@@ -84,22 +94,21 @@ def test_bad_gemini_theme2_enums_normalize_to_unknown():
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch("app.services.diagnosis_perception.get_gemini_client", return_value=mock_client), patch(
-        "google.genai.types.GenerateContentConfig", MagicMock(), create=True
-    ), patch("google.genai.types.Part.from_bytes", MagicMock(return_value="image-part"), create=True):
-        result = assess_perception(_photo_incident("theme2-bad-enums.jpg"))
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-bad-enums.jpg"))
 
-    assert result.theme2 is not None
-    assert result.theme2.input_component == "unknown"
-    assert result.theme2.observation_result == "unknown"
-    assert result.theme2.indicator_status == "unknown"
-    assert result.theme2.evdb_phase_type == "unknown"
-    assert result.theme2.rccb_type == "unknown"
-    assert result.theme2.isolator_state == "unknown"
+    assert result.extraction.input_component == "unknown"
+    assert result.extraction.observation_result == "unknown"
+    assert result.extraction.indicator_status == "unknown"
+    assert result.extraction.evdb_phase_type == "unknown"
+    assert result.extraction.rccb_type == "unknown"
+    assert result.extraction.isolator_state == "unknown"
 
 
 def test_heuristic_perception_produces_theme2_extraction_without_gemini():
-    result = assess_perception(
+    result = assess_theme2_perception(
         IncidentInput(
             site_id="site-mall-01",
             photo_hint="isolator off open circuit",
@@ -108,7 +117,6 @@ def test_heuristic_perception_produces_theme2_extraction_without_gemini():
     )
 
     assert result.mode == "text_only"
-    assert result.theme2 is not None
-    assert result.theme2.input_component == "isolator"
-    assert result.theme2.observation_result == "isolator_off_open_circuit"
-    assert result.theme2.isolator_state == "off"
+    assert result.extraction.input_component == "isolator"
+    assert result.extraction.observation_result == "isolator_off_open_circuit"
+    assert result.extraction.isolator_state == "off"

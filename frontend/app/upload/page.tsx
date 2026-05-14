@@ -9,7 +9,10 @@ import {
   fetchScenarios,
   fetchSites,
   fetchTriage,
-  formatIssueType,
+  formatFaultTypeV2,
+  formatInputComponent,
+  formatObservationResult,
+  formatRecipientType,
   type ScenarioOption,
   uploadIncidentPhoto,
 } from "../../lib/api";
@@ -179,18 +182,15 @@ export default function PhotoUpload() {
           : "";
 
   const selectedScenario = scenarios.find((item) => item.scenario_id === selectedScenarioId);
-  const issueColors: Record<string, string> = {
-    no_power: "bg-red-50 border-red-300 text-red-700",
-    tripping: "bg-amber-50 border-amber-300 text-amber-800",
-    charging_slow: "bg-green-50 border-green-300 text-green-800",
-    not_responding: "bg-slate-100 border-slate-300 text-slate-700",
-    unknown_mixed: "bg-slate-100 border-slate-300 text-slate-700",
-  };
-  const outcomeLabels: Record<string, string> = {
-    driver: "Expected: Driver",
-    local_site: "Expected: Local Site",
-    remote_ops: "Expected: Remote Ops",
-    technician: "Expected: Technician",
+  const observationColors: Record<string, string> = {
+    charger_red_light: "bg-red-50 border-red-300 text-red-700",
+    charger_blinking_red_light: "bg-amber-50 border-amber-300 text-amber-800",
+    charger_no_light: "bg-slate-100 border-slate-300 text-slate-700",
+    mcb_tripped: "bg-amber-50 border-amber-300 text-amber-800",
+    missing_mcb_rccb: "bg-red-50 border-red-300 text-red-700",
+    wrong_component_specs: "bg-red-50 border-red-300 text-red-700",
+    isolator_off_open_circuit: "bg-blue-50 border-blue-300 text-blue-800",
+    unknown: "bg-slate-100 border-slate-300 text-slate-700",
   };
 
   return (
@@ -255,12 +255,12 @@ export default function PhotoUpload() {
                         <p className="text-slate-600 text-sm">{scenario.headline}</p>
                         <p className="text-slate-500 text-xs mt-1 font-mono">ERR: {scenario.error_code}</p>
                       </div>
-                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${issueColors[scenario.expected_issue_family] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {formatIssueType(scenario.expected_issue_family)}
+                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${observationColors[scenario.expected_observation_result] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                        {formatObservationResult(scenario.expected_observation_result)}
                       </span>
                     </div>
                     <p className="text-slate-500 text-xs mt-2">
-                      {outcomeLabels[scenario.expected_resolver_tier] ?? scenario.expected_resolver_tier}
+                      {formatInputComponent(scenario.expected_input_component)} | {formatFaultTypeV2(scenario.expected_fault_type_v2)} | {formatRecipientType(scenario.expected_recipient_type)}
                     </p>
                   </button>
                 ))
@@ -342,15 +342,15 @@ export default function PhotoUpload() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 15 13.5"><path d={svgPaths.p19c07780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Include screen</span>
+                  <span className="text-sm font-semibold text-slate-800">Show indicator</span>
                 </div>
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 13.5 13.5"><path d={svgPaths.p2d5bbe80} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Show connector</span>
+                  <span className="text-sm font-semibold text-slate-800">Show labels</span>
                 </div>
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 16.5 16.5"><path d={svgPaths.p33c29780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Avoid glare</span>
+                  <span className="text-sm font-semibold text-slate-800">Show ON/OFF</span>
                 </div>
               </div>
             </div>
@@ -367,8 +367,8 @@ export default function PhotoUpload() {
         {mode === "demo" && selectedScenario ? (
           <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-slate-50 border border-slate-200 text-slate-700">
             <span className="font-bold">Ready to run: </span>
-            {selectedScenario.headline} | {formatIssueType(selectedScenario.expected_issue_family)} |{" "}
-            {outcomeLabels[selectedScenario.expected_resolver_tier] ?? selectedScenario.expected_resolver_tier}
+            {selectedScenario.headline} | {formatObservationResult(selectedScenario.expected_observation_result)} |{" "}
+            {formatRecipientType(selectedScenario.expected_recipient_type)}
           </div>
         ) : null}
 
