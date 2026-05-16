@@ -10,6 +10,7 @@ from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.intake import get_upload_root
 
 _GEMINI_PARSE_ATTEMPTS = 3
+_GEMINI_MAX_OUTPUT_TOKENS = 8192
 
 _GEMINI_RESPONSE_SCHEMA = {
     "type": "object",
@@ -419,7 +420,7 @@ def _photo_path(incident: IncidentInput) -> Path | None:
 def _gemini_config(genai_types: object) -> object:
     return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
         temperature=0.0,
-        max_output_tokens=2048,
+        max_output_tokens=_GEMINI_MAX_OUTPUT_TOKENS,
         response_mime_type="application/json",
         response_schema=_GEMINI_RESPONSE_SCHEMA,
     )
@@ -428,7 +429,7 @@ def _gemini_config(genai_types: object) -> object:
 def _gemini_config_without_schema(genai_types: object) -> object:
     return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
         temperature=0.0,
-        max_output_tokens=2048,
+        max_output_tokens=_GEMINI_MAX_OUTPUT_TOKENS,
         response_mime_type="application/json",
     )
 
@@ -457,6 +458,8 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "charger_serial_brand_visible, evdb_single_phase, evdb_three_phase, mcb_tripped, missing_mcb_rccb, "
         "wrong_component_specs, isolator_on, isolator_off_open_circuit, unknown.\n"
         "Do not guess serial number, brand/model, breaker rating, or RCCB type. Use null or unknown when unreadable.\n"
+        "Keep arrays short: maximum 5 items per array, maximum 80 characters per item. "
+        "Keep scene_summary under 160 characters. Return a complete JSON object with no markdown.\n"
         f"photo_hint: {incident.photo_hint or ''}\n"
         f"symptom_text: {incident.symptom_text or ''}\n"
         f"error_code: {incident.error_code or ''}\n"
@@ -481,7 +484,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
                 contents=contents,
                 config=_gemini_config(genai_types) if use_schema else _gemini_config_without_schema(genai_types),
             )
-        except TypeError:
+        except Exception:
             if not use_schema:
                 raise
             use_schema = False

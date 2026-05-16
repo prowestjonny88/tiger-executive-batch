@@ -32,7 +32,7 @@ except Exception as exc:
     _genai_available = False
     _genai_import_error = exc
 
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
 _client: object | None = None
 _client_initialised = False

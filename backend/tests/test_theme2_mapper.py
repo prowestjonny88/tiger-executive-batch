@@ -188,9 +188,9 @@ def test_evdb_missing_breaker_refines_to_missing_mcb_rccb(theme2: Theme2VisualEx
     "theme2",
     [
         Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", rccb_type="type_ac", confidence_score=0.82),
-        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", evdb_phase_type="single_phase", mcb_rating="32A 2P", confidence_score=0.82),
         Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", evdb_phase_type="single_phase", rccb_rating="40A 4P", confidence_score=0.82),
         Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", evdb_phase_type="three_phase", mcb_rating="40A 2P", confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", evdb_phase_type="three_phase", mcb_rating="40A 3P", confidence_score=0.82),
         Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", evdb_phase_type="three_phase", rccb_rating="40A 2P", confidence_score=0.82),
     ],
 )
@@ -203,6 +203,56 @@ def test_evdb_wrong_component_specs_refinements(theme2: Theme2VisualExtraction):
     assert output.observation_result == "wrong_component_specs"
     assert output.fault_type_v2 == "protection_issue"
     assert output.recipient_type == "after_sales_team"
+
+
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_single_phase",
+            evdb_phase_type="single_phase",
+            mcb_rating="C40",
+            rccb_rating="40A",
+            rccb_type="type_a",
+            confidence_score=0.82,
+        ),
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_three_phase",
+            evdb_phase_type="three_phase",
+            mcb_rating="C40",
+            rccb_rating="40A / 30mA",
+            rccb_type="type_a",
+            confidence_score=0.82,
+        ),
+    ],
+)
+def test_evdb_incomplete_rating_text_does_not_refine_to_wrong_specs(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB labels visible"),
+        _perception(theme2),
+    )
+
+    assert output.observation_result == theme2.observation_result
+
+
+def test_mcb_tripped_is_not_overridden_by_spec_refinement():
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="mcb_tripped",
+                evdb_phase_type="single_phase",
+                rccb_type="type_ac",
+                rccb_rating="40A 4P",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    assert output.observation_result == "mcb_tripped"
 
 
 def test_safety_signal_escalates_to_after_sales():
@@ -227,6 +277,23 @@ def test_repeated_mcb_trip_escalates_to_after_sales():
     assert output.recipient_type == "after_sales_team"
     assert output.assigned_team_id == "AS_TEAM_01"
     assert meta["override_key"] == "repeated_mcb_trip_escalation"
+
+
+def test_mcb_trip_does_not_escalate_from_hot_substring_in_photo_text():
+    output, meta = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="Photo uploaded for EV charger troubleshooting."),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="mcb_tripped",
+                confidence_score=0.8,
+            )
+        ),
+    )
+
+    assert output.recipient_type == "customer"
+    assert output.assigned_team_id is None
+    assert meta["override_key"] is None
 
 
 def test_no_light_unresolved_after_normal_breaker_escalates_to_after_sales():

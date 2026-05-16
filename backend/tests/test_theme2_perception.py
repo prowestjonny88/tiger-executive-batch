@@ -2,6 +2,7 @@ import json
 import sys
 import types
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput, StoredPhotoEvidence
@@ -185,6 +186,49 @@ def test_gemini_perception_retries_schema_mismatch_once():
     assert result.fallback_used is False
     assert result.extraction.observation_result == "charger_red_light"
     assert mock_client.models.generate_content.call_count == 2
+
+
+def test_gemini_schema_config_failure_retries_without_schema():
+    good_response = MagicMock()
+    good_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Charger indicator is red.",
+            "components_visible": ["charger"],
+            "visible_abnormalities": ["red_indicator"],
+            "ocr_findings": [],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.88,
+            "input_component": "charger",
+            "observation_result": "charger_red_light",
+            "charger_serial_number": None,
+            "charger_brand_model": None,
+            "indicator_status": "red_light",
+            "evdb_phase_type": "unknown",
+            "mcb_visible": None,
+            "rccb_visible": None,
+            "mcb_rating": None,
+            "rccb_rating": None,
+            "rccb_type": "unknown",
+            "isolator_state": "unknown",
+            "raw_visible_text": [],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = good_response
+    fake_modules = _fake_genai_modules()
+    typed_fake_types: Any = fake_modules["google.genai.types"]
+    typed_fake_types.GenerateContentConfig.side_effect = [RuntimeError("schema unsupported"), MagicMock()]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, fake_modules
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-schema-fallback.jpg"))
+
+    assert result.mode == "vlm"
+    assert result.extraction.observation_result == "charger_red_light"
+    assert mock_client.models.generate_content.call_count == 1
 
 
 def test_gemini_parse_failure_preserves_raw_provider_output():

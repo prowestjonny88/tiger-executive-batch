@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.services.theme2_triage import run_theme2_triage  # noqa: E402
-from scripts.evaluate_round2_cases import build_photo_hint, incident_for  # noqa: E402
+from scripts.evaluate_round2_cases import build_photo_hint, evaluate, incident_for  # noqa: E402
 
 
 def test_blind_eval_hint_does_not_leak_expected_labels():
@@ -105,3 +105,32 @@ def test_blinking_red_text_followup_eval_cases_map_to_expected_rules():
         assert result.competition_output.observation_result == "charger_blinking_red_light"
         assert result.competition_output.fault_type_v2 == expected_fault
         assert result.competition_output.recipient_type == expected_recipient
+
+
+def test_evaluate_returns_failure_details_for_mismatched_case():
+    report = evaluate(
+        [
+            {
+                "case_id": "mismatch",
+                "case_type": "text_followup",
+                "relative_path": None,
+                "input_component_expected": "charger",
+                "observation_expected": "charger_red_light",
+                "fault_type_expected": "charger_issue",
+                "recipient_expected": "after_sales_team",
+                "symptom_text": "The charger has blinking red light.",
+                "follow_up_answers": {"red_light_flash_count": "7 flashes"},
+            }
+        ],
+        REPO_ROOT / "data" / "round2" / "images",
+        "blind-image-eval",
+    )
+
+    assert report["evaluated_cases"] == 1
+    assert len(report["failures"]) == 1
+    failure = report["failures"][0]
+    assert failure["case_id"] == "mismatch"
+    assert "observation" in failure["failed_fields"]
+    assert failure["expected"]["observation"] == "charger_red_light"
+    assert failure["actual"]["observation"] == "charger_blinking_red_light"
+    assert failure["perception"]["extraction"]["indicator_status"] == "blinking_red_light"

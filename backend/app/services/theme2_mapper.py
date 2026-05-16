@@ -63,6 +63,15 @@ def _combined_text(incident: IncidentInput, perception: Theme2PerceptionAssessme
     return " ".join(part for part in parts if part).lower()
 
 
+def _contains_phrase(text: str, phrase: str) -> bool:
+    normalized_phrase = re.escape(phrase.strip().lower()).replace(r"\ ", r"\s+")
+    return re.search(rf"(?<![a-z0-9]){normalized_phrase}(?![a-z0-9])", text.lower()) is not None
+
+
+def _contains_any_phrase(text: str, phrases: list[str]) -> bool:
+    return any(_contains_phrase(text, phrase) for phrase in phrases)
+
+
 def detect_error_log_key(incident: IncidentInput, perception: Theme2PerceptionAssessment) -> str | None:
     text = _combined_text(incident, perception)
     flash_match = re.search(r"(?:red\s*)?(?:flash(?:es|ing)?|blink(?:s|ing)?)\D{0,12}([6-9])\b", text)
@@ -81,26 +90,28 @@ def detect_error_log_key(incident: IncidentInput, perception: Theme2PerceptionAs
     return None
 
 
-def _rating_contains(value: str | None, *tokens: str) -> bool:
-    normalized = re.sub(r"\s+", "", (value or "").lower())
-    return all(token.lower().replace(" ", "") in normalized for token in tokens)
+def _rating_has_any_pole(value: str | None, *poles: str) -> bool:
+    normalized = re.sub(r"[\s-]+", "", (value or "").lower())
+    return any(pole.lower().replace(" ", "").replace("-", "") in normalized for pole in poles)
 
 
 def _maybe_refine_observation(theme2: Theme2VisualExtraction) -> ObservationResultV2:
     observation = theme2.observation_result
     if theme2.input_component == "evdb":
+        if observation == "mcb_tripped":
+            return observation
         if theme2.mcb_visible is False or theme2.rccb_visible is False:
             return "missing_mcb_rccb"
         if theme2.rccb_type == "type_ac":
             return "wrong_component_specs"
         if theme2.evdb_phase_type == "single_phase":
-            if (theme2.mcb_rating and not _rating_contains(theme2.mcb_rating, "40a", "2p")) or (
-                theme2.rccb_rating and not _rating_contains(theme2.rccb_rating, "40a", "2p")
+            if _rating_has_any_pole(theme2.mcb_rating, "3p", "4p") or _rating_has_any_pole(
+                theme2.rccb_rating, "3p", "4p"
             ):
                 return "wrong_component_specs"
         if theme2.evdb_phase_type == "three_phase":
-            if (theme2.mcb_rating and not _rating_contains(theme2.mcb_rating, "40a", "4p")) or (
-                theme2.rccb_rating and not _rating_contains(theme2.rccb_rating, "40a", "4p")
+            if _rating_has_any_pole(theme2.mcb_rating, "2p", "3p") or _rating_has_any_pole(
+                theme2.rccb_rating, "2p", "3p"
             ):
                 return "wrong_component_specs"
     return observation
@@ -156,7 +167,7 @@ def _override_rule(
     text = _combined_text(incident, perception)
     team_id = _after_sales_team_id()
 
-    if any(term in text for term in SAFETY_ESCALATION_TERMS):
+    if _contains_any_phrase(text, SAFETY_ESCALATION_TERMS):
         return (
             {
                 **rule,
@@ -169,7 +180,7 @@ def _override_rule(
             "safety_escalation",
         )
 
-    if observation == "mcb_tripped" and any(term in text for term in REPEATED_MCB_TRIP_TERMS):
+    if observation == "mcb_tripped" and _contains_any_phrase(text, REPEATED_MCB_TRIP_TERMS):
         return (
             {
                 **rule,
@@ -182,8 +193,8 @@ def _override_rule(
             "repeated_mcb_trip_escalation",
         )
 
-    breaker_checked_normal = any(term in text for term in NO_LIGHT_NORMAL_BREAKER_TERMS)
-    charger_still_off = any(term in text for term in NO_LIGHT_STILL_OFF_TERMS)
+    breaker_checked_normal = _contains_any_phrase(text, NO_LIGHT_NORMAL_BREAKER_TERMS)
+    charger_still_off = _contains_any_phrase(text, NO_LIGHT_STILL_OFF_TERMS)
     if observation == "charger_no_light" and breaker_checked_normal and charger_still_off:
         return (
             {

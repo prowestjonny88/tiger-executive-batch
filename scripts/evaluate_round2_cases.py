@@ -39,6 +39,10 @@ class Metric:
             return "n/a"
         return f"{self.correct}/{self.total} = {(self.correct / self.total) * 100:.1f}%"
 
+    def as_dict(self) -> dict[str, float | int | None]:
+        accuracy = None if self.total == 0 else self.correct / self.total
+        return {"correct": self.correct, "total": self.total, "accuracy": accuracy}
+
 
 def load_cases(path: Path) -> list[dict[str, Any]]:
     with path.open(encoding="utf-8-sig") as handle:
@@ -93,7 +97,21 @@ def incident_for(case: dict[str, Any], images_root: Path, mode: EvaluationMode) 
     )
 
 
-def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMode) -> None:
+def _field_match(actual: str | None, expected: str | None) -> bool | None:
+    if expected is None:
+        return None
+    return actual == expected
+
+
+def _case_category(case: dict[str, Any]) -> str:
+    relative_path = case.get("relative_path")
+    if not relative_path:
+        return str(case.get("case_type") or "unknown")
+    parts = str(relative_path).split("/")
+    return "/".join(parts[:-1]) if len(parts) > 1 else "unknown"
+
+
+def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMode) -> dict[str, Any]:
     metrics = {
         "Input component accuracy": Metric(),
         "Observation accuracy": Metric(),
@@ -105,6 +123,7 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
     skipped_videos = 0
     followups = 0
     evaluated = 0
+    case_results: list[dict[str, Any]] = []
 
     for case in cases:
         case_type = case_type_for(case)
@@ -115,6 +134,7 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
 
         result = run_theme2_triage(incident_for(case, images_root, mode))
         output = result.competition_output
+        extraction = result.perception.extraction
         evaluated += 1
         metrics["Input component accuracy"].add(output.input_component, case.get("input_component_expected"))
         metrics["Observation accuracy"].add(output.observation_result, case.get("observation_expected"))
@@ -124,19 +144,115 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
         metrics["Brand/model exact match"].add(output.charger_brand_model, case.get("brand_model_expected"))
         if result.follow_up_prompts:
             followups += 1
+        matches = {
+            "input_component": _field_match(output.input_component, case.get("input_component_expected")),
+            "observation": _field_match(output.observation_result, case.get("observation_expected")),
+            "fault_type": _field_match(output.fault_type_v2, case.get("fault_type_expected")),
+            "recipient": _field_match(output.recipient_type, case.get("recipient_expected")),
+            "serial": _field_match(output.charger_serial_number, case.get("serial_number_expected")),
+            "brand_model": _field_match(output.charger_brand_model, case.get("brand_model_expected")),
+        }
+        case_results.append(
+            {
+                "case_id": case.get("case_id"),
+                "case_type": case_type,
+                "category": _case_category(case),
+                "relative_path": relative_path,
+                "expected": {
+                    "input_component": case.get("input_component_expected"),
+                    "observation": case.get("observation_expected"),
+                    "fault_type": case.get("fault_type_expected"),
+                    "recipient": case.get("recipient_expected"),
+                    "serial_number": case.get("serial_number_expected"),
+                    "brand_model": case.get("brand_model_expected"),
+                },
+                "actual": {
+                    "input_component": output.input_component,
+                    "observation": output.observation_result,
+                    "fault_type": output.fault_type_v2,
+                    "recipient": output.recipient_type,
+                    "assigned_team_id": output.assigned_team_id,
+                    "serial_number": output.charger_serial_number,
+                    "brand_model": output.charger_brand_model,
+                    "confidence_score": output.confidence_score,
+                },
+                "matches": matches,
+                "failed_fields": [field for field, matched in matches.items() if matched is False],
+                "perception": {
+                    "mode": result.perception.mode,
+                    "fallback_used": result.perception.fallback_used,
+                    "error_type": result.perception.error_type,
+                    "error_message": result.perception.error_message,
+                    "confidence_score": result.perception.confidence_score,
+                    "scene_summary": result.perception.scene_summary,
+                    "ocr_findings": result.perception.ocr_findings,
+                    "uncertainty_notes": result.perception.uncertainty_notes,
+                    "extraction": {
+                        "input_component": extraction.input_component,
+                        "observation_result": extraction.observation_result,
+                        "charger_serial_number": extraction.charger_serial_number,
+                        "charger_brand_model": extraction.charger_brand_model,
+                        "indicator_status": extraction.indicator_status,
+                        "evdb_phase_type": extraction.evdb_phase_type,
+                        "mcb_visible": extraction.mcb_visible,
+                        "rccb_visible": extraction.rccb_visible,
+                        "mcb_rating": extraction.mcb_rating,
+                        "rccb_rating": extraction.rccb_rating,
+                        "rccb_type": extraction.rccb_type,
+                        "isolator_state": extraction.isolator_state,
+                        "raw_visible_text": extraction.raw_visible_text,
+                    },
+                },
+                "follow_up_prompts": [prompt.model_dump() for prompt in result.follow_up_prompts],
+                "debug": result.debug.model_dump(),
+            }
+        )
 
     title = "Weak Label Sanity" if mode == "weak-label-sanity" else "Blind Image Eval"
-    print(f"Round 2 Evaluation Summary - {title}")
+    return {
+        "mode": mode,
+        "title": title,
+        "cases": len(cases),
+        "evaluated_cases": evaluated,
+        "skipped_videos": skipped_videos,
+        "metrics": {name: metric.as_dict() for name, metric in metrics.items()},
+        "metric_labels": {name: metric.label() for name, metric in metrics.items()},
+        "follow_up_requested": {
+            "count": followups,
+            "total": evaluated,
+            "rate": None if evaluated == 0 else followups / evaluated,
+        },
+        "case_results": case_results,
+        "failures": [item for item in case_results if item["failed_fields"]],
+    }
+
+
+def print_report(report: dict[str, Any], show_failures: bool = False) -> None:
+    print(f"Round 2 Evaluation Summary - {report['title']}")
     print("------------------------------------------")
-    print(f"Cases: {len(cases)}")
-    print(f"Evaluated cases: {evaluated}")
-    print(f"Skipped videos: {skipped_videos}")
-    for name, metric in metrics.items():
-        print(f"{name}: {metric.label()}")
-    if evaluated:
-        print(f"Follow-up requested: {followups}/{evaluated} = {(followups / evaluated) * 100:.1f}%")
+    print(f"Cases: {report['cases']}")
+    print(f"Evaluated cases: {report['evaluated_cases']}")
+    print(f"Skipped videos: {report['skipped_videos']}")
+    for name, label in report["metric_labels"].items():
+        print(f"{name}: {label}")
+    followups = report["follow_up_requested"]
+    if followups["total"]:
+        print(f"Follow-up requested: {followups['count']}/{followups['total']} = {followups['rate'] * 100:.1f}%")
     else:
         print("Follow-up requested: n/a")
+    if not show_failures:
+        return
+    print("")
+    print("Failures")
+    print("--------")
+    for item in report["failures"]:
+        print(
+            f"{item['case_id']} | {item['category']} | failed={','.join(item['failed_fields'])} | "
+            f"obs {item['expected']['observation']} -> {item['actual']['observation']} | "
+            f"fault {item['expected']['fault_type']} -> {item['actual']['fault_type']} | "
+            f"recipient {item['expected']['recipient']} -> {item['actual']['recipient']} | "
+            f"mode={item['perception']['mode']} conf={item['actual']['confidence_score']}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -144,6 +260,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_PATH)
     parser.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT)
     parser.add_argument("--mode", choices=["weak-label-sanity", "blind-image-eval"], default="weak-label-sanity")
+    parser.add_argument("--show-failures", action="store_true", help="Print per-case failure details.")
+    parser.add_argument("--output-json", type=Path, default=None, help="Write detailed evaluation report JSON.")
     parser.add_argument("--database-url", default="postgresql://omnitriage:omnitriage@localhost:5432/omnitriage")
     return parser.parse_args()
 
@@ -152,7 +270,12 @@ def main() -> None:
     args = parse_args()
     os.environ.setdefault("DATABASE_URL", args.database_url)
     cases = load_cases(args.cases)
-    evaluate(cases, args.images_root, args.mode)
+    report = evaluate(cases, args.images_root, args.mode)
+    print_report(report, show_failures=args.show_failures)
+    if args.output_json:
+        args.output_json.parent.mkdir(parents=True, exist_ok=True)
+        args.output_json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        print(f"Wrote detailed report to {args.output_json}")
 
 
 if __name__ == "__main__":
