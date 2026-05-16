@@ -54,6 +54,13 @@ function finalState(triage: ApiTriageResponse) {
   return "Routing held until clearer proof is available.";
 }
 
+function chargerIdentityValue(component: string, value: string | null | undefined, field: "serial" | "brand") {
+  if (component === "evdb") return "Not applicable for EVDB evidence";
+  if (component === "isolator") return "Not applicable for isolator evidence";
+  if (component !== "charger") return "Not applicable until component is confirmed";
+  return value || (field === "serial" ? "Not readable" : "Not readable");
+}
+
 export default function ResultAssessmentPage() {
   return (
     <Suspense
@@ -169,8 +176,14 @@ function ResultAssessment() {
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 mb-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Info label="Observation Result" value={formatObservationResult(output.observation_result)} />
-              <Info label="Charger Serial Number" value={output.charger_serial_number || extraction.charger_serial_number || "Not readable"} />
-              <Info label="Brand / Model" value={output.charger_brand_model || extraction.charger_brand_model || "Not readable"} />
+              <Info
+                label="Charger Serial Number"
+                value={chargerIdentityValue(output.input_component, output.charger_serial_number || extraction.charger_serial_number, "serial")}
+              />
+              <Info
+                label="Brand / Model"
+                value={chargerIdentityValue(output.input_component, output.charger_brand_model || extraction.charger_brand_model, "brand")}
+              />
               <Info label="Fault Type" value={formatFaultTypeV2(output.fault_type_v2)} />
               <Info label="Recipient" value={formatRecipientType(output.recipient_type)} />
               <Info label="Action Message" value={output.action_message} />

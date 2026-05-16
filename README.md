@@ -34,6 +34,19 @@ Upload / demo evidence
 
 The live path no longer uses Round 1 known-case retrieval, pgvector indexing, issue-family routing, resolver tiers, or KB gates.
 
+## Current Status
+
+| Area | Status | Notes |
+|---|---:|---|
+| Theme 2 runtime | Done | VLM/heuristic perception plus deterministic rule mapper |
+| Customer/after-sales routing | Done | Uses `recipient_type` and `assigned_team_id` |
+| Blind evaluation mode | Done | Uses neutral hints to avoid expected-label leakage |
+| Dataset manifest | Done | Raw images stay local and ignored |
+| Manual review quarantine | Done | Ambiguous cases are retained in `manual_review_cases.json` |
+| Serial/brand exact OCR validation | Partial | Requires non-null reviewed charger-label ground truth |
+| Isolator OFF coverage | Partial | Add confirmed OFF image cases when available |
+| Video handling | Partial | Frame extraction utility is available; generated frames stay ignored |
+
 ## Quick Start
 
 ### Backend
@@ -80,7 +93,7 @@ Create `backend/.env` with:
 
 ```env
 GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3-flash-preview
 ```
 
 If Gemini is unavailable, the backend falls back to deterministic Theme 2 heuristics based on the uploaded metadata, symptom text, and follow-up answers.
@@ -104,6 +117,7 @@ Local validation workflow:
 python scripts\build_round2_manifest.py --write-summary
 python scripts\pseudo_label_round2_with_theme2.py --limit 5
 python scripts\summarize_round2_pseudo_labels.py
+python scripts\check_round2_eval_coverage.py
 python scripts\evaluate_round2_cases.py --mode weak-label-sanity
 python scripts\evaluate_round2_cases.py --mode blind-image-eval
 ```
@@ -115,4 +129,6 @@ See:
 - [Theme 2 runtime contract](docs/theme2_runtime_contract.md)
 - [Round 2 dataset strategy](docs/round2_dataset_strategy.md)
 - [Round 2 evaluation methodology](docs/round2_evaluation_methodology.md)
+- [Final demo runbook](docs/final_demo_runbook.md)
+- [Final report metrics template](docs/final_report_metrics_template.md)
 - [Setup guide](docs/setup_guide.md)

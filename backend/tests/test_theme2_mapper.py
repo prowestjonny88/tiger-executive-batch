@@ -237,6 +237,39 @@ def test_evdb_incomplete_rating_text_does_not_refine_to_wrong_specs(theme2: Them
     assert output.observation_result == theme2.observation_result
 
 
+def test_evdb_phase_unknown_fault_requests_specific_label_proof():
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB three phase"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="evdb_three_phase",
+                evdb_phase_type="three_phase",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    assert output.fault_type_v2 == "unknown"
+    assert output.required_proof_next == "Clear close-up photo showing MCB/RCCB labels, pole count, and RCCB type."
+
+
+def test_isolator_unknown_requests_switch_state_proof():
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="isolator visible"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="isolator",
+                observation_result="unknown",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    assert output.fault_type_v2 == "unknown"
+    assert output.required_proof_next == "Clear photo showing whether the isolator switch is ON or OFF."
+
+
 def test_mcb_tripped_is_not_overridden_by_spec_refinement():
     output, _ = build_competition_output(
         IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped"),

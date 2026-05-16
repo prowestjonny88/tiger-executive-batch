@@ -16,10 +16,12 @@ DEFAULT_IMAGES_ROOT = REPO_ROOT / "data" / "round2" / "images"
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
 EvaluationMode = Literal["weak-label-sanity", "blind-image-eval"]
 
+sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.models import IncidentInput, StoredPhotoEvidence  # noqa: E402
 from app.services.theme2_triage import run_theme2_triage  # noqa: E402
+from scripts.round2_eval_utils import normalize_brand_model, normalize_serial  # noqa: E402
 
 
 @dataclass
@@ -103,6 +105,14 @@ def _field_match(actual: str | None, expected: str | None) -> bool | None:
     return actual == expected
 
 
+def _normalized_field_match(actual: str | None, expected: str | None, kind: Literal["serial", "brand_model"]) -> bool | None:
+    if expected is None:
+        return None
+    if kind == "serial":
+        return normalize_serial(actual) == normalize_serial(expected)
+    return normalize_brand_model(actual) == normalize_brand_model(expected)
+
+
 def _case_category(case: dict[str, Any]) -> str:
     relative_path = case.get("relative_path")
     if not relative_path:
@@ -140,8 +150,14 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
         metrics["Observation accuracy"].add(output.observation_result, case.get("observation_expected"))
         metrics["Fault type accuracy"].add(output.fault_type_v2, case.get("fault_type_expected"))
         metrics["Recipient accuracy"].add(output.recipient_type, case.get("recipient_expected"))
-        metrics["Serial exact match"].add(output.charger_serial_number, case.get("serial_number_expected"))
-        metrics["Brand/model exact match"].add(output.charger_brand_model, case.get("brand_model_expected"))
+        expected_serial = case.get("serial_number_expected")
+        expected_brand = case.get("brand_model_expected")
+        actual_serial_normalized = normalize_serial(output.charger_serial_number)
+        expected_serial_normalized = normalize_serial(str(expected_serial)) if expected_serial is not None else None
+        actual_brand_normalized = normalize_brand_model(output.charger_brand_model)
+        expected_brand_normalized = normalize_brand_model(str(expected_brand)) if expected_brand is not None else None
+        metrics["Serial exact match"].add(actual_serial_normalized, expected_serial_normalized)
+        metrics["Brand/model exact match"].add(actual_brand_normalized, expected_brand_normalized)
         if result.follow_up_prompts:
             followups += 1
         matches = {
@@ -149,8 +165,8 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
             "observation": _field_match(output.observation_result, case.get("observation_expected")),
             "fault_type": _field_match(output.fault_type_v2, case.get("fault_type_expected")),
             "recipient": _field_match(output.recipient_type, case.get("recipient_expected")),
-            "serial": _field_match(output.charger_serial_number, case.get("serial_number_expected")),
-            "brand_model": _field_match(output.charger_brand_model, case.get("brand_model_expected")),
+            "serial": _normalized_field_match(output.charger_serial_number, expected_serial, "serial"),
+            "brand_model": _normalized_field_match(output.charger_brand_model, expected_brand, "brand_model"),
         }
         case_results.append(
             {
@@ -175,6 +191,14 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMod
                     "serial_number": output.charger_serial_number,
                     "brand_model": output.charger_brand_model,
                     "confidence_score": output.confidence_score,
+                },
+                "normalized_expected": {
+                    "serial_number": expected_serial_normalized,
+                    "brand_model": expected_brand_normalized,
+                },
+                "normalized_actual": {
+                    "serial_number": actual_serial_normalized,
+                    "brand_model": actual_brand_normalized,
                 },
                 "matches": matches,
                 "failed_fields": [field for field, matched in matches.items() if matched is False],

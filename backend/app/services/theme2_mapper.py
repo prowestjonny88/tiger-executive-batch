@@ -222,6 +222,10 @@ def build_competition_output(
     rule, override_key = _override_rule(incident, perception, observation, rule)
     confidence_score = round(max(min(min(perception.confidence_score, extraction.confidence_score or perception.confidence_score), 1.0), 0.0), 4)
     required_proof_next = rule.get("required_proof_next")
+    if extraction.input_component == "evdb" and observation in {"evdb_single_phase", "evdb_three_phase"} and rule_fault_type(rule) == "unknown":
+        required_proof_next = "Clear close-up photo showing MCB/RCCB labels, pole count, and RCCB type."
+    if extraction.input_component == "isolator" and observation == "unknown":
+        required_proof_next = "Clear photo showing whether the isolator switch is ON or OFF."
     if confidence_score < 0.55 and not required_proof_next:
         required_proof_next = "Retake a clear photo of the relevant charger, EVDB, or isolator evidence."
 

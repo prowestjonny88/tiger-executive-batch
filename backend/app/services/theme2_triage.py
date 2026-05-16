@@ -42,16 +42,28 @@ def build_theme2_followups(
     ):
         add(
             "evdb_label_closeup",
-            "Capture a close-up of the MCB and RCCB labels, including amp rating, pole count, and RCCB type.",
+            "Please upload a closer EVDB photo showing the MCB/RCCB ratings, RCCB type, and pole count.",
             "EVDB phase detection alone does not prove breaker specification correctness.",
+        )
+    if extraction.input_component == "evdb" and extraction.observation_result in {"evdb_single_phase", "evdb_three_phase"}:
+        add(
+            "evdb_label_closeup",
+            "Please upload a closer EVDB photo showing the MCB/RCCB ratings, RCCB type, and pole count.",
+            "EVDB phase evidence requires readable labels before final spec confirmation.",
+        )
+    if extraction.input_component == "isolator" and extraction.observation_result == "unknown":
+        add(
+            "isolator_switch_state",
+            "Please upload a clearer photo of the isolator switch position so we can confirm whether it is ON or OFF.",
+            "The isolator is visible, but the switch state could not be confirmed.",
         )
     if extraction.observation_result == "charger_serial_brand_visible" and (
         not extraction.charger_serial_number or not extraction.charger_brand_model
     ):
         add(
             "charger_identity_closeup",
-            "Capture a closer photo of the charger serial number and brand/model label.",
-            "The charger identity label is visible but not fully readable.",
+            "Please upload a close-up photo of the charger serial number and brand/model label.",
+            "The charger identity label is visible, but the exact serial number or brand/model could not be read reliably.",
         )
 
     return prompts[:4]
