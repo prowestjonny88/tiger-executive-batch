@@ -8,7 +8,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder."
+    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_red_light_002",
@@ -19,7 +22,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder."
+    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_red_light_003",
@@ -30,7 +36,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder."
+    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_red_light_004",
@@ -41,7 +50,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder."
+    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_red_light_005",
@@ -52,7 +64,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder."
+    "notes": "Clean auto-accepted pseudo-label from Charger Red Light folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_no_light_001",
@@ -63,7 +78,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label. Only 2 of 3 local Charger No Light images are clean; the remaining image stays in manual review."
+    "notes": "Clean auto-accepted pseudo-label. Only 2 of 3 local Charger No Light images are clean; the remaining image stays in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_no_light_002",
@@ -74,7 +92,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label. Only 2 of 3 local Charger No Light images are clean; the remaining image stays in manual review."
+    "notes": "Clean auto-accepted pseudo-label. Only 2 of 3 local Charger No Light images are clean; the remaining image stays in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_001",
@@ -85,7 +106,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_002",
@@ -96,7 +120,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_003",
@@ -107,7 +134,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_004",
@@ -118,7 +148,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_005",
@@ -129,7 +162,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "charger_serial_brand_visible_006",
@@ -140,7 +176,10 @@
     "recipient_expected": "none",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack."
+    "notes": "Clean auto-accepted pseudo-label from Charger Serial Number- Id folder. Exact serial/brand transcription remains out of scope for this pack.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_001",
@@ -151,7 +190,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_002",
@@ -162,7 +204,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_003",
@@ -173,7 +218,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_004",
@@ -184,7 +232,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_005",
@@ -195,7 +246,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_single_phase_006",
@@ -206,7 +260,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Single Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_three_phase_001",
@@ -217,7 +274,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_three_phase_002",
@@ -228,7 +288,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_three_phase_003",
@@ -239,7 +302,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_three_phase_004",
@@ -250,7 +316,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "evdb_three_phase_005",
@@ -261,7 +330,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder."
+    "notes": "Clean auto-accepted pseudo-label from EVDB Three Phase folder.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "mcb_tripped_001",
@@ -272,7 +344,10 @@
     "recipient_expected": "after_sales_team",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label. Only 1 of 2 local MCB Tripped images is clean; the conflicting image stays in manual review."
+    "notes": "Clean auto-accepted pseudo-label. Only 1 of 2 local MCB Tripped images is clean; the conflicting image stays in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_001",
@@ -283,7 +358,10 @@
     "recipient_expected": "unknown",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_002",
@@ -294,7 +372,10 @@
     "recipient_expected": "unknown",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_003",
@@ -305,7 +386,10 @@
     "recipient_expected": "unknown",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_004",
@@ -316,7 +400,10 @@
     "recipient_expected": "unknown",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_005",
@@ -327,7 +414,10 @@
     "recipient_expected": "unknown",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_006",
@@ -338,7 +428,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_007",
@@ -349,7 +442,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_008",
@@ -360,7 +456,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_009",
@@ -371,7 +470,10 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
   },
   {
     "case_id": "isolator_010",
@@ -382,6 +484,73 @@
     "recipient_expected": "customer",
     "serial_number_expected": null,
     "brand_model_expected": null,
-    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review."
+    "notes": "Clean auto-accepted pseudo-label from Isolator folder. Folder-level labels do not distinguish ON/OFF; remaining parse failures stay in manual review.",
+    "case_type": "image",
+    "follow_up_answers": {},
+    "symptom_text": ""
+  },
+  {
+    "case_id": "blinking_red_6_flashes_ground_fault",
+    "relative_path": null,
+    "case_type": "text_followup",
+    "input_component_expected": "charger",
+    "observation_expected": "charger_blinking_red_light",
+    "fault_type_expected": "installation_issue",
+    "recipient_expected": "after_sales_team",
+    "serial_number_expected": null,
+    "brand_model_expected": null,
+    "follow_up_answers": {
+      "red_light_flash_count": "6 flashes"
+    },
+    "symptom_text": "The charger has blinking red light.",
+    "notes": "Blinking red light with 6 flashes; organizer mapping treats this as ground fault / installation issue."
+  },
+  {
+    "case_id": "blinking_red_7_flashes_emergency_stop",
+    "relative_path": null,
+    "case_type": "text_followup",
+    "input_component_expected": "charger",
+    "observation_expected": "charger_blinking_red_light",
+    "fault_type_expected": "manual_error",
+    "recipient_expected": "customer",
+    "serial_number_expected": null,
+    "brand_model_expected": null,
+    "follow_up_answers": {
+      "red_light_flash_count": "7 flashes"
+    },
+    "symptom_text": "The charger has blinking red light.",
+    "notes": "Blinking red light with 7 flashes; organizer mapping treats this as emergency stop / manual error."
+  },
+  {
+    "case_id": "blinking_red_8_flashes_short_circuit",
+    "relative_path": null,
+    "case_type": "text_followup",
+    "input_component_expected": "charger",
+    "observation_expected": "charger_blinking_red_light",
+    "fault_type_expected": "charger_issue",
+    "recipient_expected": "after_sales_team",
+    "serial_number_expected": null,
+    "brand_model_expected": null,
+    "follow_up_answers": {
+      "red_light_flash_count": "8 flashes"
+    },
+    "symptom_text": "The charger has blinking red light.",
+    "notes": "Blinking red light with 8 flashes; organizer mapping treats this as short circuit / charger issue."
+  },
+  {
+    "case_id": "blinking_red_9_flashes_over_temperature",
+    "relative_path": null,
+    "case_type": "text_followup",
+    "input_component_expected": "charger",
+    "observation_expected": "charger_blinking_red_light",
+    "fault_type_expected": "charger_issue",
+    "recipient_expected": "customer",
+    "serial_number_expected": null,
+    "brand_model_expected": null,
+    "follow_up_answers": {
+      "red_light_flash_count": "9 flashes"
+    },
+    "symptom_text": "The charger has blinking red light.",
+    "notes": "Blinking red light with 9 flashes; organizer mapping treats this as over-temperature with customer restart action."
   }
 ]

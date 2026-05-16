@@ -3,14 +3,18 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import json
 import mimetypes
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_IMAGES_ROOT = REPO_ROOT / "data" / "round2" / "images"
 DEFAULT_OUTPUT = REPO_ROOT / "data" / "round2" / "manifest.csv"
+DEFAULT_SUMMARY_OUTPUT = REPO_ROOT / "data" / "round2" / "manifest_summary.json"
 
 SUPPORTED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
@@ -213,20 +217,85 @@ def write_manifest(rows: list[dict[str, str]], output_path: Path) -> None:
         writer.writerows(rows)
 
 
+def unknown_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        row
+        for row in rows
+        if row["input_component_weak"] == "unknown"
+        and row["observation_weak"] == "unknown"
+        and row["category_path"] != "Isolator"
+    ]
+
+
+def manifest_summary(rows: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "total_rows": len(rows),
+        "image_rows": sum(1 for row in rows if row["is_video"] != "true"),
+        "video_rows": sum(1 for row in rows if row["is_video"] == "true"),
+        "category_counts": dict(sorted(Counter(row["category_path"] for row in rows).items())),
+        "input_component_counts": dict(sorted(Counter(row["input_component_weak"] for row in rows).items())),
+        "observation_counts": dict(sorted(Counter(row["observation_weak"] for row in rows).items())),
+        "unknown_rows": [
+            {
+                "relative_path": row["relative_path"],
+                "category_path": row["category_path"],
+                "input_component_weak": row["input_component_weak"],
+                "observation_weak": row["observation_weak"],
+            }
+            for row in unknown_rows(rows)
+        ],
+    }
+
+
+def print_summary(summary: dict[str, Any]) -> None:
+    print(f"Total rows: {summary['total_rows']}")
+    print(f"Image rows: {summary['image_rows']}")
+    print(f"Video rows: {summary['video_rows']}")
+    print("Rows by category_path:")
+    for category, count in dict(summary["category_counts"]).items():
+        print(f"- {category}: {count}")
+    print("Rows by observation_weak:")
+    for observation, count in dict(summary["observation_counts"]).items():
+        print(f"- {observation}: {count}")
+    print("Rows by input_component_weak:")
+    for component, count in dict(summary["input_component_counts"]).items():
+        print(f"- {component}: {count}")
+    print(f"Unknown weak-label rows outside allowed Isolator folder: {len(summary['unknown_rows'])}")
+
+
+def write_summary(summary: dict[str, Any], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the local Round 2 image manifest.")
     parser.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--write-summary", action="store_true", help="Write data/round2/manifest_summary.json.")
+    parser.add_argument("--summary-output", type=Path, default=DEFAULT_SUMMARY_OUTPUT)
+    parser.add_argument(
+        "--fail-on-unknown",
+        action="store_true",
+        help="Fail if any non-Isolator folder maps to unknown weak labels.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     rows = build_manifest_rows(args.images_root)
+    summary = manifest_summary(rows)
+    unknown = unknown_rows(rows)
+    if args.fail_on_unknown and unknown:
+        unknown_paths = ", ".join(row["relative_path"] for row in unknown)
+        raise SystemExit(f"Unknown weak-label rows outside Isolator folder: {unknown_paths}")
     write_manifest(rows, args.output)
-    video_count = sum(1 for row in rows if row["is_video"] == "true")
     print(f"Wrote {len(rows)} rows to {args.output}")
-    print(f"Videos: {video_count}")
+    print_summary(summary)
+    if args.write_summary:
+        write_summary(summary, args.summary_output)
+        print(f"Wrote summary to {args.summary_output}")
 
 
 if __name__ == "__main__":

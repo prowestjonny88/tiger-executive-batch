@@ -98,8 +98,21 @@ API_BASE_URL=http://127.0.0.1:8001
 
 Full raw Dataset 2 images should stay outside Git. The repo stores rules, demo scenarios, docs, and later may store manifests, pseudo-labels, evaluation cases, and a small curated `data/round2/sample_images/` set.
 
+Local validation workflow:
+
+```powershell
+python scripts\build_round2_manifest.py --write-summary
+python scripts\pseudo_label_round2_with_theme2.py --limit 5
+python scripts\summarize_round2_pseudo_labels.py
+python scripts\evaluate_round2_cases.py --mode weak-label-sanity
+python scripts\evaluate_round2_cases.py --mode blind-image-eval
+```
+
+Use `weak-label-sanity` to check weak labels and rule wiring. Use `blind-image-eval` as the closer proxy for judging because it does not pass expected labels into the incident hint.
+
 See:
 
 - [Theme 2 runtime contract](docs/theme2_runtime_contract.md)
 - [Round 2 dataset strategy](docs/round2_dataset_strategy.md)
+- [Round 2 evaluation methodology](docs/round2_evaluation_methodology.md)
 - [Setup guide](docs/setup_guide.md)

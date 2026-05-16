@@ -8,7 +8,12 @@ import shutil
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.pseudo_label_round2_with_theme2 import choose_output_path, rows_for_rerun, rows_for_resume  # noqa: E402
+from scripts.pseudo_label_round2_with_theme2 import (  # noqa: E402
+    choose_output_path,
+    pseudo_label_summary,
+    rows_for_rerun,
+    rows_for_resume,
+)
 
 
 def _script_test_dir(name: str) -> Path:
@@ -57,3 +62,54 @@ def test_rows_for_rerun_preserves_good_rows_and_selects_error_rows():
 
     assert rerun_rows == [{"file_id": "b"}]
     assert preserved == [existing[0], existing[2]]
+
+
+def test_rows_for_rerun_can_filter_by_category_and_file_id():
+    manifest_rows = [
+        {"file_id": "a", "relative_path": "Isolator/a.jpg"},
+        {"file_id": "b", "relative_path": "Charger/Charger Red Light/b.jpg"},
+        {"file_id": "c", "relative_path": "EVDB (MCB,RCCB)/Single Phase/c.jpg"},
+    ]
+    existing = [
+        {"file_id": "a", "relative_path": "Isolator/a.jpg", "status": "auto_accept"},
+        {"file_id": "b", "relative_path": "Charger/Charger Red Light/b.jpg", "status": "auto_accept"},
+        {"file_id": "c", "relative_path": "EVDB (MCB,RCCB)/Single Phase/c.jpg", "status": "auto_accept"},
+    ]
+
+    rerun_rows, preserved = rows_for_rerun(
+        manifest_rows,
+        existing,
+        statuses=set(),
+        errors=set(),
+        categories={"Isolator"},
+        file_ids={"c"},
+    )
+
+    assert rerun_rows == [manifest_rows[0], manifest_rows[2]]
+    assert preserved == [existing[1]]
+
+
+def test_pseudo_label_summary_counts_status_modes_errors_and_categories():
+    summary = pseudo_label_summary(
+        [
+            {
+                "relative_path": "Isolator/a.jpg",
+                "status": "auto_accept",
+                "perception_mode": "vlm",
+                "perception_error_type": None,
+            },
+            {
+                "relative_path": "EVDB (MCB,RCCB)/Single Phase/b.jpg",
+                "status": "conflict_review_needed",
+                "perception_mode": "heuristic",
+                "perception_error_type": "schema_mismatch",
+            },
+        ]
+    )
+
+    assert summary["total"] == 2
+    assert summary["status_counts"]["auto_accept"] == 1
+    assert summary["perception_mode_counts"]["vlm"] == 1
+    assert summary["error_type_counts"]["schema_mismatch"] == 1
+    assert summary["category_counts"]["Isolator"] == 1
+    assert summary["conflict_count"] == 1

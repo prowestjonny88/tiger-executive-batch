@@ -10,6 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { ApiTriageResponse, formatFaultTypeV2, formatObservationResult } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
 
+function percent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function confidenceLabel(value: number) {
+  if (value >= 0.75) return `High confidence (${percent(value)})`;
+  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
+  return `Low confidence - system needs more proof (${percent(value)})`;
+}
+
 export default function Escalation() {
   const [triage, setTriage] = useState<ApiTriageResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -43,7 +53,7 @@ export default function Escalation() {
       <Card className="w-full overflow-hidden shadow-xl border-slate-200">
         <div className="bg-amber-50 border-b border-amber-200 p-6 px-8 flex justify-between items-center w-full">
           <Badge variant="warning" className="font-bold text-[10px] uppercase tracking-widest px-3 py-1">
-            After-sales Routing
+            Message routed to After-sales Team: {output.assigned_team_id || "AS_TEAM_01"}
           </Badge>
           <div className="font-mono text-slate-700 text-sm font-semibold tracking-wider">
             INC-{triage.incident_id}
@@ -67,6 +77,15 @@ export default function Escalation() {
             </AlertDescription>
           </Alert>
 
+          {triage.perception.fallback_used ? (
+            <Alert className="border-l-4 border-amber-500 rounded-xl mb-6">
+              <AlertTitle className="text-xs font-bold uppercase tracking-widest mb-2">Fallback Interpretation</AlertTitle>
+              <AlertDescription className="font-semibold text-slate-800">
+                Vision model unavailable; using fallback interpretation.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
           {output.required_proof_next ? (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
               <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Required Proof</h4>
@@ -81,9 +100,27 @@ export default function Escalation() {
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
               <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Confidence</h4>
-              <p className="text-slate-800 font-medium">{Math.round(output.confidence_score * 100)}%</p>
+              <p className="text-slate-800 font-medium">{confidenceLabel(output.confidence_score)}</p>
             </div>
           </div>
+
+          <details className="mb-8 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-widest text-slate-500">
+              Advanced Debug
+            </summary>
+            <pre className="mt-3 whitespace-pre-wrap break-words text-xs text-slate-600">
+              {JSON.stringify(
+                {
+                  rule_key: triage.debug.rule_key,
+                  override_key: triage.debug.extra?.override_key,
+                  fallback_used: triage.debug.fallback_used,
+                  perception_error_type: triage.perception.error_type,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </details>
 
           <Button asChild size="lg" className="w-full h-14 rounded-xl font-bold">
             <Link href="/confirmation">Confirm Routing</Link>

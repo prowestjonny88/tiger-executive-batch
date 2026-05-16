@@ -11,7 +11,7 @@ from app.core.models import FaultTypeV2, InputComponent, ObservationResultV2, Re
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.build_round2_manifest import MANIFEST_COLUMNS, build_manifest_rows, write_manifest  # noqa: E402
+from scripts.build_round2_manifest import MANIFEST_COLUMNS, build_manifest_rows, manifest_summary, unknown_rows, write_manifest  # noqa: E402
 
 
 def _literal_values(alias) -> set[str]:
@@ -20,6 +20,33 @@ def _literal_values(alias) -> set[str]:
 
 def test_manifest_builder_writes_expected_schema_with_relative_paths():
     tmp_path = Path(__file__).parent / "test-uploads" / "manifest-builder"
+    shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+def test_manifest_summary_counts_images_videos_and_unknown_rows():
+    tmp_path = Path(__file__).parent / "test-uploads" / "manifest-summary"
+    shutil.rmtree(tmp_path, ignore_errors=True)
+    images_root = tmp_path / "images"
+    (images_root / "Charger" / "Charger Red Light").mkdir(parents=True)
+    (images_root / "Charger" / "Charger Red Light" / "red.jpg").write_bytes(b"fake-image")
+    (images_root / "Isolator").mkdir(parents=True)
+    (images_root / "Isolator" / "switch.jpg").write_bytes(b"fake-image")
+    (images_root / "Unexpected").mkdir(parents=True)
+    (images_root / "Unexpected" / "unknown.jpg").write_bytes(b"fake-image")
+    (images_root / "Unexpected" / "clip.mp4").write_bytes(b"fake-video")
+
+    rows = build_manifest_rows(images_root)
+    summary = manifest_summary(rows)
+
+    assert summary["total_rows"] == 4
+    assert summary["image_rows"] == 3
+    assert summary["video_rows"] == 1
+    assert summary["category_counts"]["Isolator"] == 1
+    assert summary["observation_counts"]["unknown"] == 3
+    assert [row["relative_path"] for row in unknown_rows(rows)] == [
+        "Unexpected/clip.mp4",
+        "Unexpected/unknown.jpg",
+    ]
     shutil.rmtree(tmp_path, ignore_errors=True)
     images_root = tmp_path / "images"
     charger_dir = images_root / "Charger" / "Charger Red Light"

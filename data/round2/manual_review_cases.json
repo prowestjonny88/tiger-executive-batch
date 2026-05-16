@@ -33,7 +33,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "06bee2557015c86b18c5d3ece27622c8b3d8b7c2",
@@ -52,7 +60,15 @@
       "uncertainty_notes": [
         "No photo evidence available for visual perception."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "c5eda9f91cb368efcffcf2a1c7fa14bc99cfb3b6",
@@ -71,7 +87,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "d4f9e733c395e7bc2fa6bcaa802155ff8a7b06d3",
@@ -90,7 +114,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "b2c7aaee1274e0c8ff1b713b4d1d687b455e40ca",
@@ -109,7 +141,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "8e9a1bac21221859bad5471fb90e30024d28a702",
@@ -128,7 +168,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "dda1ab6c82c804f6d6e24992e14a1d893c47049c",
@@ -147,7 +195,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "b449507994db45e415fe7f92601e15d86a091da3",
@@ -166,7 +222,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "e240b353f6631bc982b54a119dbafc7222ce0f4c",
@@ -185,7 +249,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "831012514e87e47d10ec7cdd1dd3b39378c02208",
@@ -202,7 +274,15 @@
       "rule_fault_type_v2": "protection_issue",
       "rule_recipient_type": "after_sales_team",
       "uncertainty_notes": [],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "195e8fcfa0903bdb6e239519343496c37bea50ed",
@@ -221,7 +301,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "a44af802af916ea8cfc1beaa141394b261aef2c7",
@@ -240,7 +328,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "fa5af96845ff7b6b3ce124fe252f334eb7478d97",
@@ -259,7 +355,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "300521677cefa7f2198af4bc4147355cd884e77a",
@@ -278,7 +382,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "64ff8c5e91ac0749eeeb4572f8531f480cd20b9b",
@@ -297,7 +409,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "79c9e3b348398e0237e2ac69c7c31f5354b8d8ef",
@@ -316,7 +436,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "8aa02bb6e04e76ea627a62978734475f664c22f2",
@@ -335,7 +463,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "f63a34e0598324359dadc16a0d48e66b7129f2f2",
@@ -354,7 +490,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "97fa3d4a52f3dd5828356297055cb156ef7eac4c",
@@ -373,7 +517,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "eb8b22ef9341ca30612f5995a45d7a0b60ca47aa",
@@ -392,7 +544,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "a6f05b8842869f3c50d7432124b0b2fd9211b8d6",
@@ -411,7 +571,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "99d9c12a720279ba5f4706f82a5ad40b26b8ff29",
@@ -430,7 +598,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "0bf29102a08c94f73667a782c56bc73b39358b59",
@@ -449,7 +625,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "2f4b849f5f3211f30358876019a2b0b975468958",
@@ -468,7 +652,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "4e4746f5fa896ace0576d52ca8a96b08668e9670",
@@ -487,7 +679,15 @@
       "uncertainty_notes": [
         "Gemini perception unavailable; using heuristic Theme 2 interpretation."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "53dc71f0807944d844419d52b936696026e5a965",
@@ -507,7 +707,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "3d002866dee6039a46f086157be5ebeaf1be085d",
@@ -527,7 +735,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "c6ba7dfee26ee29b36c44ba049c41da4f90a8b7f",
@@ -547,7 +763,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "7f7979c46a480f7c3643d9836c8aad10b03c67fc",
@@ -567,7 +791,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "d2c2d8695627e4293822f926a60b36ebd9c0760e",
@@ -587,7 +819,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "3209c15444fa133762d37c98a5e7df80570d32a6",
@@ -607,7 +847,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "656211dccfb9ec31c0123cab9f2206fee8debfac",
@@ -627,7 +875,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "a665a1f70c3717b384e7fc67156afe80e6f852bf",
@@ -647,7 +903,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "c2dc588dc612aac47513fdea3cde970fad44a69c",
@@ -667,7 +931,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "b2e63644e0aad12f8188f0738eca88a2889447d6",
@@ -687,7 +959,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "6cceb31353690638b3682e713f730e435ffeb11b",
@@ -707,7 +987,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "d2bfbe609073be3c4a50a70b6616dc539736fe8c",
@@ -727,7 +1015,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "ccbfe09a8d94c7922876acb9b103503907b7e43a",
@@ -747,7 +1043,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "ffc4c4d157ad789e7cb22e527fa05b75c1902cbb",
@@ -767,7 +1071,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "6c159983e7b7ca3add39f47d229fc7a012b1c230",
@@ -787,7 +1099,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "80edbec385ad696e8ebfb07b79d2a1ea7dd79a5a",
@@ -807,7 +1127,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "9e9595847d5e94ec6a8b4560eb9204942e503bf3",
@@ -827,7 +1155,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "bff8b404eeba12160cf954ed07b451f72ef8a8bc",
@@ -847,7 +1183,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     },
     {
       "file_id": "24cd6d3dcd13a6689e118c6f4de353f2d314d9f1",
@@ -867,7 +1211,15 @@
         "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
         "Theme 2 observation could not be inferred from available evidence."
       ],
-      "manual_review_notes": ""
+      "manual_review_notes": "",
+      "manual_final_input_component": null,
+      "manual_final_observation": null,
+      "manual_final_fault_type": null,
+      "manual_final_recipient": null,
+      "manual_serial_number_expected": null,
+      "manual_brand_model_expected": null,
+      "manual_spec_status": null,
+      "manual_review_status": "pending_manual_review"
     }
   ]
 }

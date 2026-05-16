@@ -1,0 +1,29 @@
+{
+  "total": 253,
+  "status_counts": {
+    "auto_accept": 209,
+    "conflict_review_needed": 1,
+    "frame_extraction_needed": 1,
+    "low_confidence_review_needed": 42
+  },
+  "perception_mode_counts": {
+    "heuristic": 42,
+    "text_only": 1,
+    "vlm": 210
+  },
+  "error_type_counts": {
+    "none": 210,
+    "schema_mismatch": 42,
+    "text_only_no_photo": 1
+  },
+  "category_counts": {
+    "Charger/Charger No Light": 3,
+    "Charger/Charger Red Light": 6,
+    "Charger/Charger Serial Number- Id": 32,
+    "EVDB (MCB,RCCB)/MCB Tripped": 2,
+    "EVDB (MCB,RCCB)/Single Phase": 124,
+    "EVDB (MCB,RCCB)/Three Phase": 18,
+    "Isolator": 68
+  },
+  "conflict_count": 1
+}

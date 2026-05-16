@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { ApiTriageResponse, formatFaultTypeV2, formatObservationResult, formatRecipientType } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
 
+function percent(value: number) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function confidenceLabel(value: number) {
+  if (value >= 0.75) return `High confidence (${percent(value)})`;
+  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
+  return `Low confidence - system needs more proof (${percent(value)})`;
+}
+
 export default function SafeGuidance() {
   const router = useRouter();
   const [triage, setTriage] = useState<ApiTriageResponse | null>(null);
@@ -43,7 +53,7 @@ export default function SafeGuidance() {
       <Card className="w-full shadow-xl border-slate-200">
         <CardHeader className="p-10 md:p-12 text-center">
           <Badge variant={output.recipient_type === "customer" ? "success" : "secondary"} className="mx-auto mb-5 uppercase tracking-widest">
-            {formatRecipientType(output.recipient_type)}
+            {output.recipient_type === "customer" ? "Result displayed to customer" : formatRecipientType(output.recipient_type)}
           </Badge>
           <CardTitle className="text-3xl font-extrabold tracking-tight">
             Customer Guidance
@@ -57,6 +67,18 @@ export default function SafeGuidance() {
             <h2 className="text-xs font-extrabold uppercase tracking-widest text-green-800 mb-2">Action Message</h2>
             <p className="text-green-900 font-semibold leading-relaxed">{output.action_message}</p>
           </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
+            <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-2">Confidence</h2>
+            <p className="text-slate-800 font-semibold">{confidenceLabel(output.confidence_score)}</p>
+          </div>
+
+          {triage.perception.fallback_used ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
+              <h2 className="text-xs font-extrabold uppercase tracking-widest text-amber-800 mb-2">Fallback Interpretation</h2>
+              <p className="text-amber-900 font-semibold">Vision model unavailable; using fallback interpretation.</p>
+            </div>
+          ) : null}
 
           {output.required_proof_next ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">

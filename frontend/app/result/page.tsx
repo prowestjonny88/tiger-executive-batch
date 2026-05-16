@@ -22,6 +22,12 @@ function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+function confidenceLabel(value: number) {
+  if (value >= 0.75) return `High confidence (${percent(value)})`;
+  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
+  return `Low confidence - system needs more proof (${percent(value)})`;
+}
+
 function recipientBadge(recipient: string) {
   if (recipient === "after_sales_team") return "warning";
   if (recipient === "customer") return "success";
@@ -36,6 +42,16 @@ function routingState(triage: ApiTriageResponse) {
   if (output.recipient_type === "customer") return "Displayed to customer";
   if (output.recipient_type === "none") return "No routing required";
   return "More proof required before routing";
+}
+
+function finalState(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.recipient_type === "after_sales_team") {
+    return `Message routed to After-sales Team: ${output.assigned_team_id || "AS_TEAM_01"}.`;
+  }
+  if (output.recipient_type === "customer") return "Result displayed to customer.";
+  if (output.recipient_type === "none") return "No customer or after-sales routing required.";
+  return "Routing held until clearer proof is available.";
 }
 
 export default function ResultAssessmentPage() {
@@ -174,8 +190,20 @@ function ResultAssessment() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <Info label="Routing State" value={routingState(triage)} />
-            <Info label="Confidence" value={percent(output.confidence_score)} />
+            <Info label="Final State" value={finalState(triage)} />
+            <Info label="Confidence" value={confidenceLabel(output.confidence_score)} />
           </div>
+
+          {triage.perception.fallback_used ? (
+            <div className="mb-8 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <strong className="text-amber-800 text-xs uppercase tracking-widest font-extrabold block mb-1">
+                Fallback Interpretation
+              </strong>
+              <p className="text-amber-800 font-medium">
+                Vision model unavailable; using fallback interpretation.
+              </p>
+            </div>
+          ) : null}
 
           {triage.follow_up_prompts.length ? (
             <div className="mb-8 px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl">
@@ -236,6 +264,27 @@ function ResultAssessment() {
           <p className="text-xs text-slate-400 text-center mt-8 font-mono">
             Incident ID: INC-{triage.incident_id} | Rule: {triage.debug.rule_key || "unknown"} | Version: {triage.debug.rule_version || "unknown"}
           </p>
+
+          <details className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-500">
+              Advanced Debug
+            </summary>
+            <pre className="mt-3 whitespace-pre-wrap break-words text-xs text-slate-600">
+              {JSON.stringify(
+                {
+                  perception_mode: triage.debug.perception_mode,
+                  fallback_used: triage.debug.fallback_used,
+                  rule_key: triage.debug.rule_key,
+                  override_key: triage.debug.extra?.override_key,
+                  error_type: triage.perception.error_type,
+                  error_message: triage.perception.error_message,
+                  raw_provider_output: triage.perception.raw_provider_output,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </details>
         </CardContent>
       </Card>
     </div>

@@ -6,7 +6,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +14,7 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 DEFAULT_CASES_PATH = REPO_ROOT / "data" / "round2" / "evaluation_cases.json"
 DEFAULT_IMAGES_ROOT = REPO_ROOT / "data" / "round2" / "images"
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
+EvaluationMode = Literal["weak-label-sanity", "blind-image-eval"]
 
 sys.path.insert(0, str(BACKEND_ROOT))
 
@@ -60,21 +61,39 @@ def photo_evidence_for(images_root: Path, relative_path: str) -> StoredPhotoEvid
     )
 
 
-def incident_for(case: dict[str, Any], images_root: Path) -> IncidentInput:
-    relative_path = str(case["relative_path"])
-    photo_evidence = photo_evidence_for(images_root, relative_path)
+def case_type_for(case: dict[str, Any]) -> str:
+    return str(case.get("case_type") or "image")
+
+
+def build_photo_hint(case: dict[str, Any], mode: EvaluationMode) -> str:
+    if mode == "blind-image-eval":
+        return "Photo uploaded for EV charger troubleshooting."
+    relative_path = str(case.get("relative_path") or "")
     observation_words = str(case.get("observation_expected", "unknown")).replace("_", " ")
-    hint = f"{case.get('input_component_expected', 'unknown')} {observation_words} {relative_path}"
+    return f"{case.get('input_component_expected', 'unknown')} {observation_words} {relative_path}".strip()
+
+
+def incident_for(case: dict[str, Any], images_root: Path, mode: EvaluationMode) -> IncidentInput:
+    relative_path = case.get("relative_path")
+    case_type = case_type_for(case)
+    photo_evidence = None
+    if case_type in {"image", "video_frame"} and relative_path:
+        photo_evidence = photo_evidence_for(images_root, str(relative_path))
+    if mode == "blind-image-eval" and case_type != "text_followup":
+        symptom_text = str(case.get("symptom_text") or "")
+    else:
+        symptom_text = str(case.get("symptom_text") or case.get("notes") or "")
     return IncidentInput(
         site_id="site-mall-01",
         photo_evidence=photo_evidence,
-        photo_hint=hint,
-        symptom_text=str(case.get("notes") or ""),
+        photo_hint=build_photo_hint(case, mode),
+        symptom_text=symptom_text,
+        follow_up_answers={str(key): str(value) for key, value in dict(case.get("follow_up_answers") or {}).items()},
         demo_scenario_id=str(case.get("case_id")),
     )
 
 
-def evaluate(cases: list[dict[str, Any]], images_root: Path) -> None:
+def evaluate(cases: list[dict[str, Any]], images_root: Path, mode: EvaluationMode) -> None:
     metrics = {
         "Input component accuracy": Metric(),
         "Observation accuracy": Metric(),
@@ -85,15 +104,18 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path) -> None:
     }
     skipped_videos = 0
     followups = 0
+    evaluated = 0
 
     for case in cases:
-        relative_path = str(case["relative_path"])
-        if Path(relative_path).suffix.lower() in VIDEO_EXTENSIONS:
+        case_type = case_type_for(case)
+        relative_path = case.get("relative_path")
+        if case_type != "text_followup" and relative_path and Path(str(relative_path)).suffix.lower() in VIDEO_EXTENSIONS:
             skipped_videos += 1
             continue
 
-        result = run_theme2_triage(incident_for(case, images_root))
+        result = run_theme2_triage(incident_for(case, images_root, mode))
         output = result.competition_output
+        evaluated += 1
         metrics["Input component accuracy"].add(output.input_component, case.get("input_component_expected"))
         metrics["Observation accuracy"].add(output.observation_result, case.get("observation_expected"))
         metrics["Fault type accuracy"].add(output.fault_type_v2, case.get("fault_type_expected"))
@@ -103,11 +125,11 @@ def evaluate(cases: list[dict[str, Any]], images_root: Path) -> None:
         if result.follow_up_prompts:
             followups += 1
 
-    evaluated = len(cases) - skipped_videos
-    print("Round 2 Evaluation Summary")
-    print("--------------------------")
+    title = "Weak Label Sanity" if mode == "weak-label-sanity" else "Blind Image Eval"
+    print(f"Round 2 Evaluation Summary - {title}")
+    print("------------------------------------------")
     print(f"Cases: {len(cases)}")
-    print(f"Evaluated image cases: {evaluated}")
+    print(f"Evaluated cases: {evaluated}")
     print(f"Skipped videos: {skipped_videos}")
     for name, metric in metrics.items():
         print(f"{name}: {metric.label()}")
@@ -121,6 +143,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate local Round 2 cases against Theme 2 triage.")
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_PATH)
     parser.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT)
+    parser.add_argument("--mode", choices=["weak-label-sanity", "blind-image-eval"], default="weak-label-sanity")
     parser.add_argument("--database-url", default="postgresql://omnitriage:omnitriage@localhost:5432/omnitriage")
     return parser.parse_args()
 
@@ -129,7 +152,7 @@ def main() -> None:
     args = parse_args()
     os.environ.setdefault("DATABASE_URL", args.database_url)
     cases = load_cases(args.cases)
-    evaluate(cases, args.images_root)
+    evaluate(cases, args.images_root, args.mode)
 
 
 if __name__ == "__main__":
