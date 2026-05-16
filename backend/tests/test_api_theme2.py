@@ -15,7 +15,14 @@ from app.db.persistence import init_db
 from app.main import app
 
 shutil.rmtree(Path(os.environ["UPLOAD_ROOT"]), ignore_errors=True)
-init_db()
+
+try:
+    with psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=1) as _conn:
+        pass
+    init_db()
+except psycopg.OperationalError as exc:
+    pytest.skip(f"Postgres integration tests require reachable DATABASE_URL: {exc}", allow_module_level=True)
+
 client = TestClient(app)
 
 SMALL_PNG_BASE64 = (

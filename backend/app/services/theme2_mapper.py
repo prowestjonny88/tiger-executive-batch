@@ -12,6 +12,43 @@ from app.core.models import (
 )
 from app.services.theme2_rules import get_error_log_rule, get_theme2_rule, load_theme2_rules, rule_fault_type, rule_recipient
 
+SAFETY_ESCALATION_TERMS = [
+    "burnt",
+    "smoke",
+    "melted",
+    "sparking",
+    "exposed conductor",
+    "burning smell",
+    "hot to touch",
+    "water ingress",
+]
+
+REPEATED_MCB_TRIP_TERMS = [
+    "repeatedly trips",
+    "trips again",
+    "cannot reset",
+    "reset failed",
+    "burnt",
+    "hot",
+    "smoke",
+]
+
+NO_LIGHT_NORMAL_BREAKER_TERMS = [
+    "evdb breaker normal",
+    "breaker normal",
+    "mcb normal",
+    "breaker is on",
+    "breaker checked normal",
+    "evdb_breaker_checked normal",
+]
+
+NO_LIGHT_STILL_OFF_TERMS = [
+    "charger still off",
+    "still no light",
+    "still no power",
+    "charger_still_off yes",
+]
+
 
 def _combined_text(incident: IncidentInput, perception: Theme2PerceptionAssessment) -> str:
     parts = [
@@ -105,6 +142,64 @@ def _rule_metadata(observation: ObservationResultV2, error_log_key: str | None) 
     return get_theme2_rule(observation), rule_version, observation, None
 
 
+def _after_sales_team_id() -> str:
+    value = load_theme2_rules().get("after_sales_team_id")
+    return str(value or "AS_TEAM_01")
+
+
+def _override_rule(
+    incident: IncidentInput,
+    perception: Theme2PerceptionAssessment,
+    observation: ObservationResultV2,
+    rule: dict[str, Any],
+) -> tuple[dict[str, Any], str | None]:
+    text = _combined_text(incident, perception)
+    team_id = _after_sales_team_id()
+
+    if any(term in text for term in SAFETY_ESCALATION_TERMS):
+        return (
+            {
+                **rule,
+                "fault_type_v2": "protection_issue",
+                "recipient_type": "after_sales_team",
+                "assigned_team_id": team_id,
+                "action_message": "Stop using the charger and contact after-sales team.",
+                "required_proof_next": "Clear photo of the visible safety issue before further use.",
+            },
+            "safety_escalation",
+        )
+
+    if observation == "mcb_tripped" and any(term in text for term in REPEATED_MCB_TRIP_TERMS):
+        return (
+            {
+                **rule,
+                "fault_type_v2": "protection_issue",
+                "recipient_type": "after_sales_team",
+                "assigned_team_id": team_id,
+                "action_message": "Stop resetting the breaker and contact after-sales team for repeated tripping review.",
+                "required_proof_next": "Photo of the breaker state and any visible damage.",
+            },
+            "repeated_mcb_trip_escalation",
+        )
+
+    breaker_checked_normal = any(term in text for term in NO_LIGHT_NORMAL_BREAKER_TERMS)
+    charger_still_off = any(term in text for term in NO_LIGHT_STILL_OFF_TERMS)
+    if observation == "charger_no_light" and breaker_checked_normal and charger_still_off:
+        return (
+            {
+                **rule,
+                "fault_type_v2": "charger_issue",
+                "recipient_type": "after_sales_team",
+                "assigned_team_id": team_id,
+                "action_message": "EVDB breaker appears normal but the charger is still off. Contact after-sales team.",
+                "required_proof_next": "Photo of EVDB breaker state and charger indicator after breaker check.",
+            },
+            "no_light_unresolved_escalation",
+        )
+
+    return rule, None
+
+
 def build_competition_output(
     incident: IncidentInput,
     perception: Theme2PerceptionAssessment,
@@ -113,6 +208,7 @@ def build_competition_output(
     observation = _maybe_refine_observation(extraction)
     error_log_key = detect_error_log_key(incident, perception) if observation == "charger_blinking_red_light" else None
     rule, rule_version, rule_key, applied_error_log_key = _rule_metadata(observation, error_log_key)
+    rule, override_key = _override_rule(incident, perception, observation, rule)
     confidence_score = round(max(min(min(perception.confidence_score, extraction.confidence_score or perception.confidence_score), 1.0), 0.0), 4)
     required_proof_next = rule.get("required_proof_next")
     if confidence_score < 0.55 and not required_proof_next:
@@ -136,4 +232,5 @@ def build_competition_output(
         "rule_version": rule_version,
         "rule_key": rule_key,
         "error_log_key": applied_error_log_key,
+        "override_key": override_key,
     }

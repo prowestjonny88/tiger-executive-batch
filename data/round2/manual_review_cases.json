@@ -1,0 +1,873 @@
+{
+  "source_pseudo_labels": "pseudo_labels.resume-20260514-231213.rerun-20260515-000537.rerun-20260515-003127.rerun-20260515-005035.rerun-20260515-010956.jsonl",
+  "total_review_cases": 44,
+  "status_counts": {
+    "low_confidence_review_needed": 42,
+    "frame_extraction_needed": 1,
+    "conflict_review_needed": 1
+  },
+  "category_counts": {
+    "Charger/Charger No Light": 1,
+    "Charger/Charger Red Light": 1,
+    "Charger/Charger Serial Number- Id": 7,
+    "EVDB (MCB,RCCB)/MCB Tripped": 1,
+    "EVDB (MCB,RCCB)/Single Phase": 12,
+    "EVDB (MCB,RCCB)/Three Phase": 3,
+    "Isolator": 19
+  },
+  "cases": [
+    {
+      "file_id": "cf03b23fc7dbe23114bee9dbf929763ed2c55bdb",
+      "relative_path": "Charger/Charger No Light/957704b3-bc37-4561-83a3-9a474acb671d.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_no_light",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_no_light",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "supply_issue",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "06bee2557015c86b18c5d3ece27622c8b3d8b7c2",
+      "relative_path": "Charger/Charger Red Light/WhatsApp Video 2026-04-13 at 8.38.15 PM.mp4",
+      "review_status": "frame_extraction_needed",
+      "review_reason": "text_only_no_photo",
+      "weak_observation": "charger_red_light",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_red_light",
+      "vlm_confidence_score": 0.25,
+      "perception_mode": "text_only",
+      "perception_error_type": "text_only_no_photo",
+      "perception_error_message": "No photo evidence was provided.",
+      "rule_fault_type_v2": "charger_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "No photo evidence available for visual perception."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "c5eda9f91cb368efcffcf2a1c7fa14bc99cfb3b6",
+      "relative_path": "Charger/Charger Serial Number- Id/388a11a8-e9d2-45a4-91a8-a962d9f78a08.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "d4f9e733c395e7bc2fa6bcaa802155ff8a7b06d3",
+      "relative_path": "Charger/Charger Serial Number- Id/3b303b03-e127-40ff-b3cc-4f5c135e6773.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "b2c7aaee1274e0c8ff1b713b4d1d687b455e40ca",
+      "relative_path": "Charger/Charger Serial Number- Id/835db972-b6b2-4621-aac3-8168342124f1.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "8e9a1bac21221859bad5471fb90e30024d28a702",
+      "relative_path": "Charger/Charger Serial Number- Id/a1be72a1-1aae-4be9-992e-b716afad2db3.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "dda1ab6c82c804f6d6e24992e14a1d893c47049c",
+      "relative_path": "Charger/Charger Serial Number- Id/bbc3c43b-da1b-46d4-be61-a00d353077ad.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "b449507994db45e415fe7f92601e15d86a091da3",
+      "relative_path": "Charger/Charger Serial Number- Id/c7d35e53-79b5-428b-b1d6-2e3c5b873189.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "e240b353f6631bc982b54a119dbafc7222ce0f4c",
+      "relative_path": "Charger/Charger Serial Number- Id/f6f924da-3716-4414-bf16-c748d42fe6cb.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "charger_serial_brand_visible",
+      "vlm_input_component": "charger",
+      "vlm_observation_result": "charger_serial_brand_visible",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "identification_only",
+      "rule_recipient_type": "none",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "831012514e87e47d10ec7cdd1dd3b39378c02208",
+      "relative_path": "EVDB (MCB,RCCB)/MCB Tripped/b4331adf-5cfa-4cc5-a30c-426d89cfe77b.jpg",
+      "review_status": "conflict_review_needed",
+      "review_reason": "weak_label_conflict",
+      "weak_observation": "mcb_tripped",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 1.0,
+      "perception_mode": "vlm",
+      "perception_error_type": null,
+      "perception_error_message": null,
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "195e8fcfa0903bdb6e239519343496c37bea50ed",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/17b4b031-9a2b-44d8-8c74-46b3e42d1984.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "a44af802af916ea8cfc1beaa141394b261aef2c7",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/1cbad11f-ebd6-4f14-b193-319f54ef8dfc.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "fa5af96845ff7b6b3ce124fe252f334eb7478d97",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/1f88659b-2240-426f-8b6e-ea52f135f02d.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "300521677cefa7f2198af4bc4147355cd884e77a",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/2849c210-a073-4363-b376-8753c00155e3.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "64ff8c5e91ac0749eeeb4572f8531f480cd20b9b",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/4d2d768e-2f7c-43d9-89d9-08c9dc07ea3f.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "79c9e3b348398e0237e2ac69c7c31f5354b8d8ef",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/a44ec537-df25-468a-a370-f0043ce866cc.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "8aa02bb6e04e76ea627a62978734475f664c22f2",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/b80e7d4f-06dd-4f75-bfe0-9b5819bf3362.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "f63a34e0598324359dadc16a0d48e66b7129f2f2",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/c7bf08e3-f520-44a4-97e4-3d1f6f106076.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "97fa3d4a52f3dd5828356297055cb156ef7eac4c",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/d21f7dda-1457-4a6a-96b0-af8c252d6be7.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "eb8b22ef9341ca30612f5995a45d7a0b60ca47aa",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/e5122a2f-7b67-42ef-836e-3b5d216657fa.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "a6f05b8842869f3c50d7432124b0b2fd9211b8d6",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/e5ed8c80-4003-446c-96f3-8cf2e320f3a5.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "99d9c12a720279ba5f4706f82a5ad40b26b8ff29",
+      "relative_path": "EVDB (MCB,RCCB)/Single Phase/faa176d8-788d-4b18-b904-00e2e02107a0.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_single_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_single_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "0bf29102a08c94f73667a782c56bc73b39358b59",
+      "relative_path": "EVDB (MCB,RCCB)/Three Phase/72e05855-3d28-44be-8dce-a8cf26ec49d7.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_three_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_three_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "customer",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "2f4b849f5f3211f30358876019a2b0b975468958",
+      "relative_path": "EVDB (MCB,RCCB)/Three Phase/738b44bc-f6a9-482d-b14b-73d0e27e9267.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_three_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_three_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "4e4746f5fa896ace0576d52ca8a96b08668e9670",
+      "relative_path": "EVDB (MCB,RCCB)/Three Phase/9653fd38-4e5b-4798-b084-05ad0085c662.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "evdb_three_phase",
+      "vlm_input_component": "evdb",
+      "vlm_observation_result": "evdb_three_phase",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "protection_issue",
+      "rule_recipient_type": "after_sales_team",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "53dc71f0807944d844419d52b936696026e5a965",
+      "relative_path": "Isolator/16886dad-0c71-4326-8a52-8c1984a909f1.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "3d002866dee6039a46f086157be5ebeaf1be085d",
+      "relative_path": "Isolator/1e677d19-ced7-4a53-85d6-ceeff8c67043.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "c6ba7dfee26ee29b36c44ba049c41da4f90a8b7f",
+      "relative_path": "Isolator/23f4d793-a7af-4a25-83df-d2e54f96d847.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "7f7979c46a480f7c3643d9836c8aad10b03c67fc",
+      "relative_path": "Isolator/2b5dadef-4470-48ca-8b80-bb2918db2671.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "d2c2d8695627e4293822f926a60b36ebd9c0760e",
+      "relative_path": "Isolator/4af52875-b8c1-44ad-aa71-f2ed0f28ffd6.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "Expecting ',' delimiter: line 28 column 6 (char 688)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "3209c15444fa133762d37c98a5e7df80570d32a6",
+      "relative_path": "Isolator/5262c8dd-3d5d-4fd4-8e65-e0d0d49d96da.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "656211dccfb9ec31c0123cab9f2206fee8debfac",
+      "relative_path": "Isolator/60d9042b-41a3-43af-8a96-90133fc9fbd6.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "a665a1f70c3717b384e7fc67156afe80e6f852bf",
+      "relative_path": "Isolator/6e19dc5a-94e9-4c33-930b-59f16a592018.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "c2dc588dc612aac47513fdea3cde970fad44a69c",
+      "relative_path": "Isolator/76d1a0cc-3d6a-4e41-ad33-d42baa60724e.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "b2e63644e0aad12f8188f0738eca88a2889447d6",
+      "relative_path": "Isolator/77b79483-1968-4400-8bbe-a4e52208acc8.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "6cceb31353690638b3682e713f730e435ffeb11b",
+      "relative_path": "Isolator/8a7775ad-bf15-41f1-9124-6198fff97341.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "d2bfbe609073be3c4a50a70b6616dc539736fe8c",
+      "relative_path": "Isolator/91d120aa-ba4b-4b12-a0d3-9d4dfe4cd96f.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "ccbfe09a8d94c7922876acb9b103503907b7e43a",
+      "relative_path": "Isolator/94e76ddb-0bfa-4f4c-9873-bd4bb469f9dc.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "ffc4c4d157ad789e7cb22e527fa05b75c1902cbb",
+      "relative_path": "Isolator/96a80ae0-8c77-4e32-8109-6b9c93247d50.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "6c159983e7b7ca3add39f47d229fc7a012b1c230",
+      "relative_path": "Isolator/9956441c-b05d-4792-aa7e-9474bd2b2f52.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "80edbec385ad696e8ebfb07b79d2a1ea7dd79a5a",
+      "relative_path": "Isolator/a39eb3b6-1a8d-4298-adfc-0ee821edbe59.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "9e9595847d5e94ec6a8b4560eb9204942e503bf3",
+      "relative_path": "Isolator/a6f3477b-0eec-49c3-b93e-171a02a4fe98.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "bff8b404eeba12160cf954ed07b451f72ef8a8bc",
+      "relative_path": "Isolator/bb2e1a62-97a3-4a3d-bb84-559cc8981454.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    },
+    {
+      "file_id": "24cd6d3dcd13a6689e118c6f4de353f2d314d9f1",
+      "relative_path": "Isolator/d1498f9f-efb8-4460-b825-d0b89f369adb.jpg",
+      "review_status": "low_confidence_review_needed",
+      "review_reason": "schema_mismatch",
+      "weak_observation": "unknown",
+      "vlm_input_component": "isolator",
+      "vlm_observation_result": "unknown",
+      "vlm_confidence_score": 0.38,
+      "perception_mode": "heuristic",
+      "perception_error_type": "schema_mismatch",
+      "perception_error_message": "No JSON object found in provider output: line 1 column 1 (char 0)",
+      "rule_fault_type_v2": "unknown",
+      "rule_recipient_type": "unknown",
+      "uncertainty_notes": [
+        "Gemini perception unavailable; using heuristic Theme 2 interpretation.",
+        "Theme 2 observation could not be inferred from available evidence."
+      ],
+      "manual_review_notes": ""
+    }
+  ]
+}

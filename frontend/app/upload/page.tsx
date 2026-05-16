@@ -339,18 +339,18 @@ export default function PhotoUpload() {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-slate-600">Capture Tips</h3>
                 <div className="h-px bg-slate-300 flex-1"></div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 15 13.5"><path d={svgPaths.p19c07780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Show indicator</span>
+                  <span className="text-sm font-semibold text-slate-800">Charger: indicator and serial label</span>
                 </div>
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 13.5 13.5"><path d={svgPaths.p2d5bbe80} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Show labels</span>
+                  <span className="text-sm font-semibold text-slate-800">EVDB: MCB/RCCB labels clearly</span>
                 </div>
                 <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
                   <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 16.5 16.5"><path d={svgPaths.p33c29780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Show ON/OFF</span>
+                  <span className="text-sm font-semibold text-slate-800">Isolator: ON/OFF switch clearly</span>
                 </div>
               </div>
             </div>

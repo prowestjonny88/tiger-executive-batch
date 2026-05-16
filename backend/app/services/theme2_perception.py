@@ -2,11 +2,87 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 
 from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.intake import get_upload_root
+
+_GEMINI_PARSE_ATTEMPTS = 3
+
+_GEMINI_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "evidence_type": {"type": "string"},
+        "scene_summary": {"type": "string"},
+        "components_visible": {"type": "array", "items": {"type": "string"}},
+        "visible_abnormalities": {"type": "array", "items": {"type": "string"}},
+        "ocr_findings": {"type": "array", "items": {"type": "string"}},
+        "hazard_signals": {"type": "array", "items": {"type": "string"}},
+        "uncertainty_notes": {"type": "array", "items": {"type": "string"}},
+        "confidence_score": {"type": "number"},
+        "input_component": {"type": "string", "enum": ["charger", "evdb", "isolator", "unknown"]},
+        "observation_result": {
+            "type": "string",
+            "enum": [
+                "charger_red_light",
+                "charger_blinking_red_light",
+                "charger_no_light",
+                "charger_serial_brand_visible",
+                "evdb_single_phase",
+                "evdb_three_phase",
+                "mcb_tripped",
+                "missing_mcb_rccb",
+                "wrong_component_specs",
+                "isolator_on",
+                "isolator_off_open_circuit",
+                "unknown",
+            ],
+        },
+        "charger_serial_number": {"type": "string", "nullable": True},
+        "charger_brand_model": {"type": "string", "nullable": True},
+        "indicator_status": {"type": "string"},
+        "evdb_phase_type": {"type": "string"},
+        "mcb_visible": {"type": "boolean", "nullable": True},
+        "rccb_visible": {"type": "boolean", "nullable": True},
+        "mcb_rating": {"type": "string", "nullable": True},
+        "rccb_rating": {"type": "string", "nullable": True},
+        "rccb_type": {"type": "string"},
+        "isolator_state": {"type": "string"},
+        "raw_visible_text": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "evidence_type",
+        "scene_summary",
+        "components_visible",
+        "visible_abnormalities",
+        "ocr_findings",
+        "hazard_signals",
+        "uncertainty_notes",
+        "confidence_score",
+        "input_component",
+        "observation_result",
+        "charger_serial_number",
+        "charger_brand_model",
+        "indicator_status",
+        "evdb_phase_type",
+        "mcb_visible",
+        "rccb_visible",
+        "mcb_rating",
+        "rccb_rating",
+        "rccb_type",
+        "isolator_state",
+        "raw_visible_text",
+    ],
+}
+
+
+class GeminiPerceptionError(RuntimeError):
+    def __init__(self, message: str, *, error_type: str, raw_provider_output: str | None = None) -> None:
+        super().__init__(message)
+        self.error_type = error_type
+        self.raw_provider_output = raw_provider_output
 
 _COMPONENT_TOKENS = {
     "charger": ["charger", "indicator", "wallbox", "display"],
@@ -29,7 +105,7 @@ def _normalize_list(values: object) -> list[str]:
     if isinstance(values, list):
         return [str(value).strip() for value in values if str(value).strip()]
     if isinstance(values, str):
-        return [part.strip() for part in values.split(";") if part.strip()]
+        return [part.strip() for part in re.split(r"[;\n,]+", values) if part.strip()]
     return []
 
 
@@ -88,6 +164,12 @@ def _normalize_observation_result(value: object) -> str:
 
 def _normalize_indicator_status(value: object) -> str:
     text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if text in {"solid_red_light", "solid_red", "red", "red_indicator"}:
+        return "red_light"
+    if text in {"flashing_red", "blinking_red", "red_flashing", "red_blinking"}:
+        return "blinking_red_light"
+    if text in {"off", "unlit", "no_indicator", "display_off"}:
+        return "no_light"
     return text if text in {"red_light", "blinking_red_light", "no_light", "unknown"} else "unknown"
 
 
@@ -116,6 +198,29 @@ def _normalize_isolator_state(value: object) -> str:
     if text in {"off", "open", "open_circuit"}:
         return "off"
     return "unknown"
+
+
+def _extract_json_object(raw: str) -> dict[str, object]:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text.strip())
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start < 0 or end <= start:
+        raise json.JSONDecodeError("No JSON object found in provider output", text, 0)
+    candidate = text[start : end + 1]
+    data = json.loads(candidate)
+    if not isinstance(data, dict):
+        raise json.JSONDecodeError("Provider JSON root is not an object", candidate, 0)
+    return data
 
 
 def _combined_incident_text(incident: IncidentInput) -> str:
@@ -311,6 +416,23 @@ def _photo_path(incident: IncidentInput) -> Path | None:
     return None
 
 
+def _gemini_config(genai_types: object) -> object:
+    return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
+        temperature=0.0,
+        max_output_tokens=2048,
+        response_mime_type="application/json",
+        response_schema=_GEMINI_RESPONSE_SCHEMA,
+    )
+
+
+def _gemini_config_without_schema(genai_types: object) -> object:
+    return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
+        temperature=0.0,
+        max_output_tokens=2048,
+        response_mime_type="application/json",
+    )
+
+
 def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessment | None:
     if incident.photo_evidence is None:
         return None
@@ -344,23 +466,43 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
     if image_path is None:
         raise FileNotFoundError("image_path_unresolved")
 
-    response = client.models.generate_content(  # type: ignore[attr-defined]
-        model=GEMINI_MODEL,
-        contents=[
-            genai_types.Part.from_bytes(data=image_path.read_bytes(), mime_type=incident.photo_evidence.media_type),
-            prompt,
-        ],
-        config=genai_types.GenerateContentConfig(
-            temperature=0.0,
-            max_output_tokens=2048,
-            response_mime_type="application/json",
-        ),
-    )
-    raw = (response.text or "").strip()
-    if raw.startswith("```"):
-        raw = re.sub(r"^```[a-z]*\n?", "", raw)
-        raw = re.sub(r"\n?```$", "", raw.strip())
-    data = json.loads(raw)
+    image_bytes = image_path.read_bytes()
+    image_part = genai_types.Part.from_bytes(data=image_bytes, mime_type=incident.photo_evidence.media_type)
+    contents = [image_part, prompt]
+    raw: str | None = None
+    last_error: json.JSONDecodeError | None = None
+    data: dict[str, object] | None = None
+    use_schema = True
+
+    for attempt in range(_GEMINI_PARSE_ATTEMPTS):
+        try:
+            response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=GEMINI_MODEL,
+                contents=contents,
+                config=_gemini_config(genai_types) if use_schema else _gemini_config_without_schema(genai_types),
+            )
+        except TypeError:
+            if not use_schema:
+                raise
+            use_schema = False
+            response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=GEMINI_MODEL,
+                contents=contents,
+                config=_gemini_config_without_schema(genai_types),
+            )
+        raw = (response.text or "").strip()
+        try:
+            data = _extract_json_object(raw)
+            break
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            if attempt < _GEMINI_PARSE_ATTEMPTS - 1:
+                time.sleep(0.4 * (attempt + 1))
+    else:
+        message = str(last_error) if last_error is not None else "Gemini returned no parseable JSON."
+        raise GeminiPerceptionError(message, error_type="schema_mismatch", raw_provider_output=raw)
+    if data is None:
+        raise GeminiPerceptionError("Gemini returned no parseable JSON.", error_type="schema_mismatch", raw_provider_output=raw)
 
     evidence_type = str(data.get("evidence_type") or _infer_evidence_type(incident))
     if evidence_type not in {"hardware_photo", "screenshot", "symptom_heavy_photo", "mixed_photo", "symptom_report", "unknown"}:
@@ -387,6 +529,8 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
 
 
 def _classify_perception_error(exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, GeminiPerceptionError):
+        return exc.error_type, str(exc)
     message = str(exc) or exc.__class__.__name__
     lowered = message.lower()
     if "image_path_unresolved" in lowered:
@@ -427,12 +571,15 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
 
     error_type: str | None = None
     error_message: str | None = None
+    raw_provider_output: str | None = None
     try:
         gemini_result = _call_gemini_perception(incident)
         if gemini_result is not None:
             return gemini_result
     except Exception as exc:
         error_type, error_message = _classify_perception_error(exc)
+        if isinstance(exc, GeminiPerceptionError):
+            raw_provider_output = exc.raw_provider_output
 
     text = _combined_incident_text(incident)
     extraction = _fallback_theme2_extraction(incident, 0.38)
@@ -449,6 +596,7 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
         requires_follow_up=extraction.observation_result == "unknown",
         provider_attempted=True,
         fallback_used=True,
+        raw_provider_output=raw_provider_output,
         error_type=error_type or "fallback_without_error_detail",
         error_message=error_message or "Gemini perception did not produce a usable structured response.",
         extraction=extraction,

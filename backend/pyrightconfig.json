@@ -1,8 +1,10 @@
 {
-  "venvPath": ".",
-  "venv": ".venv",
   "include": [
     "app",
     "tests"
-  ]
+  ],
+  "extraPaths": [
+    ".."
+  ],
+  "reportMissingImports": false
 }

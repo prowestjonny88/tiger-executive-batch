@@ -4,9 +4,14 @@ dist/
 coverage/
 __pycache__/
 .pytest_cache/
+.pytest-tmp/
+.pycache-root/
 *.pyc
+backend/tests/test-uploads/
 .venv/
 venv/
+*.egg-info/
+backend/*.egg-info/
 uploads/
 !frontend/app/api/uploads/
 !frontend/app/api/uploads/route.ts
@@ -25,6 +30,8 @@ data/raw/
 data/datasets/
 data/round2/raw/
 data/round2/images/
+data/round2/pseudo_labels*.jsonl
+data/round2/*.tmp.jsonl
 *.mp4
 *.mov
 *.avi

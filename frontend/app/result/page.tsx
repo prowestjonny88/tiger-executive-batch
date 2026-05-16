@@ -28,6 +28,16 @@ function recipientBadge(recipient: string) {
   return "secondary";
 }
 
+function routingState(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.recipient_type === "after_sales_team") {
+    return `Routed to After-sales Team: ${output.assigned_team_id || "AS_TEAM_01"}`;
+  }
+  if (output.recipient_type === "customer") return "Displayed to customer";
+  if (output.recipient_type === "none") return "No routing required";
+  return "More proof required before routing";
+}
+
 export default function ResultAssessmentPage() {
   return (
     <Suspense
@@ -129,10 +139,10 @@ function ResultAssessment() {
         <div className="h-1.5 bg-gradient-to-r from-green-600 via-slate-700 to-amber-500" />
         <CardHeader className="p-10 md:p-12 pb-4 text-center">
           <Badge variant={recipientBadge(output.recipient_type)} className="mx-auto mb-5 uppercase tracking-widest">
-            {formatRecipientType(output.recipient_type)}
+            {routingState(triage)}
           </Badge>
           <CardTitle className="text-3xl font-extrabold tracking-tight">
-            Theme 2 Assessment
+            Organizer Required Output
           </CardTitle>
           <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
             {output.action_message}
@@ -142,12 +152,13 @@ function ResultAssessment() {
         <CardContent className="px-8 md:px-12 pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 mb-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Info label="Input Component" value={formatInputComponent(output.input_component)} />
               <Info label="Observation Result" value={formatObservationResult(output.observation_result)} />
+              <Info label="Charger Serial Number" value={output.charger_serial_number || extraction.charger_serial_number || "Not readable"} />
+              <Info label="Brand / Model" value={output.charger_brand_model || extraction.charger_brand_model || "Not readable"} />
               <Info label="Fault Type" value={formatFaultTypeV2(output.fault_type_v2)} />
               <Info label="Recipient" value={formatRecipientType(output.recipient_type)} />
-              <Info label="Team ID" value={output.assigned_team_id || "Not required"} />
-              <Info label="Confidence" value={percent(output.confidence_score)} />
+              <Info label="Action Message" value={output.action_message} />
+              <Info label="Input Component" value={formatInputComponent(output.input_component)} />
             </div>
 
             {imageUrl ? (
@@ -162,9 +173,22 @@ function ResultAssessment() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <Info label="Charger Serial Number" value={output.charger_serial_number || extraction.charger_serial_number || "Not readable"} />
-            <Info label="Charger Brand / Model" value={output.charger_brand_model || extraction.charger_brand_model || "Not readable"} />
+            <Info label="Routing State" value={routingState(triage)} />
+            <Info label="Confidence" value={percent(output.confidence_score)} />
           </div>
+
+          {triage.follow_up_prompts.length ? (
+            <div className="mb-8 px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <strong className="text-slate-800 text-xs uppercase tracking-widest font-extrabold block mb-3">
+                System needs more proof
+              </strong>
+              <ul className="space-y-2 text-slate-700 text-sm">
+                {triage.follow_up_prompts.map((prompt) => (
+                  <li key={prompt.question_id}>{prompt.prompt}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {output.required_proof_next ? (
             <div className="mb-8 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">

@@ -1,3 +1,5 @@
+import pytest
+
 from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.theme2_mapper import build_competition_output
 
@@ -132,6 +134,115 @@ def test_blinking_red_with_flash_count_7_maps_to_manual_error_customer():
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
     assert meta["error_log_key"] == "red_light_flashes_7"
+
+
+@pytest.mark.parametrize(
+    ("flash_count", "fault_type", "recipient", "team_id"),
+    [
+        ("6 flashes", "installation_issue", "after_sales_team", "AS_TEAM_01"),
+        ("8 flashes", "charger_issue", "after_sales_team", "AS_TEAM_01"),
+        ("9 flashes", "charger_issue", "customer", None),
+    ],
+)
+def test_blinking_red_flash_count_refinements(flash_count: str, fault_type: str, recipient: str, team_id: str | None):
+    output, meta = build_competition_output(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="charger blinking red",
+            follow_up_answers={"red_light_flash_count": flash_count},
+        ),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="charger",
+                observation_result="charger_blinking_red_light",
+                indicator_status="blinking_red_light",
+                confidence_score=0.8,
+            )
+        ),
+    )
+
+    assert output.fault_type_v2 == fault_type
+    assert output.recipient_type == recipient
+    assert output.assigned_team_id == team_id
+    assert meta["error_log_key"] == f"red_light_flashes_{flash_count[0]}"
+
+
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", mcb_visible=False, confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", rccb_visible=False, confidence_score=0.82),
+    ],
+)
+def test_evdb_missing_breaker_refines_to_missing_mcb_rccb(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB protection missing"),
+        _perception(theme2),
+    )
+
+    assert output.observation_result == "missing_mcb_rccb"
+    assert output.recipient_type == "after_sales_team"
+
+
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", rccb_type="type_ac", confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", evdb_phase_type="single_phase", mcb_rating="32A 2P", confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_single_phase", evdb_phase_type="single_phase", rccb_rating="40A 4P", confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", evdb_phase_type="three_phase", mcb_rating="40A 2P", confidence_score=0.82),
+        Theme2VisualExtraction(input_component="evdb", observation_result="evdb_three_phase", evdb_phase_type="three_phase", rccb_rating="40A 2P", confidence_score=0.82),
+    ],
+)
+def test_evdb_wrong_component_specs_refinements(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB labels visible"),
+        _perception(theme2),
+    )
+
+    assert output.observation_result == "wrong_component_specs"
+    assert output.fault_type_v2 == "protection_issue"
+    assert output.recipient_type == "after_sales_team"
+
+
+def test_safety_signal_escalates_to_after_sales():
+    output, meta = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="charger no light", symptom_text="burning smell near charger"),
+        _perception(Theme2VisualExtraction(input_component="charger", observation_result="charger_no_light", confidence_score=0.8)),
+    )
+
+    assert output.recipient_type == "after_sales_team"
+    assert output.assigned_team_id == "AS_TEAM_01"
+    assert output.action_message == "Stop using the charger and contact after-sales team."
+    assert meta["override_key"] == "safety_escalation"
+
+
+def test_repeated_mcb_trip_escalates_to_after_sales():
+    output, meta = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped", symptom_text="Breaker cannot reset after tripping."),
+        _perception(Theme2VisualExtraction(input_component="evdb", observation_result="mcb_tripped", confidence_score=0.8)),
+    )
+
+    assert output.fault_type_v2 == "protection_issue"
+    assert output.recipient_type == "after_sales_team"
+    assert output.assigned_team_id == "AS_TEAM_01"
+    assert meta["override_key"] == "repeated_mcb_trip_escalation"
+
+
+def test_no_light_unresolved_after_normal_breaker_escalates_to_after_sales():
+    output, meta = build_competition_output(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="charger no light",
+            follow_up_answers={"evdb_breaker_checked": "normal", "charger_still_off": "yes"},
+        ),
+        _perception(Theme2VisualExtraction(input_component="charger", observation_result="charger_no_light", confidence_score=0.8)),
+    )
+
+    assert output.fault_type_v2 == "charger_issue"
+    assert output.recipient_type == "after_sales_team"
+    assert output.assigned_team_id == "AS_TEAM_01"
+    assert meta["override_key"] == "no_light_unresolved_escalation"
 
 
 def test_unknown_output_requests_clearer_proof():

@@ -73,6 +73,7 @@ def run_theme2_triage_with_debug(incident: IncidentInput) -> tuple[Theme2TriageR
             "perception_error_type": perception.error_type,
             "perception_error_message": perception.error_message,
             "follow_up_count": len(followups),
+            "override_key": rule_metadata.get("override_key"),
         },
     )
     result = Theme2TriageResult(

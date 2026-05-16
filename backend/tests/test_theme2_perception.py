@@ -107,6 +107,104 @@ def test_bad_gemini_theme2_enums_normalize_to_unknown():
     assert result.extraction.isolator_state == "unknown"
 
 
+def test_gemini_perception_extracts_json_from_preamble_and_normalizes_common_strings():
+    mock_response = MagicMock()
+    mock_response.text = """
+    Here is the JSON:
+    {
+      "evidence_type": "charger",
+      "scene_summary": "Solid red indicator on charger.",
+      "components_visible": "charger",
+      "visible_abnormalities": "charger_red_light",
+      "ocr_findings": "PROTON e.MAS, RFID",
+      "hazard_signals": "solid red light indicator",
+      "uncertainty_notes": "Serial number is not visible.",
+      "confidence_score": 0.95,
+      "input_component": "charger",
+      "observation_result": "charger_red_light",
+      "charger_serial_number": null,
+      "charger_brand_model": "PROTON e.MAS",
+      "indicator_status": "solid red light",
+      "raw_visible_text": "PROTON e.MAS ((( RFID )))"
+    }
+    """
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-preamble-json.jpg"))
+
+    assert result.mode == "vlm"
+    assert result.evidence_type == "hardware_photo"
+    assert result.extraction.observation_result == "charger_red_light"
+    assert result.extraction.indicator_status == "red_light"
+    assert result.extraction.charger_brand_model == "PROTON e.MAS"
+    assert result.ocr_findings == ["PROTON e.MAS", "RFID"]
+
+
+def test_gemini_perception_retries_schema_mismatch_once():
+    bad_response = MagicMock()
+    bad_response.text = ""
+    good_response = MagicMock()
+    good_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Charger indicator is red.",
+            "components_visible": ["charger"],
+            "visible_abnormalities": ["red_indicator"],
+            "ocr_findings": [],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.88,
+            "input_component": "charger",
+            "observation_result": "charger_red_light",
+            "charger_serial_number": None,
+            "charger_brand_model": None,
+            "indicator_status": "red_light",
+            "evdb_phase_type": "unknown",
+            "mcb_visible": None,
+            "rccb_visible": None,
+            "mcb_rating": None,
+            "rccb_rating": None,
+            "rccb_type": "unknown",
+            "isolator_state": "unknown",
+            "raw_visible_text": [],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [bad_response, good_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ), patch("app.services.theme2_perception.time.sleep"):
+        result = assess_theme2_perception(_photo_incident("theme2-retry.jpg"))
+
+    assert result.mode == "vlm"
+    assert result.fallback_used is False
+    assert result.extraction.observation_result == "charger_red_light"
+    assert mock_client.models.generate_content.call_count == 2
+
+
+def test_gemini_parse_failure_preserves_raw_provider_output():
+    mock_response = MagicMock()
+    mock_response.text = "not json"
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ), patch("app.services.theme2_perception.time.sleep"):
+        result = assess_theme2_perception(_photo_incident("theme2-parse-failure.jpg"))
+
+    assert result.mode == "heuristic"
+    assert result.fallback_used is True
+    assert result.error_type == "schema_mismatch"
+    assert result.raw_provider_output == "not json"
+    assert mock_client.models.generate_content.call_count == 3
+
+
 def test_heuristic_perception_produces_theme2_extraction_without_gemini():
     result = assess_theme2_perception(
         IncidentInput(

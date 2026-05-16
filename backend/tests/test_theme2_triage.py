@@ -1,5 +1,15 @@
-from app.core.models import IncidentInput
-from app.services.theme2_triage import run_theme2_triage
+from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
+from app.services.theme2_triage import build_theme2_followups, run_theme2_triage
+
+
+def _perception(theme2: Theme2VisualExtraction, score: float | None = None) -> Theme2PerceptionAssessment:
+    return Theme2PerceptionAssessment(
+        mode="heuristic",
+        evidence_type="hardware_photo",
+        scene_summary="Theme 2 perception.",
+        confidence_score=score if score is not None else theme2.confidence_score,
+        extraction=theme2,
+    )
 
 
 def test_theme2_triage_returns_clean_contract_for_text_demo():
@@ -38,3 +48,43 @@ def test_theme2_triage_low_confidence_unknown_requests_clearer_proof():
     assert result.competition_output.required_proof_next
     question_ids = {item.question_id for item in result.follow_up_prompts}
     assert "clear_theme2_photo" in question_ids
+
+
+def test_theme2_triage_no_photo_requests_photo():
+    result = run_theme2_triage(IncidentInput(site_id="site-mall-01", photo_hint="charger no light"))
+
+    question_ids = {item.question_id for item in result.follow_up_prompts}
+    assert "photo_request" in question_ids
+
+
+def test_followups_request_evdb_label_closeup_when_ratings_missing():
+    prompts = build_theme2_followups(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB single phase"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="evdb_single_phase",
+                evdb_phase_type="single_phase",
+                confidence_score=0.75,
+            )
+        ),
+    )
+
+    assert "evdb_label_closeup" in {item.question_id for item in prompts}
+
+
+def test_followups_request_charger_identity_closeup_when_serial_missing():
+    prompts = build_theme2_followups(
+        IncidentInput(site_id="site-mall-01", photo_hint="charger serial label visible"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="charger",
+                observation_result="charger_serial_brand_visible",
+                charger_serial_number=None,
+                charger_brand_model=None,
+                confidence_score=0.75,
+            )
+        ),
+    )
+
+    assert "charger_identity_closeup" in {item.question_id for item in prompts}
