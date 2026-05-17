@@ -2,71 +2,28 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 
-import { AnnotatedImage } from "../../components/ui/annotated-image";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import {
   ApiTriageResponse,
   fetchIncidentById,
-  formatFaultTypeV2,
-  formatInputComponent,
-  formatObservationResult,
-  formatRecipientType,
   resolveEvidenceUrl,
 } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
-
-function percent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function confidenceLabel(value: number) {
-  if (value >= 0.75) return `High confidence (${percent(value)})`;
-  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
-  return `Low confidence - system needs more proof (${percent(value)})`;
-}
-
-function recipientBadge(recipient: string) {
-  if (recipient === "after_sales_team") return "warning";
-  if (recipient === "customer") return "success";
-  return "secondary";
-}
-
-function routingState(triage: ApiTriageResponse) {
-  const output = triage.competition_output;
-  if (output.recipient_type === "after_sales_team") {
-    return `Routed to After-sales Team: ${output.assigned_team_id || "AS_TEAM_01"}`;
-  }
-  if (output.recipient_type === "customer") return "Displayed to customer";
-  if (output.recipient_type === "none") return "No routing required";
-  return "More proof required before routing";
-}
-
-function finalState(triage: ApiTriageResponse) {
-  const output = triage.competition_output;
-  if (output.recipient_type === "after_sales_team") {
-    return `Message routed to After-sales Team: ${output.assigned_team_id || "AS_TEAM_01"}.`;
-  }
-  if (output.recipient_type === "customer") return "Result displayed to customer.";
-  if (output.recipient_type === "none") return "No customer or after-sales routing required.";
-  return "Routing held until clearer proof is available.";
-}
-
-function chargerIdentityValue(component: string, value: string | null | undefined, field: "serial" | "brand") {
-  if (component === "evdb") return "Not applicable for EVDB evidence";
-  if (component === "isolator") return "Not applicable for isolator evidence";
-  if (component !== "charger") return "Not applicable until component is confirmed";
-  return value || (field === "serial" ? "Not readable" : "Not readable");
-}
+import { PageShell } from "../../components/layout/page-shell";
+import { DecisionChain } from "../../components/triage/decision-chain";
+import { EvidencePanel } from "../../components/triage/evidence-panel";
+import { ProofRequiredCard } from "../../components/triage/proof-required-card";
+import { ConfidencePill } from "../../components/triage/confidence-pill";
 
 export default function ResultAssessmentPage() {
   return (
     <Suspense
       fallback={
         <div className="flex items-center justify-center min-h-[70vh]">
-          <p className="text-slate-500 text-sm">Loading assessment...</p>
+          <p className="text-slate-500 font-medium animate-pulse">Loading assessment...</p>
         </div>
       }
     >
@@ -134,181 +91,131 @@ function ResultAssessment() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <p className="text-slate-500 text-sm">Loading assessment...</p>
+        <p className="text-slate-500 font-medium animate-pulse">Loading assessment...</p>
       </div>
     );
   }
 
   if (!triage) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16">
-        <Card className="w-full shadow-xl border-slate-200 p-10 text-center">
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-4">No assessment found</h2>
-          <p className="text-slate-600 mb-8">Start a new Theme 2 triage from the upload page.</p>
-          <Button onClick={() => router.push("/upload")} size="lg">Start New Triage</Button>
+      <PageShell maxWidth="3xl">
+        <Card className="w-full shadow-sm border-slate-200 p-10 text-center rounded-2xl bg-white">
+          <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+            <AlertCircle className="w-8 h-8 text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-2">No assessment found</h2>
+          <p className="text-slate-500 mb-8 max-w-md mx-auto">We couldn't find a recent triage session. Please start a new upload or demo scenario.</p>
+          <Button onClick={() => router.push("/upload")} size="lg" className="bg-green-700 hover:bg-green-800 h-14 px-8 rounded-xl text-lg font-bold">
+            Start New Triage
+          </Button>
         </Card>
-      </div>
+      </PageShell>
     );
   }
 
   const output = triage.competition_output;
-  const extraction = triage.perception.extraction;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence?.storage_path);
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
 
+  const showFallbackWarning = triage.perception.fallback_used;
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-4xl mx-auto px-6 py-16">
-      <Card className="w-full overflow-hidden shadow-xl border-slate-200 mb-8">
-        <div className="h-1.5 bg-gradient-to-r from-green-600 via-slate-700 to-amber-500" />
-        <CardHeader className="p-10 md:p-12 pb-4 text-center">
-          <Badge variant={recipientBadge(output.recipient_type)} className="mx-auto mb-5 uppercase tracking-widest">
-            {routingState(triage)}
-          </Badge>
-          <CardTitle className="text-3xl font-extrabold tracking-tight">
-            Organizer Required Output
-          </CardTitle>
-          <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
-            {output.action_message}
-          </p>
-        </CardHeader>
+    <PageShell maxWidth="5xl">
+      <Card className="w-full shadow-sm border-slate-200 mb-8 rounded-2xl overflow-hidden bg-white">
+        <div className="bg-white border-b border-slate-100 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
+              Triage Complete
+            </h1>
+            <p className="text-slate-500 font-medium">Review the assessment and proceed to guidance.</p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span className="font-bold font-mono tracking-wide">INC-{triage.incident_id}</span>
+          </div>
+        </div>
 
-        <CardContent className="px-8 md:px-12 pb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 mb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Info label="Observation Result" value={formatObservationResult(output.observation_result)} />
-              <Info
-                label="Charger Serial Number"
-                value={chargerIdentityValue(output.input_component, output.charger_serial_number || extraction.charger_serial_number, "serial")}
-              />
-              <Info
-                label="Brand / Model"
-                value={chargerIdentityValue(output.input_component, output.charger_brand_model || extraction.charger_brand_model, "brand")}
-              />
-              <Info label="Fault Type" value={formatFaultTypeV2(output.fault_type_v2)} />
-              <Info label="Recipient" value={formatRecipientType(output.recipient_type)} />
-              <Info label="Action Message" value={output.action_message} />
-              <Info label="Input Component" value={formatInputComponent(output.input_component)} />
-            </div>
-
-            {imageUrl ? (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <AnnotatedImage src={imageUrl} annotations={[]} />
+        <CardContent className="p-6 md:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            
+            {/* Left Column */}
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Decision Logic</h2>
               </div>
-            ) : (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 flex items-center justify-center text-center">
-                <p className="text-slate-500 text-sm">No uploaded image attached to this assessment.</p>
+              <DecisionChain 
+                observationResult={output.observation_result}
+                faultType={output.fault_type_v2}
+                recipientType={output.recipient_type}
+                assignedTeamId={output.assigned_team_id}
+                actionMessage={output.action_message}
+              />
+
+              <div className="mt-4 pt-6 border-t border-slate-100">
+                <Button asChild size="lg" className="w-full h-14 rounded-xl font-bold bg-green-700 hover:bg-green-800 text-lg shadow-sm">
+                  <a href={nextHref}>
+                    {output.recipient_type === "after_sales_team" ? "View After-sales Routing" : "View Customer Guidance"}
+                  </a>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="w-full h-14 rounded-xl font-bold mt-3 text-slate-600 border-slate-200 hover:bg-slate-50">
+                  <a href="/upload">Run Triage Again</a>
+                </Button>
               </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <Info label="Routing State" value={routingState(triage)} />
-            <Info label="Final State" value={finalState(triage)} />
-            <Info label="Confidence" value={confidenceLabel(output.confidence_score)} />
-          </div>
-
-          {triage.perception.fallback_used ? (
-            <div className="mb-8 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <strong className="text-amber-800 text-xs uppercase tracking-widest font-extrabold block mb-1">
-                Fallback Interpretation
-              </strong>
-              <p className="text-amber-800 font-medium">
-                Vision model unavailable; using fallback interpretation.
-              </p>
             </div>
-          ) : null}
 
-          {triage.follow_up_prompts.length ? (
-            <div className="mb-8 px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <strong className="text-slate-800 text-xs uppercase tracking-widest font-extrabold block mb-3">
-                System needs more proof
-              </strong>
-              <ul className="space-y-2 text-slate-700 text-sm">
-                {triage.follow_up_prompts.map((prompt) => (
-                  <li key={prompt.question_id}>{prompt.prompt}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+            {/* Right Column */}
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Evidence</h2>
+                <ConfidencePill score={output.confidence_score} />
+              </div>
 
-          {output.required_proof_next ? (
-            <div className="mb-8 px-5 py-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <strong className="text-amber-800 text-xs uppercase tracking-widest font-extrabold block mb-1">
-                Required Proof Next
-              </strong>
-              <p className="text-amber-800 font-medium">{output.required_proof_next}</p>
-            </div>
-          ) : null}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-              <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-3">Perception</h3>
-              <p className="font-semibold text-slate-900">{triage.perception.scene_summary}</p>
-              <p className="text-slate-600 text-sm mt-2">
-                Mode: {triage.perception.mode} | Evidence: {triage.perception.evidence_type}
-              </p>
-              {triage.perception.ocr_findings.length ? (
-                <p className="text-slate-600 text-sm mt-2">Visible text: {triage.perception.ocr_findings.join(" | ")}</p>
-              ) : null}
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-              <h3 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-3">Evidence Notes</h3>
-              {output.evidence_notes.length ? (
-                <ul className="space-y-2 text-slate-700 text-sm">
-                  {output.evidence_notes.map((note) => <li key={note}>{note}</li>)}
-                </ul>
-              ) : (
-                <p className="text-slate-600 text-sm">No additional evidence notes.</p>
+              {showFallbackWarning && (
+                <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-amber-800 text-xs uppercase tracking-widest font-extrabold block mb-0.5">
+                      Fallback Mode
+                    </strong>
+                    <p className="text-amber-800 text-sm font-medium">
+                      Vision model unavailable; using fallback interpretation.
+                    </p>
+                  </div>
+                </div>
               )}
+
+              <ProofRequiredCard 
+                proofNext={output.required_proof_next} 
+                prompts={triage.follow_up_prompts} 
+              />
+
+              <EvidencePanel imageUrl={imageUrl} />
+              
+              <details className="mt-8">
+                <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+                  Advanced Debug Info
+                </summary>
+                <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <pre className="whitespace-pre-wrap break-words text-xs text-slate-600 font-mono">
+                    {JSON.stringify(
+                      {
+                        perception_mode: triage.debug.perception_mode,
+                        fallback_used: triage.debug.fallback_used,
+                        rule_key: triage.debug.rule_key,
+                        error_type: triage.perception.error_type,
+                        scene_summary: triage.perception.scene_summary,
+                        evidence_notes: output.evidence_notes,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </div>
+              </details>
             </div>
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
-            <Button asChild size="lg" className="flex-1 h-14 rounded-xl font-bold">
-              <a href={nextHref}>
-                {output.recipient_type === "after_sales_team" ? "View After-sales Routing" : "View Customer Guidance"}
-              </a>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="flex-1 h-14 rounded-xl font-bold">
-              <a href="/upload">Run Triage Again</a>
-            </Button>
-          </div>
-
-          <p className="text-xs text-slate-400 text-center mt-8 font-mono">
-            Incident ID: INC-{triage.incident_id} | Rule: {triage.debug.rule_key || "unknown"} | Version: {triage.debug.rule_version || "unknown"}
-          </p>
-
-          <details className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-500">
-              Advanced Debug
-            </summary>
-            <pre className="mt-3 whitespace-pre-wrap break-words text-xs text-slate-600">
-              {JSON.stringify(
-                {
-                  perception_mode: triage.debug.perception_mode,
-                  fallback_used: triage.debug.fallback_used,
-                  rule_key: triage.debug.rule_key,
-                  override_key: triage.debug.extra?.override_key,
-                  error_type: triage.perception.error_type,
-                  error_message: triage.perception.error_message,
-                  raw_provider_output: triage.perception.raw_provider_output,
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </details>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-      <h3 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mb-2">{label}</h3>
-      <p className="font-bold text-slate-900">{value}</p>
-    </div>
+    </PageShell>
   );
 }

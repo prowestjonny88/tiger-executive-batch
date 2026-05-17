@@ -3,17 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { Database, Plus } from "lucide-react";
 
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import {
   fetchIncidents,
   formatFaultTypeV2,
   formatInputComponent,
   formatObservationResult,
-  formatRecipientType,
   IncidentHistoryItem,
 } from "../../lib/api";
+import { PageShell } from "../../components/layout/page-shell";
+import { IncidentStatusBadge } from "../../components/triage/incident-status-badge";
 
 export default function HistoryPage() {
   const [incidents, setIncidents] = useState<IncidentHistoryItem[]>([]);
@@ -34,104 +35,108 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <p className="text-muted-foreground">Loading Theme 2 incident history...</p>
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <p className="text-slate-500 font-medium animate-pulse">Loading incident history...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="rounded-md bg-destructive/15 p-4 text-destructive">
-          <p className="font-semibold">Error</p>
-          <p>{error}</p>
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-red-700 max-w-md text-center">
+          <p className="font-bold mb-1">Error</p>
+          <p className="text-sm font-medium">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
-      <div className="mb-8 flex items-center justify-between">
+    <PageShell maxWidth="6xl">
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-            Theme 2 Incident Database
-          </h1>
-          <p className="mt-2 text-slate-600">
+          <div className="flex items-center gap-3 mb-2">
+            <Database className="w-6 h-6 text-green-700" />
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+              Incident Database
+            </h1>
+          </div>
+          <p className="text-slate-600 text-lg">
             Recent charger, EVDB, and isolator assessments.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/upload">New Incident</Link>
+        <Button asChild size="lg" className="bg-green-700 hover:bg-green-800 rounded-xl h-12 shadow-sm font-bold flex items-center gap-2">
+          <Link href="/upload">
+            <Plus className="w-5 h-5" /> New Incident
+          </Link>
         </Button>
       </div>
 
-      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 border-b">
+            <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">ID</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Time</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Site / Charger</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Observation</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Fault Type</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider">Recipient</th>
-                <th className="px-6 py-4 font-medium uppercase tracking-wider text-right">Action</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs">ID</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs">Time</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs">Site / Charger</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs">Observation & Fault</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs">Status</th>
+                <th className="px-6 py-5 font-bold uppercase tracking-widest text-xs text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {incidents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
                     No incidents recorded yet.
                   </td>
                 </tr>
               ) : (
                 incidents.map((incident) => (
                   <tr key={incident.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">INC-{incident.id}</td>
-                    <td className="px-6 py-4 text-slate-500 whitespace-nowrap">
+                    <td className="px-6 py-5 font-bold text-slate-900 font-mono">INC-{incident.id}</td>
+                    <td className="px-6 py-5 text-slate-500 font-medium whitespace-nowrap">
                       {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{incident.site_id}</div>
-                      <div className="text-slate-500 text-xs mt-0.5">{incident.charger_id || "Unspecified"}</div>
+                    <td className="px-6 py-5">
+                      <div className="font-bold text-slate-900">{incident.site_id}</div>
+                      <div className="text-slate-500 text-xs mt-1 font-mono uppercase tracking-widest">
+                        {incident.charger_id || "UNSPECIFIED"}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">
+                    <td className="px-6 py-5">
+                      <div className="font-bold text-slate-900 mb-1">
                         {formatObservationResult(incident.latest_observation_result)}
                       </div>
-                      <div className="text-slate-500 text-xs mt-0.5">
-                        {formatInputComponent(incident.latest_input_component)}
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-500 uppercase tracking-widest font-semibold">
+                          {formatInputComponent(incident.latest_input_component)}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-600 font-medium">
+                          {formatFaultTypeV2(incident.latest_fault_type_v2)}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <Badge variant="secondary">{formatFaultTypeV2(incident.latest_fault_type_v2)}</Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-2">
-                        <Badge variant={incident.latest_recipient_type === "after_sales_team" ? "warning" : "success"}>
-                          {formatRecipientType(incident.latest_recipient_type)}
-                        </Badge>
-                        {incident.latest_assigned_team_id ? (
-                          <span className="text-xs text-slate-500">Team: {incident.latest_assigned_team_id}</span>
-                        ) : null}
-                        {typeof incident.latest_confidence_score === "number" ? (
-                          <span className="text-xs text-slate-500">
-                            Confidence: {Math.round(incident.latest_confidence_score * 100)}%
+                    <td className="px-6 py-5">
+                      <div className="flex flex-col items-start gap-1.5">
+                        <IncidentStatusBadge recipientType={incident.latest_recipient_type} />
+                        {typeof incident.latest_confidence_score === "number" && (
+                          <span className="text-xs text-slate-500 font-medium">
+                            Conf: {Math.round(incident.latest_confidence_score * 100)}%
                           </span>
-                        ) : null}
+                        )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-5 text-right">
                       {incident.latest_stage === "triage_result" ? (
-                        <Button variant="ghost" size="sm" className="font-semibold text-primary" asChild>
-                          <Link href={`/result?replay=${incident.id}`}>View</Link>
+                        <Button variant="ghost" size="sm" className="font-bold text-green-700 hover:text-green-800 hover:bg-green-50 rounded-lg" asChild>
+                          <Link href={`/result?replay=${incident.id}`}>View Details</Link>
                         </Button>
                       ) : (
-                        <span className="text-xs text-slate-400">Incomplete</span>
+                        <span className="text-xs text-slate-400 font-medium uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">Incomplete</span>
                       )}
                     </td>
                   </tr>
@@ -141,6 +146,6 @@ export default function HistoryPage() {
           </table>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

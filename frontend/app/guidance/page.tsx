@@ -2,22 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ShieldCheck, Info } from "lucide-react";
 
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { ApiTriageResponse, formatFaultTypeV2, formatObservationResult, formatRecipientType } from "../../lib/api";
+import { Card, CardContent } from "../../components/ui/card";
+import { ApiTriageResponse, formatFaultTypeV2, formatObservationResult } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
-
-function percent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function confidenceLabel(value: number) {
-  if (value >= 0.75) return `High confidence (${percent(value)})`;
-  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
-  return `Low confidence - system needs more proof (${percent(value)})`;
-}
+import { PageShell } from "../../components/layout/page-shell";
+import { ConfidencePill } from "../../components/triage/confidence-pill";
 
 export default function SafeGuidance() {
   const router = useRouter();
@@ -33,63 +25,58 @@ export default function SafeGuidance() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <p className="text-slate-500 text-sm">Loading guidance...</p>
+        <p className="text-slate-500 font-medium animate-pulse">Loading guidance...</p>
       </div>
     );
   }
 
   if (!triage) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh]">
-        <p className="text-slate-500 text-sm">No Theme 2 guidance available.</p>
-      </div>
+      <PageShell maxWidth="3xl">
+        <Card className="w-full shadow-sm border-slate-200 p-10 text-center rounded-2xl bg-white">
+          <p className="text-slate-500 font-medium">No guidance available.</p>
+        </Card>
+      </PageShell>
     );
   }
 
   const output = triage.competition_output;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-2xl mx-auto px-6 py-16">
-      <Card className="w-full shadow-xl border-slate-200">
-        <CardHeader className="p-10 md:p-12 text-center">
-          <Badge variant={output.recipient_type === "customer" ? "success" : "secondary"} className="mx-auto mb-5 uppercase tracking-widest">
-            {output.recipient_type === "customer" ? "Result displayed to customer" : formatRecipientType(output.recipient_type)}
-          </Badge>
-          <CardTitle className="text-3xl font-extrabold tracking-tight">
+    <PageShell maxWidth="3xl">
+      <Card className="w-full shadow-sm border-slate-200 rounded-2xl overflow-hidden bg-white">
+        <div className="bg-slate-50 border-b border-slate-100 p-8 md:p-10 text-center">
+          <div className="mx-auto w-16 h-16 bg-green-100 text-green-700 rounded-full flex items-center justify-center mb-6">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
             Customer Guidance
-          </CardTitle>
-          <p className="text-slate-600 mt-3">
+          </h1>
+          <p className="text-lg text-slate-600 max-w-lg mx-auto">
             {formatObservationResult(output.observation_result)} mapped to {formatFaultTypeV2(output.fault_type_v2)}.
           </p>
-        </CardHeader>
-        <CardContent className="px-10 md:px-12 pb-12">
-          <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-green-800 mb-2">Action Message</h2>
-            <p className="text-green-900 font-semibold leading-relaxed">{output.action_message}</p>
+        </div>
+
+        <CardContent className="p-8 md:p-12">
+          <div className="bg-green-50/50 border border-green-200 rounded-2xl p-6 md:p-8 mb-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-green-800 mb-3 flex items-center gap-2">
+              <Info className="w-4 h-4" /> Recommended Action
+            </h2>
+            <p className="text-lg md:text-xl text-green-950 font-semibold leading-relaxed">
+              {output.action_message}
+            </p>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-2">Confidence</h2>
-            <p className="text-slate-800 font-semibold">{confidenceLabel(output.confidence_score)}</p>
+          <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-100">
+            <ConfidencePill score={output.confidence_score} />
           </div>
 
-          {triage.perception.fallback_used ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
-              <h2 className="text-xs font-extrabold uppercase tracking-widest text-amber-800 mb-2">Fallback Interpretation</h2>
-              <p className="text-amber-900 font-semibold">Vision model unavailable; using fallback interpretation.</p>
-            </div>
-          ) : null}
-
-          {output.required_proof_next ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
-              <h2 className="text-xs font-extrabold uppercase tracking-widest text-amber-800 mb-2">Required Proof</h2>
-              <p className="text-amber-900 font-semibold leading-relaxed">{output.required_proof_next}</p>
-            </div>
-          ) : null}
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8">
-            <h2 className="text-xs font-extrabold uppercase tracking-widest text-slate-500 mb-2">Safety Note</h2>
-            <p className="text-slate-700 font-medium">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 mb-8">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" /> Safety Note
+            </h2>
+            <p className="text-slate-700 font-medium leading-relaxed">
               Do not open electrical panels beyond the requested photo evidence. Escalate if there is repeated tripping,
               visible damage, smell, heat, or uncertainty.
             </p>
@@ -98,13 +85,13 @@ export default function SafeGuidance() {
           <Button
             id="guidance-confirm-btn"
             onClick={() => router.push("/confirmation")}
-            className="w-full h-14 rounded-xl font-bold"
+            className="w-full h-14 rounded-xl font-bold bg-green-700 hover:bg-green-800 text-lg shadow-sm"
             size="lg"
           >
             Close Case and Report
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

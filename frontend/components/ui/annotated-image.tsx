@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 
 export type Annotation = {
   id: string;
@@ -16,10 +15,12 @@ export function AnnotatedImage({
   src,
   alt = "Incident Photo",
   annotations = [],
+  className = "",
 }: {
   src: string;
   alt?: string;
   annotations?: Annotation[];
+  className?: string;
 }) {
   const [hoveredAnnotation, setHoveredAnnotation] = useState<string | null>(null);
 
@@ -27,7 +28,7 @@ export function AnnotatedImage({
   const [imgSrc, setImgSrc] = useState(src);
 
   return (
-    <div className="relative overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-sm w-full h-[300px]">
+    <div className={`relative overflow-hidden rounded-md border border-slate-200 bg-slate-100 shadow-sm w-full h-[300px] ${className}`}>
       {/* Fallback to simple img tag for generic support, but can use next/image if configured */}
       <img
         src={imgSrc}

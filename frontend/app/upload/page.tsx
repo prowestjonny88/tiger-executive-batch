@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Power, Zap, Image as ImageIcon, CheckCircle2 } from "lucide-react";
 
-import svgPaths from "../../imports/2PhotoUpload/svg-cwyu35rr3g";
 import {
   fetchPreview,
   fetchScenarios,
@@ -18,22 +18,33 @@ import {
 } from "../../lib/api";
 import { clearSession, writeSession } from "../../lib/triage-session";
 
+import { PageShell } from "../../components/layout/page-shell";
+import { UploadDropzone } from "../../components/triage/upload-dropzone";
+import { CaptureTipCard } from "../../components/triage/capture-tip-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Card } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Label } from "../../components/ui/label";
+import { Button } from "../../components/ui/button";
+
 type UploadState = "idle" | "uploading" | "previewing" | "done" | "error";
 type Mode = "manual" | "demo";
 
 export default function PhotoUpload() {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<Mode>("manual");
   const [state, setState] = useState<UploadState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [fileName, setFileName] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [chargerId, setChargerId] = useState("");
   const [symptomText, setSymptomText] = useState("");
   const [errorCode, setErrorCode] = useState("");
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
+
+  const showExpected = process.env.NEXT_PUBLIC_SHOW_DEMO_EXPECTED === "true";
 
   useEffect(() => {
     fetchScenarios()
@@ -46,15 +57,9 @@ export default function PhotoUpload() {
       });
   }, []);
 
-  const handleFile = (file: File) => {
-    setFileName(file.name);
+  const handleFile = (selectedFile: File) => {
+    setFile(selectedFile);
     setErrorMsg("");
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file) handleFile(file);
   };
 
   const handleContinue = async () => {
@@ -117,13 +122,12 @@ export default function PhotoUpload() {
       }
 
       let photoEvidence = undefined;
-      const files = fileInputRef.current?.files;
-      if (files && files[0]) {
-        const uploaded = await uploadIncidentPhoto(files[0]);
+      if (file) {
+        const uploaded = await uploadIncidentPhoto(file);
         photoEvidence = uploaded;
       }
 
-      const photoHint = fileName ? `Photo: ${fileName}` : "";
+      const photoHint = file ? `Photo: ${file.name}` : "";
       writeSession({
         siteId,
         chargerId: chargerId || undefined,
@@ -182,212 +186,146 @@ export default function PhotoUpload() {
           : "";
 
   const selectedScenario = scenarios.find((item) => item.scenario_id === selectedScenarioId);
-  const observationColors: Record<string, string> = {
-    charger_red_light: "bg-red-50 border-red-300 text-red-700",
-    charger_blinking_red_light: "bg-amber-50 border-amber-300 text-amber-800",
-    charger_no_light: "bg-slate-100 border-slate-300 text-slate-700",
-    mcb_tripped: "bg-amber-50 border-amber-300 text-amber-800",
-    missing_mcb_rccb: "bg-red-50 border-red-300 text-red-700",
-    wrong_component_specs: "bg-red-50 border-red-300 text-red-700",
-    isolator_off_open_circuit: "bg-blue-50 border-blue-300 text-blue-800",
-    unknown: "bg-slate-100 border-slate-300 text-slate-700",
-  };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16 relative">
-      <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-8 md:p-12 w-full flex flex-col relative overflow-hidden">
-        <div className="absolute right-0 top-0 pointer-events-none opacity-90">
-          <svg className="w-32 h-32" fill="none" viewBox="0 0 128 128">
-            <g clipPath="url(#clip0_2_800)">
-              <path d="M0 0H128V128L0 0" fill="#006E28" />
-            </g>
-            <defs>
-              <clipPath id="clip0_2_800">
-                <rect fill="white" height="128" width="128" />
-              </clipPath>
-            </defs>
-          </svg>
-        </div>
-
-        <div className="mb-8 relative z-10">
-          <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Report a Charger Issue</h1>
-          <p className="text-slate-600 text-lg">Upload a photo or use a demo scenario to get a live triage result.</p>
-        </div>
-
-        <div className="flex gap-2 mb-8 bg-slate-100 rounded-lg p-1">
-          <button
-            onClick={() => setMode("manual")}
-            className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${mode === "manual" ? "bg-white shadow text-slate-900" : "text-slate-600 hover:text-slate-800"}`}
-          >
-            Upload Photo
-          </button>
-          <button
-            id="demo-mode-toggle"
-            onClick={() => setMode("demo")}
-            className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${mode === "demo" ? "bg-white shadow text-slate-900" : "text-slate-600 hover:text-slate-800"}`}
-          >
-            Demo Scenario
-          </button>
-        </div>
-
-        {mode === "demo" ? (
-          <div className="mb-8">
-            <label className="block text-xs font-bold uppercase tracking-widest text-slate-700 mb-3">
-              Select a Pre-Seeded Scenario
-            </label>
-            <div className="flex flex-col gap-3">
-              {scenarios.length === 0 ? (
-                <p className="text-slate-500 text-sm">Loading scenarios... (requires backend at http://127.0.0.1:8001)</p>
-              ) : (
-                scenarios.map((scenario) => (
-                  <button
-                    key={scenario.scenario_id}
-                    onClick={() => setSelectedScenarioId(scenario.scenario_id)}
-                    className={`w-full text-left rounded-xl border-2 p-5 transition-all ${
-                      selectedScenarioId === scenario.scenario_id
-                        ? "border-green-500 bg-green-50 shadow-sm"
-                        : "border-slate-200 bg-slate-50 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="font-bold text-slate-900 mb-1">{scenario.name}</p>
-                        <p className="text-slate-600 text-sm">{scenario.headline}</p>
-                        <p className="text-slate-500 text-xs mt-1 font-mono">ERR: {scenario.error_code}</p>
-                      </div>
-                      <span className={`text-[10px] font-extrabold uppercase tracking-widest border rounded-md px-2 py-1 whitespace-nowrap flex-shrink-0 ${observationColors[scenario.expected_observation_result] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                        {formatObservationResult(scenario.expected_observation_result)}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 text-xs mt-2">
-                      {formatInputComponent(scenario.expected_input_component)} | {formatFaultTypeV2(scenario.expected_fault_type_v2)} | {formatRecipientType(scenario.expected_recipient_type)}
-                    </p>
-                  </button>
-                ))
-              )}
-            </div>
+    <PageShell maxWidth="3xl">
+      <Card className="p-8 md:p-12 border-slate-200 shadow-sm rounded-2xl w-full flex flex-col overflow-hidden bg-white">
+        
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Zap className="w-8 h-8 text-green-700" />
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Report an EV Charger Issue</h1>
           </div>
-        ) : (
-          <>
-            <div
-              className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center min-h-[160px] p-8 relative mb-6 transition-colors hover:bg-slate-100 hover:border-green-400 group cursor-pointer"
-              onDrop={handleDrop}
-              onDragOver={(event) => event.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <div className="bg-slate-200 text-green-700 w-14 h-14 flex flex-col items-center justify-center rounded-xl mb-3 group-hover:bg-green-100 transition-colors shadow-sm">
-                <svg className="w-7 h-7" fill="none" viewBox="0 0 30 27">
-                  <path d={svgPaths.p177cbc00} fill="currentColor" />
-                </svg>
-              </div>
-              {fileName ? (
-                <p className="font-bold text-slate-900 text-base mb-1">{fileName}</p>
-              ) : (
-                <>
-                  <p className="font-semibold text-slate-900 text-base mb-1">Tap to capture or upload</p>
-                  <p className="text-slate-500 text-sm">JPEG, PNG up to 10MB</p>
-                </>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) handleFile(file);
-                }}
-              />
-            </div>
+          <p className="text-slate-600 text-lg">
+            Upload a photo of your charger, EVDB, or isolator. We'll identify the issue and guide you to the next step.
+          </p>
+        </div>
 
-            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-700 mb-1">Charger ID</label>
-                <input
-                  type="text"
+        <Tabs value={mode} onValueChange={(val) => setMode(val as Mode)} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100 p-1 rounded-xl">
+            <TabsTrigger value="manual" className="rounded-lg text-base">Upload Photo</TabsTrigger>
+            <TabsTrigger value="demo" className="rounded-lg text-base">Demo Scenario</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="manual" className="space-y-8">
+            <UploadDropzone
+              onFileSelect={handleFile}
+              fileName={file?.name}
+              className="bg-slate-50 hover:bg-slate-50/80"
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="chargerId" className="text-xs font-bold uppercase tracking-widest text-slate-500">Charger ID (Optional)</Label>
+                <Input
+                  id="chargerId"
                   placeholder="e.g. RX-2049-A"
                   value={chargerId}
-                  onChange={(event) => setChargerId(event.target.value)}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-3 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all shadow-inner text-sm"
+                  onChange={(e) => setChargerId(e.target.value)}
+                  className="bg-slate-50 border-slate-200 text-base py-6"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-700 mb-1">Error Code</label>
-                <input
-                  type="text"
+              <div className="space-y-2">
+                <Label htmlFor="errorCode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Error Code / App Code (Optional)</Label>
+                <Input
+                  id="errorCode"
                   placeholder="e.g. E-04"
                   value={errorCode}
-                  onChange={(event) => setErrorCode(event.target.value)}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-3 font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all shadow-inner text-sm"
+                  onChange={(e) => setErrorCode(e.target.value)}
+                  className="bg-slate-50 border-slate-200 text-base py-6"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-700 mb-1">Describe the Issue</label>
-                <textarea
-                  placeholder="e.g. Charger not responding, lights off, vehicle not pairing..."
+              <div className="md:col-span-2 space-y-2">
+                <Label htmlFor="symptom" className="text-xs font-bold uppercase tracking-widest text-slate-500">Describe the Issue</Label>
+                <Textarea
+                  id="symptom"
+                  placeholder="e.g. Charger not responding, lights off..."
                   value={symptomText}
-                  onChange={(event) => setSymptomText(event.target.value)}
-                  rows={2}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-lg px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:bg-white transition-all shadow-inner text-sm resize-none"
+                  onChange={(e) => setSymptomText(e.target.value)}
+                  className="bg-slate-50 border-slate-200 min-h-[100px] text-base resize-none"
                 />
               </div>
             </div>
 
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-px bg-slate-300 w-6"></div>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-600">Capture Tips</h3>
-                <div className="h-px bg-slate-300 flex-1"></div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="h-px bg-slate-200 flex-1"></div>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500">Helpful tips</h3>
+                <div className="h-px bg-slate-200 flex-1"></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
-                  <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 15 13.5"><path d={svgPaths.p19c07780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Charger: indicator and serial label</span>
-                </div>
-                <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
-                  <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 13.5 13.5"><path d={svgPaths.p2d5bbe80} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">EVDB: MCB/RCCB labels clearly</span>
-                </div>
-                <div className="bg-slate-50 border-l-4 border-green-400 rounded-md p-3 flex items-center gap-3 shadow-sm">
-                  <svg className="w-5 h-5 text-green-800 flex-shrink-0" fill="none" viewBox="0 0 16.5 16.5"><path d={svgPaths.p33c29780} fill="currentColor" /></svg>
-                  <span className="text-sm font-semibold text-slate-800">Isolator: ON/OFF switch clearly</span>
-                </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CaptureTipCard icon={<ImageIcon className="w-5 h-5" />} text="Charger: indicator and serial label" />
+                <CaptureTipCard icon={<Power className="w-5 h-5" />} text="EVDB: MCB/RCCB labels clearly" />
+                <CaptureTipCard icon={<Zap className="w-5 h-5" />} text="Isolator: ON/OFF switch clearly" />
               </div>
             </div>
-          </>
-        )}
+          </TabsContent>
 
-        {statusLabel ? (
-          <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${state === "error" ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-800 border border-green-200"}`}>
-            {state !== "error" ? <span className="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse" /> : null}
+          <TabsContent value="demo" className="space-y-8">
+            <div className="space-y-4">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Select a Pre-Seeded Scenario</Label>
+              <div className="flex flex-col gap-3">
+                {scenarios.length === 0 ? (
+                  <p className="text-slate-500">Loading scenarios...</p>
+                ) : (
+                  scenarios.map((scenario) => (
+                    <button
+                      key={scenario.scenario_id}
+                      onClick={() => setSelectedScenarioId(scenario.scenario_id)}
+                      className={`w-full text-left rounded-xl border-2 p-5 transition-all focus:outline-none ${
+                        selectedScenarioId === scenario.scenario_id
+                          ? "border-green-600 bg-green-50/50 shadow-sm"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-bold text-slate-900 text-lg mb-1">{scenario.name}</p>
+                          <p className="text-slate-600 mb-1">{scenario.symptom_text || scenario.headline}</p>
+                        </div>
+                        {selectedScenarioId === scenario.scenario_id && (
+                          <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0" />
+                        )}
+                      </div>
+                      
+                      {showExpected && (
+                        <div className="mt-4 pt-4 border-t border-slate-200/60">
+                          <p className="text-xs font-mono text-slate-500">
+                            EXPECTED: {formatObservationResult(scenario.expected_observation_result)} | {formatFaultTypeV2(scenario.expected_fault_type_v2)}
+                          </p>
+                        </div>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {statusLabel && (
+          <div className={`mt-8 px-4 py-3 rounded-lg text-sm font-medium ${state === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"}`}>
+            {state !== "error" && <span className="inline-block w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse" />}
             {statusLabel}
           </div>
-        ) : null}
+        )}
 
-        {mode === "demo" && selectedScenario ? (
-          <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-slate-50 border border-slate-200 text-slate-700">
-            <span className="font-bold">Ready to run: </span>
-            {selectedScenario.headline} | {formatObservationResult(selectedScenario.expected_observation_result)} |{" "}
-            {formatRecipientType(selectedScenario.expected_recipient_type)}
-          </div>
-        ) : null}
-
-        <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-          <button
-            id="upload-continue-btn"
-            onClick={() => void handleContinue()}
+        <div className="mt-8 pt-6 border-t border-slate-100">
+          <Button
+            size="lg"
+            onClick={handleContinue}
             disabled={isBusy || (mode === "demo" && !selectedScenarioId)}
-            className="bg-green-700 hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg py-4 px-6 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-3 w-full"
+            className="w-full h-14 text-lg font-bold bg-green-700 hover:bg-green-800 text-white rounded-xl shadow-sm"
           >
-            {isBusy ? "Processing..." : mode === "demo" ? "Run Demo Triage" : "Continue"}
-            {!isBusy ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 13.3333 13.3333">
-                <path d={svgPaths.p32510800} fill="currentColor" />
-              </svg>
-            ) : null}
-          </button>
+            {isBusy ? "Processing..." : "Continue"}
+          </Button>
         </div>
-      </div>
-    </div>
+        
+        <div className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-500 font-medium">
+          <CheckCircle2 className="w-4 h-4 text-green-600" /> Safe routing guaranteed
+        </div>
+      </Card>
+    </PageShell>
   );
 }

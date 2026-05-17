@@ -2,23 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Headphones, AlertCircle, Info } from "lucide-react";
 
-import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Card, CardContent } from "../../components/ui/card";
 import { ApiTriageResponse, formatFaultTypeV2, formatObservationResult } from "../../lib/api";
 import { readSession } from "../../lib/triage-session";
-
-function percent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function confidenceLabel(value: number) {
-  if (value >= 0.75) return `High confidence (${percent(value)})`;
-  if (value >= 0.55) return `Medium confidence (${percent(value)})`;
-  return `Low confidence - system needs more proof (${percent(value)})`;
-}
+import { PageShell } from "../../components/layout/page-shell";
+import { ConfidencePill } from "../../components/triage/confidence-pill";
 
 export default function Escalation() {
   const [triage, setTriage] = useState<ApiTriageResponse | null>(null);
@@ -33,82 +24,93 @@ export default function Escalation() {
   if (!loaded) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <p className="text-slate-500 text-sm">Loading after-sales routing...</p>
+        <p className="text-slate-500 font-medium animate-pulse">Loading after-sales routing...</p>
       </div>
     );
   }
 
   if (!triage) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh]">
-        <p className="text-slate-500 text-sm">No after-sales record available.</p>
-      </div>
+      <PageShell maxWidth="3xl">
+        <Card className="w-full shadow-sm border-slate-200 p-10 text-center rounded-2xl bg-white">
+          <p className="text-slate-500 font-medium">No after-sales record available.</p>
+        </Card>
+      </PageShell>
     );
   }
 
   const output = triage.competition_output;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-3xl mx-auto px-6 py-16">
-      <Card className="w-full overflow-hidden shadow-xl border-slate-200">
-        <div className="bg-amber-50 border-b border-amber-200 p-6 px-8 flex justify-between items-center w-full">
-          <Badge variant="warning" className="font-bold text-[10px] uppercase tracking-widest px-3 py-1">
-            Message routed to After-sales Team: {output.assigned_team_id || "AS_TEAM_01"}
-          </Badge>
-          <div className="font-mono text-slate-700 text-sm font-semibold tracking-wider">
+    <PageShell maxWidth="3xl">
+      <Card className="w-full shadow-sm border-slate-200 rounded-2xl overflow-hidden bg-white">
+        <div className="bg-amber-50/50 border-b border-amber-100 p-8 md:p-10 text-center">
+          <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mb-6">
+            <Headphones className="w-8 h-8" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
+            Routed to {output.assigned_team_id || "After-sales Team"}
+          </h1>
+          <p className="text-lg text-slate-600 max-w-lg mx-auto">
+            {formatObservationResult(output.observation_result)} requires {formatFaultTypeV2(output.fault_type_v2).toLowerCase()} handling.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-amber-700 font-mono font-bold tracking-wider bg-white px-4 py-2 rounded-lg border border-amber-200 w-fit mx-auto">
             INC-{triage.incident_id}
           </div>
         </div>
 
-        <CardHeader className="p-10 md:p-12 text-center">
-          <CardTitle className="text-3xl font-extrabold tracking-tight">
-            Routed to {output.assigned_team_id || "After-sales Team"}
-          </CardTitle>
-          <p className="text-slate-600 mt-3">
-            {formatObservationResult(output.observation_result)} requires {formatFaultTypeV2(output.fault_type_v2).toLowerCase()} handling.
-          </p>
-        </CardHeader>
-
-        <CardContent className="px-10 md:px-12 pb-12">
-          <Alert className="border-l-4 border-amber-500 rounded-xl mb-6">
-            <AlertTitle className="text-xs font-bold uppercase tracking-widest mb-2">Team Message</AlertTitle>
-            <AlertDescription className="font-bold text-slate-800">
+        <CardContent className="p-8 md:p-12">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 md:p-8 mb-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-amber-800 mb-3 flex items-center gap-2">
+              <Info className="w-4 h-4" /> Team Message
+            </h2>
+            <p className="text-lg md:text-xl text-amber-950 font-semibold leading-relaxed">
               {output.action_message}
-            </AlertDescription>
-          </Alert>
+            </p>
+          </div>
 
-          {triage.perception.fallback_used ? (
-            <Alert className="border-l-4 border-amber-500 rounded-xl mb-6">
-              <AlertTitle className="text-xs font-bold uppercase tracking-widest mb-2">Fallback Interpretation</AlertTitle>
-              <AlertDescription className="font-semibold text-slate-800">
-                Vision model unavailable; using fallback interpretation.
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-100">
+            <ConfidencePill score={output.confidence_score} />
+          </div>
 
-          {output.required_proof_next ? (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-6">
+          {triage.perception.fallback_used && (
+            <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-amber-800 text-xs uppercase tracking-widest font-extrabold block mb-0.5">
+                  Fallback Mode
+                </strong>
+                <p className="text-amber-800 text-sm font-medium">
+                  Vision model unavailable; using fallback interpretation.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {output.required_proof_next && (
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 mb-8">
               <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Required Proof</h4>
               <p className="text-slate-800 font-medium">{output.required_proof_next}</p>
             </div>
-          ) : null}
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
               <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Rule Key</h4>
-              <p className="text-slate-800 font-medium">{triage.debug.rule_key || "unknown"}</p>
+              <p className="text-slate-800 font-medium font-mono">{triage.debug.rule_key || "unknown"}</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
               <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Confidence</h4>
-              <p className="text-slate-800 font-medium">{confidenceLabel(output.confidence_score)}</p>
+              <p className="text-slate-800 font-medium">{Math.round(output.confidence_score * 100)}%</p>
             </div>
           </div>
 
           <details className="mb-8 bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-widest text-slate-500">
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
               Advanced Debug
             </summary>
-            <pre className="mt-3 whitespace-pre-wrap break-words text-xs text-slate-600">
+            <pre className="mt-4 whitespace-pre-wrap break-words text-xs text-slate-600 font-mono">
               {JSON.stringify(
                 {
                   rule_key: triage.debug.rule_key,
@@ -117,16 +119,16 @@ export default function Escalation() {
                   perception_error_type: triage.perception.error_type,
                 },
                 null,
-                2,
+                2
               )}
             </pre>
           </details>
 
-          <Button asChild size="lg" className="w-full h-14 rounded-xl font-bold">
+          <Button asChild size="lg" className="w-full h-14 rounded-xl font-bold bg-green-700 hover:bg-green-800 text-lg shadow-sm">
             <Link href="/confirmation">Confirm Routing</Link>
           </Button>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
