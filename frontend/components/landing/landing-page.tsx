@@ -42,15 +42,18 @@ const navItems = [
 ];
 
 const images = {
-  hero: "/landing/hero-ev-charger-wall.jpg",
-  charger: "/landing/card-charger-unit.jpg",
-  evdb: "/landing/card-evdb.jpg",
-  isolator: "/landing/card-isolator.jpg",
-  preview: "/landing/preview-evdb-case.jpg",
-  proof: "/landing/proof-closeup-photo.jpg",
-  noLight: "/landing/case-charger-no-light.jpg",
-  isolatorOff: "/landing/case-isolator-off.jpg",
+  hero: "/landing/hero-ev-charger-wall.png",
+  charger: "/landing/card-charger-unit.png",
+  evdb: "/landing/card-evdb.png",
+  isolator: "/landing/card-isolator.png",
+  preview: "/landing/preview-evdb-case.png",
+  proof: "/landing/proof-closeup-photo.png",
+  noLight: "/landing/case-charger-no-light.png",
+  isolatorOff: "/landing/case-isolator-off.png",
   mockDashboard: "/landing/mock-dashboard-result.png",
+  darkTexture: "/landing/bg-dark-charger-texture.png",
+  arrows: "/landing/rex-green-arrows.svg",
+  circuit: "/landing/bg-circuit-lines.svg",
 };
 
 function PillCta({ href, children, dark = false }: { href: string; children: React.ReactNode; dark?: boolean }) {
@@ -190,7 +193,7 @@ function HeroSection() {
       <motion.img
         src={images.hero}
         alt="EV charger mounted on a wall"
-        className="absolute inset-0 h-full w-full object-cover opacity-75"
+        className="absolute inset-0 h-full w-full object-cover object-[center_right] opacity-75"
         initial={{ scale: 1 }}
         animate={{ scale: 1.06 }}
         transition={{ duration: 14, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
@@ -241,6 +244,12 @@ function HeroSection() {
           </div>
         </motion.div>
       </div>
+      <img
+        src={images.arrows}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-10 right-10 z-10 hidden w-28 opacity-75 lg:block"
+      />
       <ScrollDots />
     </section>
   );
@@ -318,8 +327,14 @@ function ProblemSection() {
   ];
 
   return (
-    <SectionFrame className="landing-section bg-[var(--rex-bg-soft)]">
-      <div className="landing-container grid gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+    <SectionFrame className="landing-section relative overflow-hidden bg-[var(--rex-bg-soft)]">
+      <img
+        src={images.circuit}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute right-0 top-0 hidden h-full w-1/2 object-cover opacity-[0.06] lg:block"
+      />
+      <div className="landing-container relative z-10 grid gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <motion.div {...fadeUp}>
           <p className="landing-kicker mb-4">Field support problem</p>
           <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)] md:text-5xl">Manual troubleshooting slows down simple fixes.</h2>
@@ -352,6 +367,12 @@ function WorkflowSection() {
     <SectionFrame id="workflow" className="landing-section bg-white">
       <div className="landing-container">
         <SectionIntro kicker="Workflow" title="Upload -> Observe -> Classify -> Route" />
+        <img
+          src={images.arrows}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none mx-auto -mt-5 mb-8 w-20 opacity-70 md:w-28"
+        />
         <div className="relative grid gap-6 md:grid-cols-4">
           <div className="absolute left-0 right-0 top-12 hidden h-px bg-[var(--rex-line)] md:block" />
           <div className="absolute left-0 top-12 hidden h-px w-2/3 bg-[var(--rex-green)] md:block" />
@@ -533,9 +554,15 @@ function MvpAlignmentSection() {
   const outputs = ["Observation Result", "Serial + Brand/Model", "Fault Type", "Customer / After-sales Routing"];
 
   return (
-    <SectionFrame className="bg-[var(--rex-bg-soft)] py-16">
-      <div className="landing-container">
-        <motion.div {...fadeUp} className="grid gap-8 rounded-[28px] bg-white p-8 shadow-sm lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+    <SectionFrame className="relative overflow-hidden bg-[var(--rex-bg-soft)] py-16">
+      <img
+        src={images.circuit}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 hidden w-1/3 object-cover opacity-[0.055] lg:block"
+      />
+      <div className="landing-container relative z-10">
+        <motion.div {...fadeUp} className="grid gap-8 rounded-[28px] bg-white/95 p-8 shadow-sm lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div>
             <p className="landing-kicker mb-4">Theme 2 MVP</p>
             <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)]">Built for Theme 2&apos;s required outputs.</h2>
@@ -557,16 +584,29 @@ function MvpAlignmentSection() {
 
 function FinalCtaSection() {
   return (
-    <SectionFrame className="relative overflow-hidden bg-white py-24 text-center md:py-32">
+    <SectionFrame className="relative overflow-hidden bg-[var(--rex-dark)] py-24 text-center text-white md:py-32">
+      <img
+        src={images.darkTexture}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.45]"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,8,7,0.92)_0%,rgba(5,8,7,0.76)_48%,rgba(5,8,7,0.48)_100%)]" />
+      <img
+        src={images.arrows}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-10 right-10 hidden w-24 opacity-80 md:block"
+      />
       <div className="landing-container relative z-10">
         <motion.div {...fadeUp} className="mx-auto max-w-3xl">
-          <p className="landing-kicker mb-4">Start report</p>
-          <h2 className="text-4xl font-extrabold leading-tight text-[var(--rex-charcoal)] md:text-6xl">Start a guided charger fault report.</h2>
-          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-[var(--rex-muted)]">Open the dashboard, upload evidence, and generate a structured support result.</p>
+          <p className="mb-4 text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--rex-green)]">Start report</p>
+          <h2 className="text-4xl font-extrabold leading-tight md:text-6xl">Start a guided charger fault report.</h2>
+          <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-white/72">Open the dashboard, upload evidence, and generate a structured support result.</p>
           <div className="mt-9">
             <PillCta href="/upload">Go to Dashboard</PillCta>
           </div>
-          <p className="mt-5 text-sm font-semibold text-[var(--rex-muted)]">Demo mode is available for judge walkthroughs.</p>
+          <p className="mt-5 text-sm font-semibold text-white/62">Demo mode is available for judge walkthroughs.</p>
         </motion.div>
       </div>
     </SectionFrame>

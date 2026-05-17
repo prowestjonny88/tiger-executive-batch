@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <pattern id="circuitPattern" x="0" y="0" width="320" height="220" patternUnits="userSpaceOnUse">
+      <g stroke="#16B856" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.14">
+        <path d="M24 54H92V28H152"/>
+        <path d="M152 28V84H218"/>
+        <path d="M218 84V138H278"/>
+        <path d="M50 170H120V138H178"/>
+        <path d="M178 138V184H248V154H296"/>
+        <path d="M104 28V84H58V126"/>
+        <path d="M248 154V98H292"/>
+        <path d="M120 138V102H168"/>
+      </g>
+
+      <g fill="#16B856" opacity="0.18">
+        <circle cx="24" cy="54" r="2.2"/>
+        <circle cx="92" cy="54" r="2.2"/>
+        <circle cx="92" cy="28" r="2.2"/>
+        <circle cx="152" cy="28" r="2.6"/>
+        <circle cx="152" cy="84" r="2.2"/>
+        <circle cx="218" cy="84" r="2.6"/>
+        <circle cx="218" cy="138" r="2.2"/>
+        <circle cx="278" cy="138" r="2.2"/>
+        <circle cx="50" cy="170" r="2.2"/>
+        <circle cx="120" cy="170" r="2.2"/>
+        <circle cx="120" cy="138" r="2.6"/>
+        <circle cx="178" cy="138" r="2.6"/>
+        <circle cx="178" cy="184" r="2.2"/>
+        <circle cx="248" cy="184" r="2.2"/>
+        <circle cx="248" cy="154" r="2.6"/>
+        <circle cx="296" cy="154" r="2.2"/>
+        <circle cx="104" cy="28" r="2.2"/>
+        <circle cx="104" cy="84" r="2.2"/>
+        <circle cx="58" cy="84" r="2.2"/>
+        <circle cx="58" cy="126" r="2.2"/>
+        <circle cx="248" cy="98" r="2.2"/>
+        <circle cx="292" cy="98" r="2.2"/>
+        <circle cx="120" cy="102" r="2.2"/>
+        <circle cx="168" cy="102" r="2.2"/>
+      </g>
+
+      <g stroke="#16B856" stroke-width="0.9" opacity="0.08">
+        <path d="M8 206H74"/>
+        <path d="M236 14H312"/>
+        <path d="M282 202H314"/>
+        <path d="M8 14H46"/>
+      </g>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#circuitPattern)"/>
+</svg>
