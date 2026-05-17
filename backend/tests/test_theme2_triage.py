@@ -157,6 +157,28 @@ def test_followups_request_evdb_proof_for_phase_observation():
         assert "evdb_label_closeup" in {item.question_id for item in prompts}
 
 
+def test_followups_do_not_request_evdb_proof_when_specs_are_complete_and_correct():
+    prompts = build_theme2_followups(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB labels readable"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="evdb_three_phase",
+                evdb_phase_type="three_phase",
+                mcb_current_amp=40,
+                rccb_current_amp=40,
+                mcb_poles="4p",
+                rccb_poles="4p",
+                rccb_type="type_a",
+                evdb_spec_status="correct",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    assert "evdb_label_closeup" not in {item.question_id for item in prompts}
+
+
 def test_followups_request_isolator_switch_state_when_unknown():
     prompts = build_theme2_followups(
         IncidentInput(site_id="site-mall-01", photo_hint="isolator visible"),

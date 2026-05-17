@@ -49,7 +49,17 @@ _GEMINI_RESPONSE_SCHEMA = {
         "rccb_visible": {"type": "boolean", "nullable": True},
         "mcb_rating": {"type": "string", "nullable": True},
         "rccb_rating": {"type": "string", "nullable": True},
+        "mcb_current_amp": {"type": "integer", "nullable": True},
+        "rccb_current_amp": {"type": "integer", "nullable": True},
+        "mcb_poles": {"type": "string"},
+        "rccb_poles": {"type": "string"},
+        "mcb_brand_model": {"type": "string", "nullable": True},
+        "rccb_brand_model": {"type": "string", "nullable": True},
         "rccb_type": {"type": "string"},
+        "rccb_type_evidence": {"type": "string"},
+        "rccb_symbol_description": {"type": "string", "nullable": True},
+        "charger_brand_source": {"type": "string"},
+        "evdb_spec_status": {"type": "string"},
         "isolator_state": {"type": "string"},
         "raw_visible_text": {"type": "array", "items": {"type": "string"}},
     },
@@ -72,7 +82,17 @@ _GEMINI_RESPONSE_SCHEMA = {
         "rccb_visible",
         "mcb_rating",
         "rccb_rating",
+        "mcb_current_amp",
+        "rccb_current_amp",
+        "mcb_poles",
+        "rccb_poles",
+        "mcb_brand_model",
+        "rccb_brand_model",
         "rccb_type",
+        "rccb_type_evidence",
+        "rccb_symbol_description",
+        "charger_brand_source",
+        "evdb_spec_status",
         "isolator_state",
         "raw_visible_text",
     ],
@@ -192,6 +212,45 @@ def _normalize_rccb_type(value: object) -> str:
     return "unknown"
 
 
+def _normalize_poles(value: object) -> str:
+    text = str(value or "").strip().lower().replace("-", "").replace(" ", "")
+    if text in {"1p", "1pole", "singlepole"}:
+        return "1p"
+    if text in {"2p", "2pole", "doublepole"}:
+        return "2p"
+    if text in {"3p", "3pole", "triplepole"}:
+        return "3p"
+    if text in {"4p", "4pole", "fourpole"}:
+        return "4p"
+    match = re.search(r"\b([1-4])\s*p(?:ole)?\b", str(value or ""), flags=re.IGNORECASE)
+    return f"{match.group(1)}p" if match else "unknown"
+
+
+def _normalize_optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        number = int(float(str(value).strip().replace("A", "").replace("a", "")))
+    except (TypeError, ValueError):
+        return None
+    return number if 0 < number <= 250 else None
+
+
+def _normalize_evidence_source(value: object) -> str:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return text if text in {"text_label", "symbol_only", "mixed", "unknown"} else "unknown"
+
+
+def _normalize_brand_source(value: object) -> str:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return text if text in {"text_label", "logo_text", "mixed", "unknown"} else "unknown"
+
+
+def _normalize_evdb_spec_status(value: object) -> str:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return text if text in {"correct", "wrong", "missing", "incomplete", "unknown"} else "unknown"
+
+
 def _normalize_isolator_state(value: object) -> str:
     text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
     if text in {"on", "closed", "closed_circuit"}:
@@ -252,9 +311,20 @@ def _contains_token(text: str, token: str) -> bool:
 
 
 def _extract_rating(text: str, component: str) -> str | None:
-    pattern = rf"\b{component}\b[^.;,\n]*?(\d{{1,3}}\s*a(?:\s*(?:2p|4p))?)"
+    pattern = rf"\b{component}\b[^.;,\n/\\]{{0,80}}?(\d{{1,3}}\s*a(?:\s*(?:1p|2p|3p|4p))?)"
     match = re.search(pattern, text, flags=re.IGNORECASE)
     return match.group(1).strip() if match else None
+
+
+def _extract_current_amp(text: str | None) -> int | None:
+    if not text:
+        return None
+    match = re.search(r"\b(?:c)?(\d{1,3})\s*a?\b", text, flags=re.IGNORECASE)
+    return _normalize_optional_int(match.group(1)) if match else None
+
+
+def _extract_poles(text: str | None) -> str:
+    return _normalize_poles(text)
 
 
 def _extract_serial_number(text: str) -> str | None:
@@ -279,6 +349,8 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         or _normalize_list(theme_data.get("visible_text"))
         or _normalize_list(theme_data.get("ocr_findings"))
     )
+    mcb_rating = _clean_optional_text(theme_data.get("mcb_rating"))
+    rccb_rating = _clean_optional_text(theme_data.get("rccb_rating"))
     return Theme2VisualExtraction(
         input_component=_normalize_input_component(theme_data.get("input_component")),  # type: ignore[arg-type]
         observation_result=_normalize_observation_result(theme_data.get("observation_result")),  # type: ignore[arg-type]
@@ -288,9 +360,19 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         evdb_phase_type=_normalize_phase_type(theme_data.get("evdb_phase_type")),  # type: ignore[arg-type]
         mcb_visible=_normalize_optional_bool(theme_data.get("mcb_visible")),
         rccb_visible=_normalize_optional_bool(theme_data.get("rccb_visible")),
-        mcb_rating=_clean_optional_text(theme_data.get("mcb_rating")),
-        rccb_rating=_clean_optional_text(theme_data.get("rccb_rating")),
+        mcb_rating=mcb_rating,
+        rccb_rating=rccb_rating,
+        mcb_current_amp=_normalize_optional_int(theme_data.get("mcb_current_amp")) or _extract_current_amp(mcb_rating),
+        rccb_current_amp=_normalize_optional_int(theme_data.get("rccb_current_amp")) or _extract_current_amp(rccb_rating),
+        mcb_poles=_normalize_poles(theme_data.get("mcb_poles")) if theme_data.get("mcb_poles") is not None else _extract_poles(mcb_rating),  # type: ignore[arg-type]
+        rccb_poles=_normalize_poles(theme_data.get("rccb_poles")) if theme_data.get("rccb_poles") is not None else _extract_poles(rccb_rating),  # type: ignore[arg-type]
+        mcb_brand_model=_clean_optional_text(theme_data.get("mcb_brand_model")),
+        rccb_brand_model=_clean_optional_text(theme_data.get("rccb_brand_model")),
         rccb_type=_normalize_rccb_type(theme_data.get("rccb_type")),  # type: ignore[arg-type]
+        rccb_type_evidence=_normalize_evidence_source(theme_data.get("rccb_type_evidence")),  # type: ignore[arg-type]
+        rccb_symbol_description=_clean_optional_text(theme_data.get("rccb_symbol_description")),
+        charger_brand_source=_normalize_brand_source(theme_data.get("charger_brand_source")),  # type: ignore[arg-type]
+        evdb_spec_status=_normalize_evdb_spec_status(theme_data.get("evdb_spec_status")),  # type: ignore[arg-type]
         isolator_state=_normalize_isolator_state(theme_data.get("isolator_state")),  # type: ignore[arg-type]
         raw_visible_text=raw_visible_text,
         confidence_score=_normalize_confidence(theme_data.get("theme2_confidence_score", theme_data.get("confidence_score")), default_confidence),
@@ -380,6 +462,15 @@ def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float
     brand_model = _extract_brand_model(text)
     if observation == "unknown" and input_component == "charger" and (serial_number or brand_model):
         observation = "charger_serial_brand_visible"
+    mcb_rating = _extract_rating(text, "mcb")
+    rccb_rating = _extract_rating(text, "rccb")
+    evdb_spec_status = "unknown"
+    if observation == "missing_mcb_rccb":
+        evdb_spec_status = "missing"
+    elif observation == "wrong_component_specs":
+        evdb_spec_status = "wrong"
+    elif observation in {"evdb_single_phase", "evdb_three_phase"}:
+        evdb_spec_status = "incomplete"
 
     return Theme2VisualExtraction(
         input_component=input_component,  # type: ignore[arg-type]
@@ -390,9 +481,16 @@ def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float
         evdb_phase_type=evdb_phase_type,  # type: ignore[arg-type]
         mcb_visible=mcb_visible,
         rccb_visible=rccb_visible,
-        mcb_rating=_extract_rating(text, "mcb"),
-        rccb_rating=_extract_rating(text, "rccb"),
+        mcb_rating=mcb_rating,
+        rccb_rating=rccb_rating,
+        mcb_current_amp=_extract_current_amp(mcb_rating),
+        rccb_current_amp=_extract_current_amp(rccb_rating),
+        mcb_poles=_extract_poles(mcb_rating),  # type: ignore[arg-type]
+        rccb_poles=_extract_poles(rccb_rating),  # type: ignore[arg-type]
         rccb_type=rccb_type,  # type: ignore[arg-type]
+        rccb_type_evidence="text_label" if rccb_type != "unknown" else "unknown",  # type: ignore[arg-type]
+        charger_brand_source="text_label" if brand_model else "unknown",  # type: ignore[arg-type]
+        evdb_spec_status=evdb_spec_status,  # type: ignore[arg-type]
         isolator_state=isolator_state,  # type: ignore[arg-type]
         raw_visible_text=_fallback_ocr_findings(incident),
         confidence_score=confidence_score,
@@ -452,12 +550,23 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "evidence_type, scene_summary, components_visible, visible_abnormalities, ocr_findings, hazard_signals, "
         "uncertainty_notes, confidence_score, input_component, observation_result, charger_serial_number, "
         "charger_brand_model, indicator_status, evdb_phase_type, mcb_visible, rccb_visible, mcb_rating, "
-        "rccb_rating, rccb_type, isolator_state, raw_visible_text.\n"
+        "rccb_rating, mcb_current_amp, rccb_current_amp, mcb_poles, rccb_poles, mcb_brand_model, "
+        "rccb_brand_model, rccb_type, rccb_type_evidence, rccb_symbol_description, charger_brand_source, "
+        "evdb_spec_status, isolator_state, raw_visible_text.\n"
         "Allowed input_component: charger, evdb, isolator, unknown.\n"
         "Allowed observation_result: charger_red_light, charger_blinking_red_light, charger_no_light, "
         "charger_serial_brand_visible, evdb_single_phase, evdb_three_phase, mcb_tripped, missing_mcb_rccb, "
         "wrong_component_specs, isolator_on, isolator_off_open_circuit, unknown.\n"
-        "Do not guess serial number, brand/model, breaker rating, or RCCB type. Use null or unknown when unreadable.\n"
+        "PDF guide EVDB rules: single phase expects MCB 40A 2P and RCCB 40A Type A 2P; "
+        "three phase expects MCB 40A 4P and RCCB 40A Type A 4P. "
+        "RCCB Type AC is wrong for this guide. A sine-wave-only RCCB symbol means Type AC; "
+        "a sine wave plus pulsating DC symbol or readable Type A text means Type A. "
+        "Do not mix MCB and RCCB labels. If a label is blurry, occluded, or unreadable, set numeric/pole/type fields "
+        "to null or unknown and add an uncertainty note. "
+        "Set evdb_spec_status to correct, wrong, missing, incomplete, or unknown based only on readable EVDB evidence. "
+        "For charger identity, extract serial number only from readable serial/SN/ID text and brand/model only from "
+        "readable text or logo text; do not infer brand from shape, color, or styling. "
+        "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
         "Keep arrays short: maximum 5 items per array, maximum 80 characters per item. "
         "Keep scene_summary under 160 characters. Return a complete JSON object with no markdown.\n"
         f"photo_hint: {incident.photo_hint or ''}\n"

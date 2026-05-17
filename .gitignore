@@ -31,6 +31,9 @@ data/datasets/
 data/round2/raw/
 data/round2/images/
 data/round2/video_frames/
+data/round2/video_frame_case_stubs.json
+data/round2/unseen_external/
+data/round2/unseen_external_report.json
 data/round2/pseudo_labels*.jsonl
 data/round2/*.tmp.jsonl
 data/round2/*eval_report*.json

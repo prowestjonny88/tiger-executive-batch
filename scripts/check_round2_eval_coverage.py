@@ -15,15 +15,24 @@ RECOMMENDED_OBSERVATIONS = {
     "charger_no_light": 2,
     "charger_serial_brand_visible": 3,
     "charger_blinking_red_light": 4,
+    "evdb_single_phase": 2,
     "evdb_three_phase": 2,
     "mcb_tripped": 1,
-    "isolator_off_open_circuit": 1,
+    "missing_mcb_rccb": 1,
+    "wrong_component_specs": 1,
+    "isolator_on": 1,
+    "isolator_off_open_circuit": 2,
 }
 
 RECOMMENDED_COMPONENTS = {
     "charger": 8,
-    "evdb": 3,
-    "isolator": 1,
+    "evdb": 7,
+    "isolator": 3,
+}
+
+RECOMMENDED_OCR = {
+    "serial_number_expected": 3,
+    "brand_model_expected": 3,
 }
 
 
@@ -62,10 +71,16 @@ def build_coverage_report(cases: list[dict[str, Any]]) -> dict[str, Any]:
     for observation, minimum in RECOMMENDED_OBSERVATIONS.items():
         if observation_counts.get(observation, 0) < minimum:
             warnings.append(f"observation_expected {observation} has {observation_counts.get(observation, 0)} cases; recommended {minimum}.")
-    if serial_expected_count == 0:
-        warnings.append("serial_number_expected has no non-null exact OCR ground truth cases.")
-    if brand_expected_count == 0:
-        warnings.append("brand_model_expected has no non-null exact OCR ground truth cases.")
+    if serial_expected_count < RECOMMENDED_OCR["serial_number_expected"]:
+        warnings.append(
+            "serial_number_expected has "
+            f"{serial_expected_count} non-null exact OCR ground truth cases; recommended {RECOMMENDED_OCR['serial_number_expected']}."
+        )
+    if brand_expected_count < RECOMMENDED_OCR["brand_model_expected"]:
+        warnings.append(
+            "brand_model_expected has "
+            f"{brand_expected_count} non-null exact OCR ground truth cases; recommended {RECOMMENDED_OCR['brand_model_expected']}."
+        )
     if flash_followup_count < 4:
         warnings.append(f"blinking-red text follow-up cases have {flash_followup_count}; recommended 4.")
 
@@ -116,8 +131,8 @@ def print_coverage_report(report: dict[str, Any]) -> None:
     ocr = report["ocr_exact_coverage"]
     serial_count = ocr["serial_number_expected_non_null"]
     brand_count = ocr["brand_model_expected_non_null"]
-    print(f"- serial_number_expected non-null: {serial_count} {'OK' if serial_count else 'WARNING'}")
-    print(f"- brand_model_expected non-null: {brand_count} {'OK' if brand_count else 'WARNING'}")
+    print(f"- serial_number_expected non-null: {serial_count} {_status(serial_count, RECOMMENDED_OCR['serial_number_expected'])}")
+    print(f"- brand_model_expected non-null: {brand_count} {_status(brand_count, RECOMMENDED_OCR['brand_model_expected'])}")
     if report["warnings"]:
         print("")
         print("Warnings:")

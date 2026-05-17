@@ -42,7 +42,17 @@ export type Theme2VisualExtraction = {
   rccb_visible?: boolean | null;
   mcb_rating?: string | null;
   rccb_rating?: string | null;
+  mcb_current_amp?: number | null;
+  rccb_current_amp?: number | null;
+  mcb_poles: "1p" | "2p" | "3p" | "4p" | "unknown";
+  rccb_poles: "1p" | "2p" | "3p" | "4p" | "unknown";
+  mcb_brand_model?: string | null;
+  rccb_brand_model?: string | null;
   rccb_type: "type_a" | "type_ac" | "unknown";
+  rccb_type_evidence: "text_label" | "symbol_only" | "mixed" | "unknown";
+  rccb_symbol_description?: string | null;
+  charger_brand_source: "text_label" | "logo_text" | "mixed" | "unknown";
+  evdb_spec_status: "correct" | "wrong" | "missing" | "incomplete" | "unknown";
   isolator_state: "on" | "off" | "unknown";
   raw_visible_text: string[];
   confidence_score: number;

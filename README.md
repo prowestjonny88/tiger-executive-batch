@@ -46,10 +46,57 @@ The live path no longer uses Round 1 known-case retrieval, pgvector indexing, is
 | Serial/brand exact OCR validation | Partial | Requires non-null reviewed charger-label ground truth |
 | Isolator OFF coverage | Partial | Add confirmed OFF image cases when available |
 | Video handling | Partial | Frame extraction utility is available; generated frames stay ignored |
+| EVDB spec interpretation | Done | Normalizes 40A/pole/RCCB Type A evidence before rule mapping |
 
 ## Quick Start
 
-### Backend
+### 1. Create Local Env Files
+
+Create `backend/.env`:
+
+```env
+DATABASE_URL=postgresql://omnitriage:omnitriage@localhost:5432/omnitriage
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-3-flash-preview
+```
+
+Create `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
+API_BASE_URL=http://127.0.0.1:8001
+```
+
+Both files are intentionally ignored by Git. Restart the backend after changing `backend/.env`, and restart the frontend after changing `frontend/.env.local`.
+
+### 2. Start Postgres
+
+The backend persists incidents and audit history in Postgres. If local Postgres is not already running on port `5432`, start a throwaway Docker instance:
+
+```powershell
+docker run --name rex-postgres `
+  -e POSTGRES_USER=omnitriage `
+  -e POSTGRES_PASSWORD=omnitriage `
+  -e POSTGRES_DB=omnitriage `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+If the container already exists:
+
+```powershell
+docker start rex-postgres
+```
+
+Quick check:
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 5432
+```
+
+`TcpTestSucceeded` should be `True`. If the backend stays at `Waiting for application startup`, Postgres is the first thing to check.
+
+### 3. Start Backend
 
 ```powershell
 C:\Users\JON\AppData\Local\Programs\Python\Python312\python.exe -m venv backend\.venv
@@ -73,7 +120,7 @@ Expected health payload includes:
 }
 ```
 
-### Frontend
+### 4. Start Frontend
 
 ```powershell
 cd frontend
@@ -87,9 +134,17 @@ Open:
 - `http://localhost:3000/upload`
 - `http://localhost:3000/history`
 
+### 5. Test From The Web Interface
+
+1. Open `http://localhost:3000/upload`.
+2. Upload an unseen charger, EVDB, or isolator image.
+3. Confirm `/result` shows `Organizer Required Output`.
+4. Check `Input Component`, `Observation Result`, `Fault Type`, `Recipient`, confidence, and proof prompts.
+5. If the result says `Vision model unavailable; using fallback interpretation`, confirm `GEMINI_API_KEY` is present in `backend/.env` and restart the backend.
+
 ## Gemini / VLM Setup
 
-Create `backend/.env` with:
+For real image understanding, `backend/.env` must contain:
 
 ```env
 GEMINI_API_KEY=your_key_here
@@ -100,7 +155,7 @@ If Gemini is unavailable, the backend falls back to deterministic Theme 2 heuris
 
 ## Frontend Backend Wiring
 
-Create `frontend/.env.local`:
+`frontend/.env.local` should point to the FastAPI backend port used by `backend/run-backend.ps1`:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
@@ -118,11 +173,15 @@ python scripts\build_round2_manifest.py --write-summary
 python scripts\pseudo_label_round2_with_theme2.py --limit 5
 python scripts\summarize_round2_pseudo_labels.py
 python scripts\check_round2_eval_coverage.py
+.\scripts\run_final_validation.ps1
 python scripts\evaluate_round2_cases.py --mode weak-label-sanity
 python scripts\evaluate_round2_cases.py --mode blind-image-eval
+python scripts\run_unseen_external_smoke.py
 ```
 
 Use `weak-label-sanity` to check weak labels and rule wiring. Use `blind-image-eval` as the closer proxy for judging because it does not pass expected labels into the incident hint.
+Place outside test images in ignored `data/round2/unseen_external/` and run `run_unseen_external_smoke.py` for prediction-only checks with no accuracy claims.
+Use `.\scripts\run_final_validation.ps1 -StrictCoverage` only after adding human-reviewed EVDB, isolator, and exact OCR ground-truth cases.
 
 See:
 

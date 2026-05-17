@@ -1,3 +1,7 @@
+param(
+    [switch]$StrictCoverage
+)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -57,7 +61,11 @@ Run-Step "Checking frontend build" {
 Run-Step "Checking eval coverage" {
     Push-Location $repoRoot
     try {
-        py scripts\check_round2_eval_coverage.py
+        if ($StrictCoverage) {
+            py scripts\check_round2_eval_coverage.py --strict
+        } else {
+            py scripts\check_round2_eval_coverage.py
+        }
     } finally {
         Pop-Location
     }

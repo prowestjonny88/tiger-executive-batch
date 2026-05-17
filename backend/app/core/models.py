@@ -78,7 +78,17 @@ class Theme2VisualExtraction(BaseModel):
     rccb_visible: Optional[bool] = None
     mcb_rating: Optional[str] = None
     rccb_rating: Optional[str] = None
+    mcb_current_amp: Optional[int] = None
+    rccb_current_amp: Optional[int] = None
+    mcb_poles: Literal["1p", "2p", "3p", "4p", "unknown"] = "unknown"
+    rccb_poles: Literal["1p", "2p", "3p", "4p", "unknown"] = "unknown"
+    mcb_brand_model: Optional[str] = None
+    rccb_brand_model: Optional[str] = None
     rccb_type: Literal["type_a", "type_ac", "unknown"] = "unknown"
+    rccb_type_evidence: Literal["text_label", "symbol_only", "mixed", "unknown"] = "unknown"
+    rccb_symbol_description: Optional[str] = None
+    charger_brand_source: Literal["text_label", "logo_text", "mixed", "unknown"] = "unknown"
+    evdb_spec_status: Literal["correct", "wrong", "missing", "incomplete", "unknown"] = "unknown"
     isolator_state: Literal["on", "off", "unknown"] = "unknown"
     raw_visible_text: List[str] = Field(default_factory=list)
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)

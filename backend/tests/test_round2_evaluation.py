@@ -11,9 +11,10 @@ from app.core.models import CompetitionOutput, IncidentInput, Theme2DebugInfo, T
 from app.services.theme2_triage import run_theme2_triage  # noqa: E402
 from scripts.check_round2_eval_coverage import build_coverage_report, main as coverage_main  # noqa: E402
 import scripts.evaluate_round2_cases as eval_script  # noqa: E402
-from scripts.extract_round2_video_frames import frame_output_path, parse_seconds  # noqa: E402
+from scripts.extract_round2_video_frames import frame_case_stub, frame_output_path, parse_seconds  # noqa: E402
 from scripts.evaluate_round2_cases import build_photo_hint, evaluate, incident_for  # noqa: E402
 from scripts.round2_eval_utils import normalize_brand_model, normalize_serial  # noqa: E402
+from scripts.run_unseen_external_smoke import run_smoke  # noqa: E402
 
 
 def _script_test_dir(name: str) -> Path:
@@ -280,6 +281,8 @@ def test_eval_coverage_warns_for_missing_isolator_and_ocr_ground_truth():
 
     warnings = " ".join(report["warnings"])
     assert "isolator" in warnings
+    assert "evdb_single_phase" in warnings
+    assert "wrong_component_specs" in warnings
     assert "serial_number_expected" in warnings
     assert "brand_model_expected" in warnings
 
@@ -296,3 +299,24 @@ def test_eval_coverage_strict_fails_but_default_passes():
 def test_video_frame_seconds_and_output_path_generation():
     assert parse_seconds("1,3,5") == [1, 3, 5]
     assert frame_output_path(Path("frames"), Path("Charger Red Light.mp4"), 3) == Path("frames") / "Charger Red Light_frame_003.jpg"
+
+
+def test_video_frame_case_stub_is_unlabeled_and_review_only():
+    stub = frame_case_stub(
+        Path("frames") / "source_frame_001.jpg",
+        Path("frames"),
+        Path("Isolator") / "source.mp4",
+        1,
+    )
+
+    assert stub["case_type"] == "video_frame"
+    assert stub["relative_path"] == "video_frames/source_frame_001.jpg"
+    assert stub["input_component_expected"] is None
+    assert "human-reviewed labels" in str(stub["notes"])
+
+
+def test_unseen_external_smoke_handles_missing_folder():
+    report = run_smoke(Path("does-not-exist"))
+
+    assert report["image_count"] == 0
+    assert report["results"] == []

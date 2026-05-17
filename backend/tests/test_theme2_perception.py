@@ -70,6 +70,60 @@ def test_gemini_perception_parses_theme2_fields():
     assert result.extraction.charger_serial_number == "260301982"
     assert result.extraction.charger_brand_model == "Proton eMAS"
     assert result.extraction.indicator_status == "red_light"
+    assert result.extraction.mcb_current_amp is None
+    assert result.extraction.rccb_current_amp is None
+    assert result.extraction.rccb_type_evidence == "unknown"
+
+
+def test_gemini_perception_parses_normalized_evdb_spec_fields():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "EVDB labels are readable.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["MCB C40 2P", "RCCB 40A Type AC 2P"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.91,
+            "input_component": "evdb",
+            "observation_result": "evdb_single_phase",
+            "evdb_phase_type": "single phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 2P",
+            "rccb_rating": "40A 2P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "2 pole",
+            "rccb_poles": "2P",
+            "mcb_brand_model": "CHINT",
+            "rccb_brand_model": "CHINT",
+            "rccb_type": "AC",
+            "rccb_type_evidence": "symbol only",
+            "rccb_symbol_description": "sine-wave-only symbol",
+            "evdb_spec_status": "wrong",
+            "raw_visible_text": ["MCB C40 2P", "RCCB 40A Type AC 2P"],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-evdb-normalized.jpg"))
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.evdb_phase_type == "single_phase"
+    assert result.extraction.mcb_current_amp == 40
+    assert result.extraction.rccb_current_amp == 40
+    assert result.extraction.mcb_poles == "2p"
+    assert result.extraction.rccb_poles == "2p"
+    assert result.extraction.rccb_type == "type_ac"
+    assert result.extraction.rccb_type_evidence == "symbol_only"
+    assert result.extraction.evdb_spec_status == "wrong"
 
 
 def test_bad_gemini_theme2_enums_normalize_to_unknown():

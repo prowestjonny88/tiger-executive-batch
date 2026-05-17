@@ -7,6 +7,22 @@ from app.services.theme2_mapper import build_competition_output, detect_error_lo
 from app.services.theme2_perception import assess_theme2_perception
 
 
+def _evdb_needs_label_proof(perception: Theme2PerceptionAssessment) -> bool:
+    extraction = perception.extraction
+    if extraction.input_component != "evdb" or extraction.observation_result not in {"evdb_single_phase", "evdb_three_phase"}:
+        return False
+    if extraction.evdb_spec_status in {"wrong", "missing", "correct"}:
+        return False
+    return (
+        extraction.mcb_current_amp is None
+        or extraction.rccb_current_amp is None
+        or extraction.mcb_poles == "unknown"
+        or extraction.rccb_poles == "unknown"
+        or extraction.rccb_type == "unknown"
+        or extraction.evdb_spec_status in {"incomplete", "unknown"}
+    )
+
+
 def build_theme2_followups(
     incident: IncidentInput,
     perception: Theme2PerceptionAssessment,
@@ -37,19 +53,11 @@ def build_theme2_followups(
             "Provide the red-light flash count or an app error log screenshot.",
             "Blinking red light fault type depends on the error-log or flash-count evidence.",
         )
-    if extraction.observation_result in {"evdb_single_phase", "evdb_three_phase"} and (
-        not extraction.mcb_rating or not extraction.rccb_rating or extraction.rccb_type == "unknown"
-    ):
+    if _evdb_needs_label_proof(perception):
         add(
             "evdb_label_closeup",
             "Please upload a closer EVDB photo showing the MCB/RCCB ratings, RCCB type, and pole count.",
             "EVDB phase detection alone does not prove breaker specification correctness.",
-        )
-    if extraction.input_component == "evdb" and extraction.observation_result in {"evdb_single_phase", "evdb_three_phase"}:
-        add(
-            "evdb_label_closeup",
-            "Please upload a closer EVDB photo showing the MCB/RCCB ratings, RCCB type, and pole count.",
-            "EVDB phase evidence requires readable labels before final spec confirmation.",
         )
     if extraction.input_component == "isolator" and extraction.observation_result == "unknown":
         add(

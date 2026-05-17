@@ -90,9 +90,77 @@ def detect_error_log_key(incident: IncidentInput, perception: Theme2PerceptionAs
     return None
 
 
-def _rating_has_any_pole(value: str | None, *poles: str) -> bool:
-    normalized = re.sub(r"[\s-]+", "", (value or "").lower())
-    return any(pole.lower().replace(" ", "").replace("-", "") in normalized for pole in poles)
+def _amp_from_rating(value: str | None) -> int | None:
+    match = re.search(r"\b(?:c)?(\d{1,3})\s*a?\b", value or "", flags=re.IGNORECASE)
+    if not match:
+        return None
+    amp = int(match.group(1))
+    return amp if 0 < amp <= 250 else None
+
+
+def _poles_from_rating(value: str | None) -> str:
+    match = re.search(r"\b([1-4])\s*p(?:ole)?\b", value or "", flags=re.IGNORECASE)
+    return f"{match.group(1)}p" if match else "unknown"
+
+
+def _phase_for_evdb(theme2: Theme2VisualExtraction) -> str:
+    if theme2.evdb_phase_type in {"single_phase", "three_phase"}:
+        return theme2.evdb_phase_type
+    if theme2.observation_result == "evdb_single_phase":
+        return "single_phase"
+    if theme2.observation_result == "evdb_three_phase":
+        return "three_phase"
+    return "unknown"
+
+
+def _evdb_spec_review(theme2: Theme2VisualExtraction) -> tuple[str, list[str]]:
+    if theme2.input_component != "evdb":
+        return "unknown", []
+    if theme2.mcb_visible is False or theme2.rccb_visible is False or theme2.evdb_spec_status == "missing":
+        return "missing", ["MCB or RCCB is not visible/present."]
+    if theme2.evdb_spec_status == "wrong":
+        return "wrong", ["EVDB spec status was read as wrong."]
+    if theme2.rccb_type == "type_ac":
+        return "wrong", ["RCCB was read as Type AC; Theme 2 requires Type A."]
+
+    phase = _phase_for_evdb(theme2)
+    if phase == "unknown":
+        return "unknown", ["EVDB phase could not be confirmed."]
+    expected_pole = "2p" if phase == "single_phase" else "4p"
+    expected_amp = 40
+
+    mcb_amp = theme2.mcb_current_amp if theme2.mcb_current_amp is not None else _amp_from_rating(theme2.mcb_rating)
+    rccb_amp = theme2.rccb_current_amp if theme2.rccb_current_amp is not None else _amp_from_rating(theme2.rccb_rating)
+    mcb_poles = theme2.mcb_poles if theme2.mcb_poles != "unknown" else _poles_from_rating(theme2.mcb_rating)
+    rccb_poles = theme2.rccb_poles if theme2.rccb_poles != "unknown" else _poles_from_rating(theme2.rccb_rating)
+
+    reasons: list[str] = []
+    if mcb_amp is not None and mcb_amp != expected_amp:
+        reasons.append(f"MCB current was read as {mcb_amp}A; expected 40A.")
+    if rccb_amp is not None and rccb_amp != expected_amp:
+        reasons.append(f"RCCB current was read as {rccb_amp}A; expected 40A.")
+    if mcb_poles != "unknown" and mcb_poles != expected_pole:
+        reasons.append(f"MCB pole count was read as {mcb_poles}; expected {expected_pole}.")
+    if rccb_poles != "unknown" and rccb_poles != expected_pole:
+        reasons.append(f"RCCB pole count was read as {rccb_poles}; expected {expected_pole}.")
+    if reasons:
+        return "wrong", reasons
+
+    missing_fields: list[str] = []
+    if mcb_amp is None:
+        missing_fields.append("MCB current")
+    if rccb_amp is None:
+        missing_fields.append("RCCB current")
+    if mcb_poles == "unknown":
+        missing_fields.append("MCB pole count")
+    if rccb_poles == "unknown":
+        missing_fields.append("RCCB pole count")
+    if theme2.rccb_type == "unknown":
+        missing_fields.append("RCCB type")
+    if missing_fields or theme2.evdb_spec_status == "incomplete":
+        return "incomplete", [f"EVDB label proof incomplete: {', '.join(missing_fields) or 'unreadable labels'}."]
+
+    return "correct", []
 
 
 def _maybe_refine_observation(theme2: Theme2VisualExtraction) -> ObservationResultV2:
@@ -100,20 +168,11 @@ def _maybe_refine_observation(theme2: Theme2VisualExtraction) -> ObservationResu
     if theme2.input_component == "evdb":
         if observation == "mcb_tripped":
             return observation
-        if theme2.mcb_visible is False or theme2.rccb_visible is False:
+        spec_status, _ = _evdb_spec_review(theme2)
+        if spec_status == "missing":
             return "missing_mcb_rccb"
-        if theme2.rccb_type == "type_ac":
+        if spec_status == "wrong":
             return "wrong_component_specs"
-        if theme2.evdb_phase_type == "single_phase":
-            if _rating_has_any_pole(theme2.mcb_rating, "3p", "4p") or _rating_has_any_pole(
-                theme2.rccb_rating, "3p", "4p"
-            ):
-                return "wrong_component_specs"
-        if theme2.evdb_phase_type == "three_phase":
-            if _rating_has_any_pole(theme2.mcb_rating, "2p", "3p") or _rating_has_any_pole(
-                theme2.rccb_rating, "2p", "3p"
-            ):
-                return "wrong_component_specs"
     return observation
 
 
@@ -132,10 +191,10 @@ def _evidence_notes(
         if extraction.charger_brand_model is None:
             notes.append("Charger brand/model was not readable.")
     if observation in {"evdb_single_phase", "evdb_three_phase"}:
-        if not extraction.mcb_rating or not extraction.rccb_rating:
+        spec_status, spec_notes = _evdb_spec_review(extraction)
+        notes.extend(spec_notes)
+        if spec_status in {"incomplete", "unknown"}:
             notes.append("EVDB MCB/RCCB labels were not fully readable.")
-        if extraction.rccb_type == "unknown":
-            notes.append("RCCB type was not readable.")
     if perception.confidence_score < 0.55 or extraction.confidence_score < 0.55:
         notes.append("Theme 2 extraction confidence is low; request clearer proof.")
     if error_log_key:
