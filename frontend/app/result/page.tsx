@@ -9,6 +9,9 @@ import { Card, CardContent } from "../../components/ui/card";
 import {
   ApiTriageResponse,
   fetchIncidentById,
+  formatFaultTypeV2,
+  formatObservationResult,
+  formatRecipientType,
   resolveEvidenceUrl,
 } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
@@ -116,6 +119,8 @@ function ResultAssessment() {
   const output = triage.competition_output;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence);
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
+  const serialNumber = output.charger_serial_number || triage.perception.extraction.charger_serial_number || "";
+  const brandModel = output.charger_brand_model || triage.perception.extraction.charger_brand_model || "";
 
   const showFallbackWarning = triage.perception.fallback_used;
 
@@ -136,6 +141,45 @@ function ResultAssessment() {
         </div>
 
         <CardContent className="p-6 md:p-8">
+          <div className="mb-8 rounded-2xl border border-green-100 bg-green-50/45 p-5 md:p-6">
+            <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-widest text-green-700">
+                  Organizer Required Output
+                </p>
+                <h2 className="mt-1 text-xl font-extrabold text-slate-900">
+                  Theme 2 extraction and routing fields
+                </h2>
+              </div>
+              <ConfidencePill score={output.confidence_score} />
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {[
+                ["Observation Result", formatObservationResult(output.observation_result)],
+                ["Charger Serial Number", serialNumber || "Not readable"],
+                ["Brand / Model", brandModel || "Not readable"],
+                ["Fault Type", formatFaultTypeV2(output.fault_type_v2)],
+                [
+                  "Recipient",
+                  output.recipient_type === "after_sales_team" && output.assigned_team_id
+                    ? `${formatRecipientType(output.recipient_type)}: ${output.assigned_team_id}`
+                    : formatRecipientType(output.recipient_type),
+                ],
+                ["Action Message", output.action_message],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-green-100 bg-white p-4 shadow-sm">
+                  <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-base font-bold leading-6 text-slate-950">
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             
             {/* Left Column */}
