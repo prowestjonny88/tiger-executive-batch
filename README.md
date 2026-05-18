@@ -140,7 +140,8 @@ Open:
 2. Upload an unseen charger, EVDB, or isolator image.
 3. Confirm `/result` shows `Organizer Required Output`.
 4. Check `Input Component`, `Observation Result`, `Fault Type`, `Recipient`, confidence, and proof prompts.
-5. If the result says `Vision model unavailable; using fallback interpretation`, confirm `GEMINI_API_KEY` is present in `backend/.env` and restart the backend.
+5. Confirm the evidence cards match the component: charger shows serial/brand, EVDB shows MCB/RCCB fields, and isolator shows switch state.
+6. If the result says `Vision model unavailable; using fallback interpretation`, confirm `GEMINI_API_KEY` is present in `backend/.env` and restart the backend.
 
 ## Gemini / VLM Setup
 
@@ -182,6 +183,8 @@ python scripts\run_unseen_external_smoke.py
 Use `weak-label-sanity` to check weak labels and rule wiring. Use `blind-image-eval` as the closer proxy for judging because it does not pass expected labels into the incident hint.
 Place outside test images in ignored `data/round2/unseen_external/` and run `run_unseen_external_smoke.py` for prediction-only checks with no accuracy claims.
 Use `.\scripts\run_final_validation.ps1 -StrictCoverage` only after adding human-reviewed EVDB, isolator, and exact OCR ground-truth cases.
+
+No-light routing follows the PDF action sequence: the first customer-facing action is to check whether the EVDB breaker has tripped. The system escalates no-light as a charger issue only after follow-up says the breaker is normal and the charger remains off.
 
 See:
 

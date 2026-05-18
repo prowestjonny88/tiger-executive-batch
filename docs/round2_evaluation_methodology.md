@@ -58,6 +58,18 @@ By default this writes `data/round2/evaluation_cases.reviewed.json` and does not
 
 Do not invent serial or brand/model values from VLM guesses. Only set `serial_number_expected` and `brand_model_expected` after human review. Once those fields are present, the evaluator reports exact-match OCR metrics instead of `n/a`.
 
+Until those reviewed fields exist, the runtime may still extract visible serial or brand/model values for live charger-label evidence, but report metrics must describe exact OCR validation as partial.
+
+## Current Coverage Guardrail
+
+The clean baseline is intentionally conservative. Run:
+
+```powershell
+python scripts\check_round2_eval_coverage.py
+```
+
+Warnings for EVDB single-phase, missing/wrong specs, isolator ON/OFF, or exact OCR ground truth mean the runtime can still support those cases, but the committed evaluation pack does not yet prove them with reviewed image ground truth.
+
 ## Interpreting Metrics
 
 - Use weak-label sanity for pipeline regression checks.

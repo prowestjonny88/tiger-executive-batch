@@ -70,6 +70,16 @@ class IncidentInput(BaseModel):
     demo_scenario_id: Optional[str] = None
 
 
+class Theme2BoundingBox(BaseModel):
+    id: str
+    label: str
+    x: float = Field(ge=0.0, le=100.0)
+    y: float = Field(ge=0.0, le=100.0)
+    width: float = Field(ge=1.0, le=100.0)
+    height: float = Field(ge=1.0, le=100.0)
+    source: Literal["vlm", "heuristic"] = "vlm"
+
+
 class Theme2VisualExtraction(BaseModel):
     input_component: InputComponent = "unknown"
     observation_result: ObservationResultV2 = "unknown"
@@ -94,6 +104,7 @@ class Theme2VisualExtraction(BaseModel):
     evdb_spec_status: Literal["correct", "wrong", "missing", "incomplete", "unknown"] = "unknown"
     isolator_state: Literal["on", "off", "unknown"] = "unknown"
     raw_visible_text: List[str] = Field(default_factory=list)
+    bounding_boxes: List[Theme2BoundingBox] = Field(default_factory=list)
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
     uncertainty_notes: List[str] = Field(default_factory=list)
 

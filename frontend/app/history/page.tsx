@@ -114,7 +114,7 @@ export default function HistoryPage() {
                         <span className="text-slate-500 uppercase tracking-widest font-semibold">
                           {formatInputComponent(incident.latest_input_component)}
                         </span>
-                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-300">/</span>
                         <span className="text-slate-600 font-medium">
                           {formatFaultTypeV2(incident.latest_fault_type_v2)}
                         </span>

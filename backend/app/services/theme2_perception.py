@@ -4,7 +4,7 @@ import json
 import re
 import time
 
-from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
+from app.core.models import IncidentInput, Theme2BoundingBox, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.storage import read_photo_bytes
 
@@ -61,6 +61,21 @@ _GEMINI_RESPONSE_SCHEMA = {
         "evdb_spec_status": {"type": "string"},
         "isolator_state": {"type": "string"},
         "raw_visible_text": {"type": "array", "items": {"type": "string"}},
+        "bounding_boxes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "label": {"type": "string"},
+                    "x": {"type": "number"},
+                    "y": {"type": "number"},
+                    "width": {"type": "number"},
+                    "height": {"type": "number"},
+                },
+                "required": ["id", "label", "x", "y", "width", "height"],
+            },
+        },
     },
     "required": [
         "evidence_type",
@@ -94,6 +109,7 @@ _GEMINI_RESPONSE_SCHEMA = {
         "evdb_spec_status",
         "isolator_state",
         "raw_visible_text",
+        "bounding_boxes",
     ],
 }
 
@@ -259,6 +275,104 @@ def _normalize_isolator_state(value: object) -> str:
     return "unknown"
 
 
+def _normalize_box_number(value: object, default: float) -> float:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_bounding_boxes(values: object, *, source: str) -> list[Theme2BoundingBox]:
+    if not isinstance(values, list):
+        return []
+
+    boxes: list[Theme2BoundingBox] = []
+    for index, raw_box in enumerate(values, start=1):
+        if len(boxes) >= 3:
+            break
+        if not isinstance(raw_box, dict):
+            continue
+        if any(raw_box.get(field) is None for field in ("x", "y", "width", "height")):
+            continue
+        x = max(min(_normalize_box_number(raw_box.get("x"), 0.0), 100.0), 0.0)
+        y = max(min(_normalize_box_number(raw_box.get("y"), 0.0), 100.0), 0.0)
+        width = max(min(_normalize_box_number(raw_box.get("width"), 1.0), 100.0), 1.0)
+        height = max(min(_normalize_box_number(raw_box.get("height"), 1.0), 100.0), 1.0)
+        if x + width > 100.0:
+            width = max(1.0, 100.0 - x)
+        if y + height > 100.0:
+            height = max(1.0, 100.0 - y)
+
+        label = str(raw_box.get("label") or f"Theme 2 evidence {index}").strip()[:80]
+        box_id = str(raw_box.get("id") or f"theme2-box-{index}").strip()[:60]
+        boxes.append(
+            Theme2BoundingBox(
+                id=box_id,
+                label=label,
+                x=x,
+                y=y,
+                width=width,
+                height=height,
+                source="heuristic" if source == "heuristic" else "vlm",
+            )
+        )
+    return boxes
+
+
+def _fallback_bounding_boxes(input_component: str, observation: str, *, has_photo: bool) -> list[Theme2BoundingBox]:
+    if not has_photo or input_component == "unknown":
+        return []
+    if input_component == "charger":
+        if observation == "charger_serial_brand_visible":
+            return [
+                Theme2BoundingBox(
+                    id="charger-label",
+                    label="Charger serial / brand label",
+                    x=18.0,
+                    y=15.0,
+                    width=36.0,
+                    height=58.0,
+                    source="heuristic",
+                )
+            ]
+        return [
+            Theme2BoundingBox(
+                id="charger-unit",
+                label="Charger unit",
+                x=25.0,
+                y=12.0,
+                width=50.0,
+                height=72.0,
+                source="heuristic",
+            )
+        ]
+    if input_component == "evdb":
+        return [
+            Theme2BoundingBox(
+                id="evdb-protection",
+                label="EVDB / protection breakers",
+                x=12.0,
+                y=12.0,
+                width=76.0,
+                height=76.0,
+                source="heuristic",
+            )
+        ]
+    if input_component == "isolator":
+        return [
+            Theme2BoundingBox(
+                id="isolator-switch",
+                label="Isolator switch",
+                x=30.0,
+                y=18.0,
+                width=40.0,
+                height=64.0,
+                source="heuristic",
+            )
+        ]
+    return []
+
+
 def _extract_json_object(raw: str) -> dict[str, object]:
     text = raw.strip()
     if text.startswith("```"):
@@ -374,6 +488,7 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         evdb_spec_status=_normalize_evdb_spec_status(theme_data.get("evdb_spec_status")),  # type: ignore[arg-type]
         isolator_state=_normalize_isolator_state(theme_data.get("isolator_state")),  # type: ignore[arg-type]
         raw_visible_text=raw_visible_text,
+        bounding_boxes=_normalize_bounding_boxes(theme_data.get("bounding_boxes"), source="vlm"),
         confidence_score=_normalize_confidence(theme_data.get("theme2_confidence_score", theme_data.get("confidence_score")), default_confidence),
         uncertainty_notes=_normalize_list(theme_data.get("theme2_uncertainty_notes")) or _normalize_list(theme_data.get("uncertainty_notes")),
     )
@@ -492,6 +607,7 @@ def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float
         evdb_spec_status=evdb_spec_status,  # type: ignore[arg-type]
         isolator_state=isolator_state,  # type: ignore[arg-type]
         raw_visible_text=_fallback_ocr_findings(incident),
+        bounding_boxes=_fallback_bounding_boxes(input_component, observation, has_photo=incident.photo_evidence is not None),
         confidence_score=confidence_score,
         uncertainty_notes=[] if observation != "unknown" else ["Theme 2 observation could not be inferred from available evidence."],
     )
@@ -534,7 +650,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "charger_brand_model, indicator_status, evdb_phase_type, mcb_visible, rccb_visible, mcb_rating, "
         "rccb_rating, mcb_current_amp, rccb_current_amp, mcb_poles, rccb_poles, mcb_brand_model, "
         "rccb_brand_model, rccb_type, rccb_type_evidence, rccb_symbol_description, charger_brand_source, "
-        "evdb_spec_status, isolator_state, raw_visible_text.\n"
+        "evdb_spec_status, isolator_state, raw_visible_text, bounding_boxes.\n"
         "Allowed input_component: charger, evdb, isolator, unknown.\n"
         "Allowed observation_result: charger_red_light, charger_blinking_red_light, charger_no_light, "
         "charger_serial_brand_visible, evdb_single_phase, evdb_three_phase, mcb_tripped, missing_mcb_rccb, "
@@ -549,6 +665,10 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "For charger identity, extract serial number only from readable serial/SN/ID text and brand/model only from "
         "readable text or logo text; do not infer brand from shape, color, or styling. "
         "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
+        "For bounding_boxes, return at most 3 boxes using percentages relative to the full image: "
+        "x, y, width, height are 0-100 values. Bound only visible Theme 2 evidence objects such as the charger unit, "
+        "charger serial/brand label, EVDB enclosure or MCB/RCCB cluster, or isolator switch. "
+        "If the object location cannot be estimated from the image, return an empty array. Do not draw boxes for hidden objects.\n"
         "Keep arrays short: maximum 5 items per array, maximum 80 characters per item. "
         "Keep scene_summary under 160 characters. Return a complete JSON object with no markdown.\n"
         f"photo_hint: {incident.photo_hint or ''}\n"

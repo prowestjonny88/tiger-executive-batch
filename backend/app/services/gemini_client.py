@@ -7,7 +7,7 @@ Usage
 
     client = get_gemini_client()
     if client is None:
-        # No API key configured — fall back to heuristic providers
+        # No API key configured; fall back to heuristic providers.
         ...
 """
 from __future__ import annotations

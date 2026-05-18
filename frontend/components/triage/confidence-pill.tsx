@@ -23,7 +23,7 @@ export function ConfidencePill({ score }: ConfidencePillProps) {
         Observation Confidence
       </span>
       <Badge variant={variant} className="rounded-full px-3 shadow-none">
-        {label} — {percent}%
+        {label} - {percent}%
       </Badge>
     </div>
   );

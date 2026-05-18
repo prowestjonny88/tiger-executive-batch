@@ -9,9 +9,6 @@ import { Card, CardContent } from "../../components/ui/card";
 import {
   ApiTriageResponse,
   fetchIncidentById,
-  formatFaultTypeV2,
-  formatObservationResult,
-  formatRecipientType,
   resolveEvidenceUrl,
 } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
@@ -20,6 +17,7 @@ import { DecisionChain } from "../../components/triage/decision-chain";
 import { EvidencePanel } from "../../components/triage/evidence-panel";
 import { ProofRequiredCard } from "../../components/triage/proof-required-card";
 import { ConfidencePill } from "../../components/triage/confidence-pill";
+import { buildOrganizerOutputFields } from "../../lib/theme2-result-fields";
 
 export default function ResultAssessmentPage() {
   return (
@@ -119,8 +117,7 @@ function ResultAssessment() {
   const output = triage.competition_output;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence);
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
-  const serialNumber = output.charger_serial_number || triage.perception.extraction.charger_serial_number || "";
-  const brandModel = output.charger_brand_model || triage.perception.extraction.charger_brand_model || "";
+  const organizerFields = buildOrganizerOutputFields(output, triage.perception.extraction);
 
   const showFallbackWarning = triage.perception.fallback_used;
 
@@ -155,19 +152,7 @@ function ResultAssessment() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {[
-                ["Observation Result", formatObservationResult(output.observation_result)],
-                ["Charger Serial Number", serialNumber || "Not readable"],
-                ["Brand / Model", brandModel || "Not readable"],
-                ["Fault Type", formatFaultTypeV2(output.fault_type_v2)],
-                [
-                  "Recipient",
-                  output.recipient_type === "after_sales_team" && output.assigned_team_id
-                    ? `${formatRecipientType(output.recipient_type)}: ${output.assigned_team_id}`
-                    : formatRecipientType(output.recipient_type),
-                ],
-                ["Action Message", output.action_message],
-              ].map(([label, value]) => (
+              {organizerFields.map(({ label, value }) => (
                 <div key={label} className="rounded-xl border border-green-100 bg-white p-4 shadow-sm">
                   <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
                     {label}
@@ -233,7 +218,10 @@ function ResultAssessment() {
                 prompts={triage.follow_up_prompts} 
               />
 
-              <EvidencePanel imageUrl={imageUrl} />
+              <EvidencePanel
+                imageUrl={imageUrl}
+                annotations={triage.perception.extraction.bounding_boxes ?? []}
+              />
               
               <details className="mt-8">
                 <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">

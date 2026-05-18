@@ -109,15 +109,25 @@ def _local_photo_path(evidence: StoredPhotoEvidence) -> Path | None:
     if storage_path.is_absolute() and storage_path.exists():
         return storage_path
 
+    backend_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     candidates = [
-        Path(__file__).resolve().parents[2] / evidence.storage_path,
-        get_upload_root() / (evidence.storage_key or ""),
-        get_upload_root() / "incidents" / storage_path.name,
-        Path(__file__).resolve().parents[3] / evidence.storage_path,
+        repo_root / evidence.storage_path,
+        backend_root / evidence.storage_path,
     ]
+    if evidence.storage_key:
+        candidates.extend(
+            [
+                get_upload_root() / evidence.storage_key,
+                get_upload_root() / "incidents" / storage_path.name,
+            ]
+        )
     for candidate in candidates:
-        if candidate.exists():
-            return candidate
+        try:
+            if candidate.exists():
+                return candidate
+        except OSError:
+            continue
     return None
 
 

@@ -12,7 +12,7 @@
 Summarize Theme 2 mappings:
 
 - Charger red light -> charger issue -> after-sales team.
-- Charger no light -> supply issue -> customer.
+- Charger no light -> supply issue -> customer breaker check first; escalates to charger issue / after-sales only when the breaker is confirmed normal and the charger remains off.
 - Blinking red flash counts -> installation/manual/charger issue outcomes.
 - EVDB missing/wrong protection -> protection issue -> after-sales team.
 - MCB tripped -> protection issue -> customer unless repeated/safety terms escalate.
@@ -23,6 +23,7 @@ Summarize Theme 2 mappings:
 - Weak-label sanity: validates rule and folder-label wiring. Do not report as visual accuracy.
 - Blind image eval: neutral prompt, no expected labels leaked into `photo_hint`; use this as image-evaluation-like evidence.
 - OCR exact metrics are reported only when non-null serial/brand ground truth exists.
+- Current runtime contract is implemented, but exact OCR validation remains partial until human-reviewed charger label ground truth is added.
 
 ## 4. Current Metrics
 
@@ -46,6 +47,7 @@ Explain that unstable EVDB spec-boundary cases, ambiguous multi-component isolat
 ## 6. Known Limitations
 
 - Exact serial/brand OCR needs human-reviewed expected values.
+- The current clean baseline intentionally does not claim full Dataset 2 coverage; isolator, EVDB single-phase, missing/wrong-spec, and exact OCR ground-truth coverage are tracked by `check_round2_eval_coverage.py`.
 - EVDB Type A vs Type AC markings can be visually unstable without close-up labels.
 - Video support requires extracted frames before normal image evaluation.
 - Raw dataset images are not committed.

@@ -1,10 +1,11 @@
-import { AnnotatedImage } from "../ui/annotated-image";
+import { AnnotatedImage, type Annotation } from "../ui/annotated-image";
 
 interface EvidencePanelProps {
   imageUrl: string | null | undefined;
+  annotations?: Annotation[];
 }
 
-export function EvidencePanel({ imageUrl }: EvidencePanelProps) {
+export function EvidencePanel({ imageUrl, annotations = [] }: EvidencePanelProps) {
   if (!imageUrl) {
     return (
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center min-h-[300px]">
@@ -16,10 +17,12 @@ export function EvidencePanel({ imageUrl }: EvidencePanelProps) {
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
       <div className="w-full h-full relative aspect-video md:aspect-square lg:aspect-auto flex items-center justify-center">
-        <AnnotatedImage src={imageUrl} annotations={[]} className="max-h-[500px] w-auto object-contain rounded-lg" />
+        <AnnotatedImage src={imageUrl} annotations={annotations} className="max-h-[500px] w-auto object-contain rounded-lg" />
       </div>
       <p className="text-xs text-slate-400 mt-4 text-center">
-        Uploaded evidence used for visual assessment
+        {annotations.length > 0
+          ? "Highlighted object evidence used for visual assessment"
+          : "Uploaded evidence used for visual assessment"}
       </p>
     </div>
   );

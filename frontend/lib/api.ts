@@ -36,6 +36,16 @@ export type FaultTypeV2 =
   | "unknown";
 export type RecipientType = "customer" | "after_sales_team" | "none" | "unknown";
 
+export type Theme2BoundingBox = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  source?: "vlm" | "heuristic";
+};
+
 export type Theme2VisualExtraction = {
   input_component: InputComponent;
   observation_result: ObservationResultV2;
@@ -60,6 +70,7 @@ export type Theme2VisualExtraction = {
   evdb_spec_status: "correct" | "wrong" | "missing" | "incomplete" | "unknown";
   isolator_state: "on" | "off" | "unknown";
   raw_visible_text: string[];
+  bounding_boxes?: Theme2BoundingBox[];
   confidence_score: number;
   uncertainty_notes: string[];
 };

@@ -55,6 +55,16 @@ def test_gemini_perception_parses_theme2_fields():
             "charger_brand_model": "Proton eMAS",
             "indicator_status": "red_light",
             "raw_visible_text": ["SN 260301982", "Proton eMAS"],
+            "bounding_boxes": [
+                {
+                    "id": "charger-unit",
+                    "label": "Charger unit",
+                    "x": 24,
+                    "y": 12,
+                    "width": 52,
+                    "height": 74,
+                }
+            ],
         }
     )
     mock_client = MagicMock()
@@ -73,6 +83,9 @@ def test_gemini_perception_parses_theme2_fields():
     assert result.extraction.mcb_current_amp is None
     assert result.extraction.rccb_current_amp is None
     assert result.extraction.rccb_type_evidence == "unknown"
+    assert len(result.extraction.bounding_boxes) == 1
+    assert result.extraction.bounding_boxes[0].label == "Charger unit"
+    assert result.extraction.bounding_boxes[0].source == "vlm"
 
 
 def test_gemini_perception_parses_normalized_evdb_spec_fields():
@@ -160,6 +173,43 @@ def test_bad_gemini_theme2_enums_normalize_to_unknown():
     assert result.extraction.evdb_phase_type == "unknown"
     assert result.extraction.rccb_type == "unknown"
     assert result.extraction.isolator_state == "unknown"
+
+
+def test_bad_gemini_bounding_boxes_are_clamped_and_limited():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Image inspected.",
+            "components_visible": ["charger"],
+            "visible_abnormalities": [],
+            "ocr_findings": [],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.67,
+            "input_component": "charger",
+            "observation_result": "charger_serial_brand_visible",
+            "bounding_boxes": [
+                {"id": "label", "label": "Charger label", "x": -5, "y": 90, "width": 140, "height": 30},
+                {"id": "skip"},
+                {"id": "unit", "label": "Charger unit", "x": 25, "y": 10, "width": 50, "height": 70},
+                {"id": "extra", "label": "Extra object", "x": 0, "y": 0, "width": 10, "height": 10},
+            ],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-bad-boxes.jpg"))
+
+    assert len(result.extraction.bounding_boxes) == 3
+    assert result.extraction.bounding_boxes[0].x == 0.0
+    assert result.extraction.bounding_boxes[0].height == 10.0
+    assert result.extraction.bounding_boxes[1].label == "Charger unit"
+    assert result.extraction.bounding_boxes[2].label == "Extra object"
 
 
 def test_gemini_perception_extracts_json_from_preamble_and_normalizes_common_strings():
@@ -316,3 +366,16 @@ def test_heuristic_perception_produces_theme2_extraction_without_gemini():
     assert result.extraction.input_component == "isolator"
     assert result.extraction.observation_result == "isolator_off_open_circuit"
     assert result.extraction.isolator_state == "off"
+    assert result.extraction.bounding_boxes == []
+
+
+def test_heuristic_photo_fallback_adds_component_bounding_box_without_gemini():
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=None):
+        result = assess_theme2_perception(_photo_incident("theme2-heuristic-box.jpg"))
+
+    assert result.mode == "heuristic"
+    assert result.fallback_used is True
+    assert result.extraction.observation_result == "charger_red_light"
+    assert len(result.extraction.bounding_boxes) == 1
+    assert result.extraction.bounding_boxes[0].id == "charger-unit"
+    assert result.extraction.bounding_boxes[0].source == "heuristic"

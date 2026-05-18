@@ -21,6 +21,7 @@ frontend/.env.local
 backend/.env
 UI prototype/
 .agents
+.codex_tmp/
 .vscode/
 backend/.env.example
 backend/.env

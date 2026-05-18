@@ -29,6 +29,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-p no:cacheprovider"
+norecursedirs = ["tests/test-uploads"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -85,3 +85,21 @@ def test_read_photo_bytes_supports_existing_absolute_local_path(monkeypatch):
     )
 
     assert storage.read_photo_bytes(evidence) == b"legacy-bytes"
+
+
+def test_read_photo_bytes_supports_repo_relative_dataset_path(monkeypatch):
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    image_path = _test_dir("storage-dataset-relative") / "dataset.jpg"
+    image_path.write_bytes(b"dataset-bytes")
+    repo_root = Path(__file__).resolve().parents[2]
+    relative_path = image_path.relative_to(repo_root)
+
+    evidence = StoredPhotoEvidence(
+        filename="dataset.jpg",
+        media_type="image/jpeg",
+        storage_path=str(relative_path).replace("\\", "/"),
+        byte_size=image_path.stat().st_size,
+    )
+
+    assert evidence.storage_key is None
+    assert storage.read_photo_bytes(evidence) == b"dataset-bytes"
