@@ -213,6 +213,9 @@ export default function PhotoUpload() {
               fileName={file?.name}
               className="bg-slate-50 hover:bg-slate-50/80"
             />
+            <p className="text-xs font-medium text-slate-500">
+              Large photos are optimized before upload to keep labels readable while avoiding deployment upload limits.
+            </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">

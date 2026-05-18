@@ -47,6 +47,9 @@ class StoredPhotoEvidence(BaseModel):
     media_type: str = "image/jpeg"
     storage_path: str
     byte_size: int = Field(ge=0)
+    storage_provider: Literal["local", "gcs"] = "local"
+    storage_key: Optional[str] = None
+    display_url: Optional[str] = None
 
 
 class UploadedPhotoPayload(BaseModel):

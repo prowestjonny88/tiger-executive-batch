@@ -3,35 +3,13 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-import os
 import re
-from pathlib import Path
-from uuid import uuid4
 
 from fastapi import HTTPException
 
 from app.core.models import IncidentInput, PhotoEvidence, StoredPhotoEvidence, UploadedPhotoPayload
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
-
-
-def get_upload_root() -> Path:
-    return Path(os.getenv("UPLOAD_ROOT", Path(__file__).resolve().parents[2] / "uploads"))
-
-
-UPLOAD_ROOT = get_upload_root()
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MEDIA_TYPE_SUFFIXES = {
-    "image/jpeg": ".jpg",
-    "image/png": ".png",
-    "image/webp": ".webp",
-}
-
-
-def _safe_filename(filename: str, media_type: str) -> str:
-    base_name = Path(filename or "incident-photo").name
-    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(base_name).stem).strip("-._") or "incident-photo"
-    suffix = Path(base_name).suffix.lower() or MEDIA_TYPE_SUFFIXES[media_type]
-    return f"{stem}{suffix}"
+from app.services.storage import MEDIA_TYPE_SUFFIXES, read_photo_bytes, store_photo_bytes
 
 
 def store_uploaded_photo(payload: UploadedPhotoPayload) -> StoredPhotoEvidence:
@@ -43,23 +21,7 @@ def store_uploaded_photo(payload: UploadedPhotoPayload) -> StoredPhotoEvidence:
     except (ValueError, binascii.Error) as exc:
         raise HTTPException(status_code=400, detail="Invalid photo payload") from exc
 
-    if not content:
-        raise HTTPException(status_code=400, detail="Photo payload is empty")
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="Photo payload exceeds 10MB limit")
-
-    stored_name = f"{uuid4().hex}-{_safe_filename(payload.filename, payload.media_type)}"
-    upload_dir = get_upload_root() / "incidents"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    stored_path = upload_dir / stored_name
-    stored_path.write_bytes(content)
-
-    return StoredPhotoEvidence(
-        filename=payload.filename or stored_name,
-        media_type=payload.media_type,
-        storage_path=str(Path("uploads") / "incidents" / stored_name).replace("\\", "/"),
-        byte_size=len(content),
-    )
+    return store_photo_bytes(content=content, filename=payload.filename, media_type=payload.media_type)
 
 
 # ---------------------------------------------------------------------------
@@ -129,25 +91,18 @@ def _call_gemini_intake(
     prompt_text = _build_intake_prompt(incident, photo_evidence)
     contents: list[object] = [prompt_text]
 
-    # Attach photo bytes if we have them
+    # Attach photo bytes if we have them.
     if photo_evidence and photo_evidence.storage_path:
-        candidate_paths = [
-            get_upload_root() / Path(photo_evidence.storage_path).name,
-            Path(__file__).resolve().parents[2] / photo_evidence.storage_path,
-        ]
-        for p in candidate_paths:
-            if p.exists():
-                try:
-                    contents.insert(
-                        0,
-                        genai_types.Part.from_bytes(
-                            data=p.read_bytes(),
-                            mime_type=photo_evidence.media_type,
-                        ),
-                    )
-                except Exception:
-                    pass
-                break
+        try:
+            contents.insert(
+                0,
+                genai_types.Part.from_bytes(
+                    data=read_photo_bytes(photo_evidence),
+                    mime_type=photo_evidence.media_type,
+                ),
+            )
+        except Exception:
+            pass
 
     response = client.models.generate_content(  # type: ignore[attr-defined]
         model=GEMINI_MODEL,

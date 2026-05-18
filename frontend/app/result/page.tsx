@@ -114,7 +114,7 @@ function ResultAssessment() {
   }
 
   const output = triage.competition_output;
-  const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence?.storage_path);
+  const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence);
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
 
   const showFallbackWarning = triage.perception.fallback_used;

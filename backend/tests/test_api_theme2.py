@@ -145,9 +145,16 @@ def test_upload_endpoint_persists_photo_and_preview_uses_metadata():
     uploaded_photo = upload.json()
     assert uploaded_photo["filename"] == "charger-screen.png"
     assert uploaded_photo["storage_path"].startswith("uploads/incidents/")
+    assert uploaded_photo["storage_provider"] == "local"
+    assert uploaded_photo["storage_key"].startswith("incidents/")
+    assert uploaded_photo["display_url"].startswith("/uploads/incidents/")
 
     stored_file = Path(os.environ["UPLOAD_ROOT"]) / "incidents" / Path(uploaded_photo["storage_path"]).name
     assert stored_file.exists()
+
+    evidence = client.get(f"/api/v1/evidence/{uploaded_photo['storage_key']}")
+    assert evidence.status_code == 200
+    assert evidence.headers["content-type"].startswith("image/png")
 
     preview = client.post(
         "/api/v1/intake/preview",

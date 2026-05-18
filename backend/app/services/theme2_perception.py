@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 import re
 import time
-from pathlib import Path
 
 from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
-from app.services.intake import get_upload_root
+from app.services.storage import read_photo_bytes
 
 _GEMINI_PARSE_ATTEMPTS = 3
 _GEMINI_MAX_OUTPUT_TOKENS = 8192
@@ -498,23 +497,6 @@ def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float
     )
 
 
-def _photo_path(incident: IncidentInput) -> Path | None:
-    if not incident.photo_evidence:
-        return None
-    storage_path = Path(incident.photo_evidence.storage_path)
-    if storage_path.is_absolute() and storage_path.exists():
-        return storage_path
-    candidates = [
-        Path(__file__).resolve().parents[2] / incident.photo_evidence.storage_path,
-        get_upload_root() / "incidents" / storage_path.name,
-        Path(__file__).resolve().parents[3] / incident.photo_evidence.storage_path,
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
 def _gemini_config(genai_types: object) -> object:
     return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
         temperature=0.0,
@@ -574,11 +556,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         f"error_code: {incident.error_code or ''}\n"
     )
 
-    image_path = _photo_path(incident)
-    if image_path is None:
-        raise FileNotFoundError("image_path_unresolved")
-
-    image_bytes = image_path.read_bytes()
+    image_bytes = read_photo_bytes(incident.photo_evidence)
     image_part = genai_types.Part.from_bytes(data=image_bytes, mime_type=incident.photo_evidence.media_type)
     contents = [image_part, prompt]
     raw: str | None = None

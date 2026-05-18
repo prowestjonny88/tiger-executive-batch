@@ -1,8 +1,13 @@
+import { compressImageForUpload } from "./image-compress";
+
 export type UploadedPhotoEvidence = {
   filename: string;
   media_type: string;
   storage_path: string;
   byte_size: number;
+  storage_provider?: "local" | "gcs";
+  storage_key?: string | null;
+  display_url?: string | null;
 };
 
 export type EvidenceType = "hardware_photo" | "screenshot" | "symptom_report" | "symptom_heavy_photo" | "mixed_photo" | "unknown";
@@ -193,8 +198,29 @@ export type IncidentHistoryDetailItem = IncidentHistoryItem & {
 
 const backendAssetBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "";
 
-export function resolveEvidenceUrl(storagePath?: string | null) {
-  if (!storagePath) return "";
+export function resolveEvidenceUrl(evidenceOrPath?: UploadedPhotoEvidence | string | null) {
+  if (!evidenceOrPath) return "";
+
+  if (typeof evidenceOrPath !== "string") {
+    if (evidenceOrPath.display_url) {
+      if (/^https?:\/\//i.test(evidenceOrPath.display_url)) return evidenceOrPath.display_url;
+      const normalizedDisplayUrl = evidenceOrPath.display_url.startsWith("/")
+        ? evidenceOrPath.display_url
+        : `/${evidenceOrPath.display_url}`;
+      return backendAssetBase
+        ? `${backendAssetBase.replace(/\/$/, "")}${normalizedDisplayUrl}`
+        : normalizedDisplayUrl;
+    }
+    if (evidenceOrPath.storage_provider === "gcs" && evidenceOrPath.storage_key) {
+      const key = evidenceOrPath.storage_key.replace(/^\/+/, "");
+      return backendAssetBase
+        ? `${backendAssetBase.replace(/\/$/, "")}/api/v1/evidence/${key}`
+        : `/api/v1/evidence/${key}`;
+    }
+    evidenceOrPath = evidenceOrPath.storage_path;
+  }
+
+  const storagePath = evidenceOrPath;
   const normalizedPath = storagePath.startsWith("/") ? storagePath : `/${storagePath}`;
   if (!backendAssetBase) return normalizedPath;
   return `${backendAssetBase.replace(/\/$/, "")}${normalizedPath}`;
@@ -261,14 +287,15 @@ export async function fetchTriage(payload: {
 }
 
 export async function uploadIncidentPhoto(file: File) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const uploadFile = await compressImageForUpload(file);
+  const bytes = new Uint8Array(await uploadFile.arrayBuffer());
   let binary = "";
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
   }
   return postJson<UploadedPhotoEvidence>("/api/uploads", {
-    filename: file.name,
-    media_type: file.type,
+    filename: uploadFile.name,
+    media_type: uploadFile.type || "image/jpeg",
     content_base64: btoa(binary),
   });
 }

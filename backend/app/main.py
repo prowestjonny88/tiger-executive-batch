@@ -6,13 +6,15 @@ import time
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import IncidentInput, UploadedPhotoPayload
 from app.db.persistence import init_db, save_audit, save_incident, update_incident
 from app.services.history import get_incident_history_by_id, list_incident_history
-from app.services.intake import assess_image_quality, build_follow_up_questions, get_upload_root, store_uploaded_photo
+from app.services.intake import assess_image_quality, build_follow_up_questions, store_uploaded_photo
+from app.services.storage import get_upload_root, read_evidence_object
 from app.services.theme2_rules import load_theme2_rules
 from app.services.theme2_triage import run_theme2_triage_with_debug
 
@@ -124,6 +126,15 @@ def get_incident(incident_id: int):
 @app.post("/api/v1/uploads")
 def upload_photo(payload: UploadedPhotoPayload):
     return store_uploaded_photo(payload)
+
+
+@app.get("/api/v1/evidence/{storage_key:path}")
+def evidence(storage_key: str):
+    try:
+        content, media_type = read_evidence_object(storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Evidence not found") from exc
+    return Response(content=content, media_type=media_type)
 
 
 @app.post("/api/v1/intake/preview")
