@@ -18,6 +18,7 @@ export function FollowUpControl({ questionId, value, onChange, onFileSelect, fil
     "charger_identity_closeup",
     "photo_request",
     "clear_theme2_photo",
+    "charger_app_screenshot",
   ].includes(questionId);
 
   const isIsolator = questionId === "isolator_switch_state";

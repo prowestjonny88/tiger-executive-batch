@@ -28,6 +28,19 @@ def _photo_incident(response_filename: str = "theme2.jpg") -> IncidentInput:
     )
 
 
+def _photo_incident_with_app_screenshot(response_filename: str = "theme2.jpg") -> IncidentInput:
+    incident = _photo_incident(response_filename)
+    screenshot_path = TEST_UPLOAD_ROOT / f"app-{response_filename}"
+    screenshot_path.write_bytes(b"\xff\xd8theme2-app-screenshot\xff\xd9")
+    incident.app_screenshot_evidence = StoredPhotoEvidence(
+        filename=screenshot_path.name,
+        media_type="image/jpeg",
+        storage_path=str(screenshot_path),
+        byte_size=screenshot_path.stat().st_size,
+    )
+    return incident
+
+
 def _fake_genai_modules() -> dict[str, object]:
     fake_types = types.SimpleNamespace(
         GenerateContentConfig=MagicMock(),
@@ -137,6 +150,53 @@ def test_gemini_perception_parses_normalized_evdb_spec_fields():
     assert result.extraction.rccb_type == "type_ac"
     assert result.extraction.rccb_type_evidence == "symbol_only"
     assert result.extraction.evdb_spec_status == "wrong"
+
+
+def test_gemini_perception_merges_ev_app_screenshot_text():
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Charger indicator is blinking red.",
+            "components_visible": ["charger"],
+            "visible_abnormalities": ["blinking_red_indicator"],
+            "ocr_findings": [],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.88,
+            "input_component": "charger",
+            "observation_result": "charger_blinking_red_light",
+            "charger_serial_number": None,
+            "charger_brand_model": None,
+            "indicator_status": "blinking_red_light",
+            "raw_visible_text": [],
+            "bounding_boxes": [],
+        }
+    )
+    screenshot_response = MagicMock()
+    screenshot_response.text = json.dumps(
+        {
+            "app_status_summary": "Emergency stop detected in app.",
+            "app_visible_text": ["Emergency Stop", "7 flashes"],
+            "app_error_code": "E-STOP",
+            "app_fault_hint": "emergency stop",
+            "app_uncertainty_notes": [],
+            "confidence_score": 0.9,
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, screenshot_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident_with_app_screenshot("theme2-app-merge.jpg"))
+
+    combined_text = " ".join(result.ocr_findings + result.extraction.raw_visible_text).lower()
+    assert result.mode == "vlm"
+    assert "app fault hint: emergency stop" in combined_text
+    assert "app text: 7 flashes" in combined_text
+    assert "APP_SCREENSHOT" in (result.raw_provider_output or "")
 
 
 def test_bad_gemini_theme2_enums_normalize_to_unknown():

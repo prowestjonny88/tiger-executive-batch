@@ -42,6 +42,16 @@ def test_evidence_panel_accepts_theme2_object_annotations():
     assert "Highlighted object evidence" in source
 
 
+def test_result_page_supports_optional_ev_app_screenshot_upload():
+    source = _read(FRONTEND_ROOT / "app" / "result" / "page.tsx")
+
+    assert "charger_app_screenshot" in source
+    assert "app_screenshot_evidence" in source
+    assert "Add App Screenshot" in source
+    assert "uploadIncidentPhoto" in source
+    assert "fetchTriage" in source
+
+
 def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():
     bad_sequences = [
         "".join(chr(code) for code in [0x00E2, 0x20AC, 0x201D]),
@@ -53,6 +63,7 @@ def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():
         FRONTEND_ROOT / "app" / "result" / "page.tsx",
         FRONTEND_ROOT / "app" / "history" / "page.tsx",
         FRONTEND_ROOT / "components" / "triage" / "evidence-panel.tsx",
+        FRONTEND_ROOT / "components" / "triage" / "follow-up-control.tsx",
         FRONTEND_ROOT / "components" / "triage" / "confidence-pill.tsx",
         FRONTEND_ROOT / "lib" / "theme2-result-fields.ts",
     ]

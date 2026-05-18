@@ -7,6 +7,7 @@ __pycache__/
 .pytest-tmp/
 .pycache-root/
 *.pyc
+*.tsbuildinfo
 backend/tests/test-uploads/
 .venv/
 venv/
@@ -23,8 +24,6 @@ UI prototype/
 .agents
 .codex_tmp/
 .vscode/
-backend/.env.example
-backend/.env
 
 # Raw datasets stay outside Git
 data/raw/

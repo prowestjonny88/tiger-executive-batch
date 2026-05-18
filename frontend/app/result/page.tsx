@@ -9,7 +9,9 @@ import { Card, CardContent } from "../../components/ui/card";
 import {
   ApiTriageResponse,
   fetchIncidentById,
+  fetchTriage,
   resolveEvidenceUrl,
+  uploadIncidentPhoto,
 } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
 import { PageShell } from "../../components/layout/page-shell";
@@ -17,6 +19,7 @@ import { DecisionChain } from "../../components/triage/decision-chain";
 import { EvidencePanel } from "../../components/triage/evidence-panel";
 import { ProofRequiredCard } from "../../components/triage/proof-required-card";
 import { ConfidencePill } from "../../components/triage/confidence-pill";
+import { UploadDropzone } from "../../components/triage/upload-dropzone";
 import { buildOrganizerOutputFields } from "../../lib/theme2-result-fields";
 
 export default function ResultAssessmentPage() {
@@ -38,6 +41,9 @@ function ResultAssessment() {
   const searchParams = useSearchParams();
   const [triage, setTriage] = useState<ApiTriageResponse | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [appScreenshotFile, setAppScreenshotFile] = useState<File | null>(null);
+  const [appScreenshotStatus, setAppScreenshotStatus] = useState<"idle" | "uploading" | "error">("idle");
+  const [appScreenshotError, setAppScreenshotError] = useState("");
 
   useEffect(() => {
     const replayId = searchParams.get("replay");
@@ -58,6 +64,8 @@ function ResultAssessment() {
                 photo_hint: incidentDetail.photo_hint,
                 demo_scenario_id: incidentDetail.demo_scenario_id,
                 photo_evidence: incidentDetail.photo_evidence || undefined,
+                app_screenshot_evidence:
+                  incidentDetail.app_screenshot_evidence || incidentDetail.triage_payload.incident.app_screenshot_evidence,
                 follow_up_answers: incidentDetail.follow_up_answers ?? incidentDetail.triage_payload.incident.follow_up_answers,
               },
             };
@@ -68,9 +76,10 @@ function ResultAssessment() {
               chargerId: reconstructedTriage.incident.charger_id,
               symptomText: reconstructedTriage.incident.symptom_text,
               errorCode: reconstructedTriage.incident.error_code,
-              photoHint: reconstructedTriage.incident.photo_hint,
-              photoEvidence: reconstructedTriage.incident.photo_evidence,
-              followUpAnswers: reconstructedTriage.incident.follow_up_answers,
+                photoHint: reconstructedTriage.incident.photo_hint,
+                photoEvidence: reconstructedTriage.incident.photo_evidence,
+                appScreenshotEvidence: reconstructedTriage.incident.app_screenshot_evidence,
+                followUpAnswers: reconstructedTriage.incident.follow_up_answers,
               demoScenarioId: reconstructedTriage.incident.demo_scenario_id,
               triage: reconstructedTriage,
             });
@@ -118,8 +127,49 @@ function ResultAssessment() {
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence);
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
   const organizerFields = buildOrganizerOutputFields(output, triage.perception.extraction);
+  const appScreenshotPrompt = triage.follow_up_prompts.find((prompt) => prompt.question_id === "charger_app_screenshot");
+  const hasAppScreenshot = Boolean(triage.incident.app_screenshot_evidence);
 
   const showFallbackWarning = triage.perception.fallback_used;
+
+  const handleAppScreenshotSubmit = async () => {
+    if (!appScreenshotFile || appScreenshotStatus === "uploading") return;
+    setAppScreenshotStatus("uploading");
+    setAppScreenshotError("");
+
+    try {
+      const uploaded = await uploadIncidentPhoto(appScreenshotFile);
+      const followUpAnswers = {
+        ...(triage.incident.follow_up_answers ?? {}),
+        charger_app_screenshot: `[Uploaded app screenshot: ${uploaded.filename}]`,
+      };
+      const nextTriage = await fetchTriage({
+        incident_id: triage.incident_id,
+        site_id: triage.incident.site_id,
+        charger_id: triage.incident.charger_id,
+        photo_evidence: triage.incident.photo_evidence,
+        app_screenshot_evidence: uploaded,
+        photo_hint: triage.incident.photo_hint ?? "",
+        symptom_text: triage.incident.symptom_text ?? "",
+        error_code: triage.incident.error_code ?? "",
+        follow_up_answers: followUpAnswers,
+        demo_scenario_id: triage.incident.demo_scenario_id,
+      });
+
+      setTriage(nextTriage);
+      setAppScreenshotFile(null);
+      setAppScreenshotStatus("idle");
+      writeSession({
+        incidentId: nextTriage.incident_id,
+        appScreenshotEvidence: uploaded,
+        followUpAnswers,
+        triage: nextTriage,
+      });
+    } catch (error) {
+      setAppScreenshotStatus("error");
+      setAppScreenshotError(error instanceof Error ? error.message : "App screenshot upload failed. Please try again.");
+    }
+  };
 
   return (
     <PageShell maxWidth="5xl">
@@ -217,6 +267,44 @@ function ResultAssessment() {
                 proofNext={output.required_proof_next} 
                 prompts={triage.follow_up_prompts} 
               />
+
+              {(appScreenshotPrompt || hasAppScreenshot) && (
+                <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4">
+                    <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">
+                      EV App Screenshot
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-600">
+                      {hasAppScreenshot
+                        ? "EV app screenshot included in this triage result."
+                        : appScreenshotPrompt?.prompt}
+                    </p>
+                  </div>
+
+                  {!hasAppScreenshot && (
+                    <div className="space-y-4">
+                      <UploadDropzone
+                        onFileSelect={(file) => {
+                          setAppScreenshotFile(file);
+                          setAppScreenshotError("");
+                        }}
+                        fileName={appScreenshotFile?.name}
+                      />
+                      {appScreenshotError && (
+                        <p className="text-sm font-medium text-red-700">{appScreenshotError}</p>
+                      )}
+                      <Button
+                        type="button"
+                        onClick={handleAppScreenshotSubmit}
+                        disabled={!appScreenshotFile || appScreenshotStatus === "uploading"}
+                        className="w-full rounded-xl bg-green-700 font-bold hover:bg-green-800"
+                      >
+                        {appScreenshotStatus === "uploading" ? "Parsing app screenshot..." : "Add App Screenshot"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <EvidencePanel
                 imageUrl={imageUrl}

@@ -185,6 +185,7 @@ def _evidence_notes(
     notes: list[str] = []
     notes.extend(extraction.uncertainty_notes)
     notes.extend(perception.uncertainty_notes[:2])
+    notes.extend([finding for finding in perception.ocr_findings if finding.startswith("App ")][:3])
     if observation == "charger_serial_brand_visible":
         if extraction.charger_serial_number is None:
             notes.append("Charger serial number was not readable.")

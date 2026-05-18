@@ -103,6 +103,7 @@ export type ApiTriageResponse = {
     site_id: string;
     charger_id?: string;
     photo_evidence?: UploadedPhotoEvidence;
+    app_screenshot_evidence?: UploadedPhotoEvidence;
     photo_hint?: string;
     symptom_text?: string;
     error_code?: string;
@@ -185,6 +186,7 @@ export type IncidentHistoryItem = {
   site_id: string;
   charger_id?: string;
   photo_evidence?: UploadedPhotoEvidence | null;
+  app_screenshot_evidence?: UploadedPhotoEvidence | null;
   photo_hint?: string;
   symptom_text?: string;
   error_code?: string;
@@ -274,6 +276,7 @@ export async function fetchPreview(payload: {
   site_id: string;
   charger_id?: string;
   photo_evidence?: UploadedPhotoEvidence;
+  app_screenshot_evidence?: UploadedPhotoEvidence;
   photo_hint: string;
   symptom_text: string;
   error_code: string;
@@ -288,6 +291,7 @@ export async function fetchTriage(payload: {
   site_id: string;
   charger_id?: string;
   photo_evidence?: UploadedPhotoEvidence;
+  app_screenshot_evidence?: UploadedPhotoEvidence;
   photo_hint: string;
   symptom_text: string;
   error_code: string;

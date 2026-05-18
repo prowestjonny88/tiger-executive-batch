@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import re
 import time
+from typing import Any
 
-from app.core.models import IncidentInput, Theme2BoundingBox, Theme2PerceptionAssessment, Theme2VisualExtraction
+from app.core.models import IncidentInput, StoredPhotoEvidence, Theme2BoundingBox, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.storage import read_photo_bytes
 
@@ -110,6 +111,26 @@ _GEMINI_RESPONSE_SCHEMA = {
         "isolator_state",
         "raw_visible_text",
         "bounding_boxes",
+    ],
+}
+
+_APP_SCREENSHOT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "app_status_summary": {"type": "string"},
+        "app_visible_text": {"type": "array", "items": {"type": "string"}},
+        "app_error_code": {"type": "string", "nullable": True},
+        "app_fault_hint": {"type": "string", "nullable": True},
+        "app_uncertainty_notes": {"type": "array", "items": {"type": "string"}},
+        "confidence_score": {"type": "number"},
+    },
+    "required": [
+        "app_status_summary",
+        "app_visible_text",
+        "app_error_code",
+        "app_fault_hint",
+        "app_uncertainty_notes",
+        "confidence_score",
     ],
 }
 
@@ -406,6 +427,11 @@ def _combined_incident_text(incident: IncidentInput) -> str:
     return " ".join(part for part in parts if part).strip()
 
 
+def _dedupe(items: list[str], limit: int | None = None) -> list[str]:
+    values = list(dict.fromkeys(item for item in items if item))
+    return values[:limit] if limit is not None else values
+
+
 def _infer_evidence_type(incident: IncidentInput) -> str:
     if incident.photo_evidence is None:
         return "symptom_report"
@@ -630,6 +656,59 @@ def _gemini_config_without_schema(genai_types: object) -> object:
     )
 
 
+def _gemini_config_for_schema(genai_types: object, schema: dict[str, object]) -> object:
+    return genai_types.GenerateContentConfig(  # type: ignore[attr-defined]
+        temperature=0.0,
+        max_output_tokens=2048,
+        response_mime_type="application/json",
+        response_schema=schema,
+    )
+
+
+def _generate_gemini_json(
+    evidence: StoredPhotoEvidence,
+    prompt: str,
+    genai_types: object,
+    schema: dict[str, object],
+) -> tuple[dict[str, object], str]:
+    image_bytes = read_photo_bytes(evidence)
+    typed_genai_types = genai_types  # type: Any
+    image_part = typed_genai_types.Part.from_bytes(data=image_bytes, mime_type=evidence.media_type)
+    raw: str | None = None
+    last_error: json.JSONDecodeError | None = None
+    client = get_gemini_client()
+    if client is None:
+        raise RuntimeError("gemini_client_unavailable")
+
+    use_schema = True
+    for attempt in range(_GEMINI_PARSE_ATTEMPTS):
+        try:
+            response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=GEMINI_MODEL,
+                contents=[image_part, prompt],
+                config=_gemini_config_for_schema(genai_types, schema) if use_schema else _gemini_config_without_schema(genai_types),
+            )
+        except Exception:
+            if not use_schema:
+                raise
+            use_schema = False
+            response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=GEMINI_MODEL,
+                contents=[image_part, prompt],
+                config=_gemini_config_without_schema(genai_types),
+            )
+        raw = (response.text or "").strip()
+        try:
+            return _extract_json_object(raw), raw
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            if attempt < _GEMINI_PARSE_ATTEMPTS - 1:
+                time.sleep(0.4 * (attempt + 1))
+
+    message = str(last_error) if last_error is not None else "Gemini returned no parseable JSON."
+    raise GeminiPerceptionError(message, error_type="schema_mismatch", raw_provider_output=raw)
+
+
 def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessment | None:
     if incident.photo_evidence is None:
         return None
@@ -738,6 +817,89 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
     )
 
 
+def _call_gemini_app_screenshot(incident: IncidentInput) -> tuple[dict[str, object], str] | None:
+    if incident.app_screenshot_evidence is None:
+        return None
+
+    try:
+        from google.genai import types as genai_types  # type: ignore[import-untyped]
+    except ImportError:
+        raise RuntimeError("gemini_sdk_unavailable")
+
+    prompt = (
+        "You are reading an EV charging app screenshot for RExharge Theme 2. Return JSON only.\n"
+        "Use exactly these keys: app_status_summary, app_visible_text, app_error_code, app_fault_hint, "
+        "app_uncertainty_notes, confidence_score.\n"
+        "Extract only visible app text. Do not infer hidden status. If text is unreadable, use null and add an uncertainty note.\n"
+        "For app_fault_hint, prefer one of: ground fault, emergency stop, short circuit, over-temperature, "
+        "charger fault, offline/no supply, unknown. Include visible flash count text if present.\n"
+        "Keep arrays short and each text item under 80 characters.\n"
+        f"photo_hint: {incident.photo_hint or ''}\n"
+        f"symptom_text: {incident.symptom_text or ''}\n"
+        f"error_code: {incident.error_code or ''}\n"
+    )
+    return _generate_gemini_json(incident.app_screenshot_evidence, prompt, genai_types, _APP_SCREENSHOT_SCHEMA)
+
+
+def _merge_app_screenshot_perception(
+    incident: IncidentInput,
+    perception: Theme2PerceptionAssessment,
+) -> Theme2PerceptionAssessment:
+    if incident.app_screenshot_evidence is None:
+        return perception
+    try:
+        parsed = _call_gemini_app_screenshot(incident)
+    except Exception as exc:
+        error_type, error_message = _classify_perception_error(exc)
+        notes = _dedupe(
+            [
+                *perception.uncertainty_notes,
+                f"EV app screenshot could not be parsed ({error_type}: {error_message}).",
+            ],
+            limit=5,
+        )
+        return perception.model_copy(update={"uncertainty_notes": notes, "requires_follow_up": True})
+    if parsed is None:
+        return perception
+
+    data, raw = parsed
+    app_visible_text = _normalize_list(data.get("app_visible_text"))
+    app_error_code = _clean_optional_text(data.get("app_error_code"))
+    app_fault_hint = _clean_optional_text(data.get("app_fault_hint"))
+    app_summary = _clean_optional_text(data.get("app_status_summary"))
+    app_uncertainty_notes = _normalize_list(data.get("app_uncertainty_notes"))
+
+    app_findings = _dedupe(
+        [
+            *([f"App screenshot summary: {app_summary}"] if app_summary else []),
+            *([f"App error code: {app_error_code}"] if app_error_code else []),
+            *([f"App fault hint: {app_fault_hint}"] if app_fault_hint else []),
+            *[f"App text: {item}" for item in app_visible_text],
+        ],
+        limit=8,
+    )
+    extraction = perception.extraction.model_copy(
+        update={
+            "raw_visible_text": _dedupe([*perception.extraction.raw_visible_text, *app_findings], limit=12),
+            "uncertainty_notes": _dedupe([*perception.extraction.uncertainty_notes, *app_uncertainty_notes], limit=6),
+        }
+    )
+    raw_provider_output = perception.raw_provider_output
+    if raw:
+        raw_provider_output = f"{raw_provider_output}\n\nAPP_SCREENSHOT:\n{raw}" if raw_provider_output else f"APP_SCREENSHOT:\n{raw}"
+
+    return perception.model_copy(
+        update={
+            "scene_summary": f"{perception.scene_summary} App screenshot reviewed." if app_findings else perception.scene_summary,
+            "ocr_findings": _dedupe([*perception.ocr_findings, *app_findings], limit=12),
+            "uncertainty_notes": _dedupe([*perception.uncertainty_notes, *app_uncertainty_notes], limit=6),
+            "requires_follow_up": perception.requires_follow_up or bool(app_uncertainty_notes),
+            "raw_provider_output": raw_provider_output,
+            "extraction": extraction,
+        }
+    )
+
+
 def _classify_perception_error(exc: Exception) -> tuple[str, str]:
     if isinstance(exc, GeminiPerceptionError):
         return exc.error_type, str(exc)
@@ -761,7 +923,7 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
         summary = incident.symptom_text or incident.photo_hint or "No visual evidence provided."
         text = _combined_incident_text(incident)
         extraction = _fallback_theme2_extraction(incident, 0.25)
-        return Theme2PerceptionAssessment(
+        text_only_result = Theme2PerceptionAssessment(
             mode="text_only",
             evidence_type=_infer_evidence_type(incident),  # type: ignore[arg-type]
             scene_summary=summary,
@@ -778,6 +940,7 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
             error_message="No photo evidence was provided.",
             extraction=extraction,
         )
+        return _merge_app_screenshot_perception(incident, text_only_result)
 
     error_type: str | None = None
     error_message: str | None = None
@@ -785,7 +948,7 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
     try:
         gemini_result = _call_gemini_perception(incident)
         if gemini_result is not None:
-            return gemini_result
+            return _merge_app_screenshot_perception(incident, gemini_result)
     except Exception as exc:
         error_type, error_message = _classify_perception_error(exc)
         if isinstance(exc, GeminiPerceptionError):
@@ -793,7 +956,7 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
 
     text = _combined_incident_text(incident)
     extraction = _fallback_theme2_extraction(incident, 0.38)
-    return Theme2PerceptionAssessment(
+    heuristic_result = Theme2PerceptionAssessment(
         mode="heuristic",
         evidence_type=_infer_evidence_type(incident),  # type: ignore[arg-type]
         scene_summary=incident.photo_hint or incident.symptom_text or "Uploaded photo requires deterministic Theme 2 assessment.",
@@ -811,3 +974,4 @@ def assess_theme2_perception(incident: IncidentInput) -> Theme2PerceptionAssessm
         error_message=error_message or "Gemini perception did not produce a usable structured response.",
         extraction=extraction,
     )
+    return _merge_app_screenshot_perception(incident, heuristic_result)

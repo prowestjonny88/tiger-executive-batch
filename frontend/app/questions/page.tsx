@@ -76,10 +76,15 @@ export default function AdaptiveQuestions() {
     
     // Upload any newly selected files for follow-up questions
     const finalAnswers = { ...answers };
+    let appScreenshotEvidence = session.appScreenshotEvidence;
     for (const [qId, file] of Object.entries(files)) {
       try {
         const uploaded = await uploadIncidentPhoto(file);
         finalAnswers[qId] = `[Uploaded Photo ID: ${uploaded.storage_path}]`;
+        if (qId === "charger_app_screenshot" || qId === "red_light_flash_count") {
+          appScreenshotEvidence = uploaded;
+          finalAnswers[qId] = `[Uploaded app screenshot: ${uploaded.filename}]`;
+        }
       } catch (e) {
         // Fallback if upload fails
         finalAnswers[qId] = `[Failed to upload: ${file.name}]`;
@@ -99,6 +104,7 @@ export default function AdaptiveQuestions() {
         site_id: session.siteId ?? "site-mall-01",
         charger_id: session.chargerId,
         photo_evidence: session.photoEvidence,
+        app_screenshot_evidence: appScreenshotEvidence,
         photo_hint: session.photoHint ?? "",
         symptom_text: session.symptomText ?? "",
         error_code: session.errorCode ?? "",
@@ -108,6 +114,7 @@ export default function AdaptiveQuestions() {
 
       writeSession({
         incidentId: triage.incident_id,
+        appScreenshotEvidence,
         followUpAnswers: mergedAnswers,
         triage,
       });

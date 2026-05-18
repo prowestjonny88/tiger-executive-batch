@@ -1,14 +1,14 @@
-# RExharge Theme 2 Deployment Guide
+# Cloud Run And Vercel Deployment Guide
 
-This guide deploys the RExharge Theme 2 app with:
+This guide deploys the current RExharge Theme 2 app:
 
 - Frontend: Vercel
 - Backend: Google Cloud Run
 - Database: Neon Postgres
 - Upload storage: Google Cloud Storage
-- Vision model: Gemini via `GEMINI_API_KEY`
+- Vision model: Gemini
 
-Raw Dataset 2 images remain local or in Google Drive. They are not committed and are not deployed as app storage.
+Raw Dataset 2 images are not deployed. Uploaded user evidence is stored in GCS.
 
 ## Architecture
 
@@ -18,30 +18,20 @@ Browser
   -> Next.js API proxy routes
   -> Cloud Run FastAPI backend
   -> Gemini API
-  -> Neon Postgres for metadata/history/audits
-  -> Google Cloud Storage for uploaded image bytes
+  -> Neon Postgres for incidents/audits
+  -> Google Cloud Storage for uploaded photos and app screenshots
 ```
 
-Cloud Run local disk is ephemeral. For a quick smoke test, `UPLOAD_ROOT=/tmp/rexharge/uploads` with `--max-instances=1` can work, but the final demo should use GCS.
+Cloud Run local disk is ephemeral. Use GCS for deployment.
 
-## Repository Deployment Files
+## Required Files
 
-The backend is deployed from the repo root so the container includes both `backend/` and `data/`.
-
-Required root files:
+The backend deploys from the repository root:
 
 - `Dockerfile`
 - `.dockerignore`
 
-The Dockerfile copies:
-
-```text
-backend/pyproject.toml
-backend/app/
-data/
-```
-
-The `.dockerignore` excludes raw images, videos, pseudo-labels, local build outputs, virtual environments, and archived Round 1 files from the Cloud Build context.
+The Dockerfile copies `backend/` and `data/` into the container. `.dockerignore` excludes raw datasets, videos, pseudo-labels, local builds, virtual environments, and `_archive/`.
 
 ## Backend Environment Variables
 
@@ -51,17 +41,12 @@ Required:
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3-flash-preview
-```
-
-Recommended for final deployment:
-
-```env
 STORAGE_BACKEND=gcs
 GCS_BUCKET=rexharge-uploads-<PROJECT_ID>
 GCS_UPLOAD_PREFIX=incidents
 ```
 
-Temporary filesystem mode:
+Temporary local-disk smoke mode only:
 
 ```env
 UPLOAD_ROOT=/tmp/rexharge/uploads
@@ -76,19 +61,7 @@ NEXT_PUBLIC_API_BASE_URL=https://YOUR-CLOUD-RUN-URL
 API_BASE_URL=https://YOUR-CLOUD-RUN-URL
 ```
 
-Set both because browser-side helpers and server-side proxy routes need the backend URL.
-
-## Neon Setup
-
-1. Create a Neon Postgres project.
-2. Copy the connection string.
-3. Ensure it includes SSL:
-
-```text
-?sslmode=require
-```
-
-Neon stores incident metadata, audit payloads, and history. Do not store image bytes in Neon.
+Both are required because browser helpers and Next.js server proxy routes need the backend URL.
 
 ## Google Cloud Setup
 
@@ -98,9 +71,9 @@ Recommended region:
 us-central1
 ```
 
-Enable required APIs:
+Enable APIs:
 
-```powershell
+```cmd
 gcloud services enable run.googleapis.com
 gcloud services enable cloudbuild.googleapis.com
 gcloud services enable artifactregistry.googleapis.com
@@ -109,79 +82,60 @@ gcloud services enable storage.googleapis.com
 
 Create the upload bucket:
 
-```powershell
-$PROJECT_ID = "YOUR_PROJECT_ID"
-$BUCKET = "rexharge-uploads-$PROJECT_ID"
+```cmd
+set PROJECT_ID=rexharge-experiment
+set BUCKET=rexharge-uploads-%PROJECT_ID%
 
-gcloud storage buckets create gs://$BUCKET `
-  --location=US-CENTRAL1 `
+gcloud storage buckets create gs://%BUCKET% ^
+  --location=US-CENTRAL1 ^
   --uniform-bucket-level-access
 ```
 
-Grant Cloud Run access:
+Grant the Cloud Run service account access:
 
-```powershell
-$PROJECT_NUMBER = gcloud projects describe $PROJECT_ID --format="value(projectNumber)"
-$SERVICE_ACCOUNT = "$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
+```cmd
+gcloud projects describe %PROJECT_ID% --format="value(projectNumber)"
+```
 
-gcloud storage buckets add-iam-policy-binding gs://$BUCKET `
-  --member="serviceAccount:$SERVICE_ACCOUNT" `
+Use the printed project number:
+
+```cmd
+gcloud storage buckets add-iam-policy-binding gs://%BUCKET% ^
+  --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" ^
   --role="roles/storage.objectAdmin"
 ```
 
-## Deploy Backend
+## Manual Backend Redeploy
 
 Run from the repo root:
 
-```powershell
-$PROJECT_ID = "YOUR_PROJECT_ID"
-$REGION = "us-central1"
-$SERVICE = "rexharge-backend"
-$BUCKET = "rexharge-uploads-$PROJECT_ID"
-
-gcloud run deploy $SERVICE `
-  --source . `
-  --region $REGION `
-  --allow-unauthenticated `
-  --memory 512Mi `
-  --cpu 1 `
-  --min-instances 0 `
-  --max-instances 2 `
-  --timeout 120 `
-  --set-env-vars DATABASE_URL="YOUR_NEON_DATABASE_URL" `
-  --set-env-vars GEMINI_API_KEY="YOUR_GEMINI_API_KEY" `
-  --set-env-vars GEMINI_MODEL="gemini-3-flash-preview" `
-  --set-env-vars STORAGE_BACKEND="gcs" `
-  --set-env-vars GCS_BUCKET="$BUCKET" `
-  --set-env-vars GCS_UPLOAD_PREFIX="incidents"
+```cmd
+gcloud run deploy rexharge-backend ^
+  --source . ^
+  --region us-central1 ^
+  --allow-unauthenticated ^
+  --memory 512Mi ^
+  --cpu 1 ^
+  --min-instances 0 ^
+  --max-instances 2 ^
+  --timeout 120
 ```
 
-Temporary filesystem smoke mode:
+If the service already has environment variables configured, this redeploy keeps them unless you overwrite them. Use this for quick iteration after backend commits.
 
-```powershell
-gcloud run deploy $SERVICE `
-  --source . `
-  --region $REGION `
-  --allow-unauthenticated `
-  --memory 512Mi `
-  --cpu 1 `
-  --min-instances 0 `
-  --max-instances 1 `
-  --timeout 120 `
-  --set-env-vars DATABASE_URL="YOUR_NEON_DATABASE_URL" `
-  --set-env-vars GEMINI_API_KEY="YOUR_GEMINI_API_KEY" `
-  --set-env-vars GEMINI_MODEL="gemini-3-flash-preview" `
-  --set-env-vars UPLOAD_ROOT="/tmp/rexharge/uploads"
+Get the service URL:
+
+```cmd
+gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
 ```
 
-## Test Backend
+Health check:
 
-```powershell
-$BACKEND_URL = "https://YOUR-CLOUD-RUN-URL"
-curl "$BACKEND_URL/api/v1/health"
+```cmd
+curl https://YOUR-CLOUD-RUN-URL/api/v1/health
 ```
 
-Expected response includes:
+Expected fields:
 
 ```json
 {
@@ -192,63 +146,42 @@ Expected response includes:
 }
 ```
 
-Read logs:
+Read backend logs:
 
-```powershell
-gcloud run services logs read rexharge-backend `
-  --region us-central1 `
-  --limit 100
+```cmd
+gcloud run services logs read rexharge-backend --region us-central1 --limit 100
 ```
 
-## Deploy Frontend
+## Vercel Frontend
 
-In Vercel:
-
-```text
-New Project
--> Import GitHub repo
--> Framework: Next.js
--> Root Directory: frontend
-```
-
-Build settings:
+Project settings:
 
 ```text
+Root Directory: frontend
 Install Command: npm install
 Build Command: npm run build
 Output Directory: .next
 ```
 
-Set environment variables:
+After changing `NEXT_PUBLIC_API_BASE_URL` or `API_BASE_URL`, redeploy Vercel.
 
-```env
-NEXT_PUBLIC_API_BASE_URL=https://YOUR-CLOUD-RUN-URL
-API_BASE_URL=https://YOUR-CLOUD-RUN-URL
-```
-
-Redeploy after changing env vars.
+If only backend code changes and the Cloud Run URL stays the same, redeploy Cloud Run; Vercel env does not need to change.
 
 ## Final Smoke Test
 
-1. Open Vercel app `/upload`.
-2. Upload a charger red light image.
-3. Confirm result shows:
-   - input component: charger
-   - observation: charger red light
-   - fault type: charger issue
-   - recipient: after-sales team
-   - assigned team: `AS_TEAM_01`
-4. Upload an isolator OFF image.
-5. Confirm result routes to customer power-cut action.
-6. Open `/history` and confirm Theme 2 history fields render.
+1. Open the Vercel `/upload` page.
+2. Upload a charger red-light image.
+3. Confirm the result routes to after-sales team `AS_TEAM_01`.
+4. Add an EV app screenshot if prompted and confirm triage reruns.
+5. Upload an isolator OFF image and confirm customer power-cut guidance.
+6. Open `/history` and confirm Theme 2 columns render.
 
 ## Common Failures
 
-Backend cannot find Theme 2 rules:
+Backend cannot find rules:
 
 ```text
-Docker build context missed data/.
-Deploy from repo root with --source .
+Deploy from repo root with --source . so data/ is included.
 ```
 
 Neon connection fails:
@@ -257,20 +190,20 @@ Neon connection fails:
 Check DATABASE_URL and sslmode=require.
 ```
 
-Upload fails with 413:
+Upload or app screenshot is unreadable after deploy:
 
 ```text
-Compress images before upload. Target <= 1.5 MB.
-```
-
-Triage cannot read uploaded image:
-
-```text
-Use GCS storage backend. Cloud Run local disk is ephemeral.
+Use STORAGE_BACKEND=gcs and confirm Cloud Run has roles/storage.objectAdmin on the bucket.
 ```
 
 Gemini fallback appears unexpectedly:
 
 ```text
-Check GEMINI_API_KEY, Cloud Run logs, and whether image bytes can be read.
+Check GEMINI_API_KEY, Cloud Run logs, and uploaded object read access.
+```
+
+Frontend still calls old backend:
+
+```text
+Check Vercel NEXT_PUBLIC_API_BASE_URL and API_BASE_URL, then redeploy Vercel.
 ```

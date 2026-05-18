@@ -63,6 +63,7 @@ class IncidentInput(BaseModel):
     site_id: str
     charger_id: Optional[str] = None
     photo_evidence: Optional[StoredPhotoEvidence] = None
+    app_screenshot_evidence: Optional[StoredPhotoEvidence] = None
     photo_hint: Optional[str] = None
     symptom_text: Optional[str] = None
     error_code: Optional[str] = None

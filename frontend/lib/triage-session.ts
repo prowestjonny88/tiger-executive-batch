@@ -20,6 +20,7 @@ export type TriageSession = {
   errorCode?: string;
   photoHint?: string;
   photoEvidence?: UploadedPhotoEvidence;
+  appScreenshotEvidence?: UploadedPhotoEvidence;
   followUpAnswers?: Record<string, string>;
   demoScenarioId?: string;
   preview?: PreviewResponse;

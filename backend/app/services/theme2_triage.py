@@ -53,6 +53,12 @@ def build_theme2_followups(
             "Provide the red-light flash count or an app error log screenshot.",
             "Blinking red light fault type depends on the error-log or flash-count evidence.",
         )
+    if extraction.observation_result == "charger_red_light" and incident.app_screenshot_evidence is None:
+        add(
+            "charger_app_screenshot",
+            "If available, upload a screenshot from the EV charging app showing the charger fault/status.",
+            "The Theme 2 guide asks for EV app screenshot evidence for charger red-light cases when available.",
+        )
     if _evdb_needs_label_proof(perception):
         add(
             "evdb_label_closeup",

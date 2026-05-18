@@ -1,56 +1,55 @@
 # RExharge Theme 2 Triage
 
-RExharge Theme 2 Triage is a VLM-assisted EV charger troubleshooting prototype for the organizer-scoped ESUM Theme 2 dataset. It inspects charger, EVDB, and isolator evidence; extracts visible observations and charger identity fields; maps the result to official Theme 2 fault types; and routes each case to either the customer or an after-sales team identifier.
+RExharge Theme 2 Triage is an EV charger troubleshooting prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, and routes the result either to the customer or to `AS_TEAM_01`.
 
-The live runtime is now centered on:
+The current product is Theme 2 only. Round 1 known-case retrieval, pgvector, KB gates, `issue_family`, and `resolver_tier` are archived under `_archive/round1/` and are not part of the live runtime.
 
-- `input_component`: `charger`, `evdb`, `isolator`, or `unknown`
-- `observation_result`: charger light state, EVDB protection state/spec, or isolator state
-- `fault_type_v2`: organizer fault type such as `charger_issue`, `supply_issue`, `protection_issue`, or `power_cut`
-- `recipient_type`: `customer`, `after_sales_team`, `none`, or `unknown`
-- `assigned_team_id`: currently `AS_TEAM_01` for after-sales routing
-
-## Repo Structure
-
-- `frontend/` - Next.js app for upload, follow-up questions, result, guidance, escalation, history, and demo flows
-- `backend/` - FastAPI backend for uploads, Theme 2 perception, organizer rule mapping, audit history, and persistence
-- `data/round2/` - Theme 2 rule table and future manifest/evaluation assets
-- `data/demo/` - text-first Theme 2 demo scenarios
-- `docs/` - current Theme 2 setup and runtime notes
-- `_archive/round1/` - archived Round 1 known-case retrieval runtime, tests, data, and old docs
-
-## Current Runtime
-
-The active path is:
+## System Architecture
 
 ```text
-Upload / demo evidence
--> Theme 2 VLM or heuristic perception
--> deterministic organizer rule mapping
--> follow-up prompt generation
--> customer or after-sales output
--> Postgres incident/audit history
+Browser
+  -> Vercel Next.js frontend
+  -> Next.js API proxy routes
+  -> FastAPI backend on Cloud Run or local Uvicorn
+  -> Gemini VLM for image/app-screenshot perception
+  -> deterministic Theme 2 rule mapper
+  -> Neon/local Postgres for incidents and triage_audits
+  -> Google Cloud Storage or local disk for uploaded evidence
 ```
 
-The live path no longer uses Round 1 known-case retrieval, pgvector indexing, issue-family routing, resolver tiers, or KB gates.
+Live triage path:
 
-## Current Status
+```text
+upload/demo input
+-> Theme 2 perception
+-> optional EV app screenshot parsing
+-> organizer rule mapping
+-> proof/follow-up prompts
+-> customer guidance or after-sales routing
+-> audit/history
+```
 
-| Area | Status | Notes |
-|---|---:|---|
-| Theme 2 runtime | Done | VLM/heuristic perception plus deterministic rule mapper |
-| Customer/after-sales routing | Done | Uses `recipient_type` and `assigned_team_id` |
-| Blind evaluation mode | Done | Uses neutral hints to avoid expected-label leakage |
-| Dataset manifest | Done | Raw images stay local and ignored |
-| Manual review quarantine | Done | Ambiguous cases are retained in `manual_review_cases.json` |
-| Serial/brand exact OCR validation | Partial | Requires non-null reviewed charger-label ground truth |
-| Isolator OFF coverage | Partial | Add confirmed OFF image cases when available |
-| Video handling | Partial | Frame extraction utility is available; generated frames stay ignored |
-| EVDB spec interpretation | Done | Normalizes 40A/pole/RCCB Type A evidence before rule mapping |
+## Current Features
 
-## Quick Start
+- Charger, EVDB, and isolator evidence classification.
+- Optional EV app screenshot upload for charger red/blinking-red cases.
+- VLM extraction of visible charger serial number, brand/model, EVDB specs, isolator state, app status text, and object bounding boxes.
+- Conservative fallback behavior when Gemini is unavailable.
+- Organizer outputs: `input_component`, `observation_result`, `fault_type_v2`, `recipient_type`, optional `assigned_team_id`, action message, confidence, proof prompts, and evidence notes.
+- Component-specific result display: charger identity, EVDB MCB/RCCB evidence, or isolator switch state.
+- Dataset manifest, evaluation, pseudo-label, quarantine, video-frame, and unseen-image utility scripts.
 
-### 1. Create Local Env Files
+## Repository Layout
+
+- `backend/` - FastAPI app, Theme 2 perception, rule mapping, storage, persistence, and tests.
+- `frontend/` - Next.js landing page and dashboard flow.
+- `data/round2/` - Theme 2 rules, manifest/evaluation metadata, quarantine metadata, and summaries. Raw images stay ignored.
+- `data/demo/` - text/demo scenarios.
+- `scripts/` - dataset, evaluation, pseudo-label, smoke-test, and validation utilities.
+- `docs/` - current architecture, contract, deployment, evaluation, demo, and report docs.
+- `_archive/round1/` - archived Round 1 code/data/docs for reference only.
+
+## Local Setup
 
 Create `backend/.env`:
 
@@ -58,6 +57,8 @@ Create `backend/.env`:
 DATABASE_URL=postgresql://omnitriage:omnitriage@localhost:5432/omnitriage
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-3-flash-preview
+STORAGE_BACKEND=local
+UPLOAD_ROOT=uploads
 ```
 
 Create `frontend/.env.local`:
@@ -67,11 +68,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
 API_BASE_URL=http://127.0.0.1:8001
 ```
 
-Both files are intentionally ignored by Git. Restart the backend after changing `backend/.env`, and restart the frontend after changing `frontend/.env.local`.
-
-### 2. Start Postgres
-
-The backend persists incidents and audit history in Postgres. If local Postgres is not already running on port `5432`, start a throwaway Docker instance:
+Start local Postgres if needed:
 
 ```powershell
 docker run --name rex-postgres `
@@ -82,21 +79,13 @@ docker run --name rex-postgres `
   -d postgres:16
 ```
 
-If the container already exists:
+If it already exists:
 
 ```powershell
 docker start rex-postgres
 ```
 
-Quick check:
-
-```powershell
-Test-NetConnection 127.0.0.1 -Port 5432
-```
-
-`TcpTestSucceeded` should be `True`. If the backend stays at `Waiting for application startup`, Postgres is the first thing to check.
-
-### 3. Start Backend
+Install and run the backend:
 
 ```powershell
 C:\Users\JON\AppData\Local\Programs\Python\Python312\python.exe -m venv backend\.venv
@@ -111,16 +100,7 @@ Health check:
 Invoke-RestMethod http://127.0.0.1:8001/api/v1/health
 ```
 
-Expected health payload includes:
-
-```json
-{
-  "runtime_mode": "theme2_round2_clean",
-  "round1_runtime_enabled": false
-}
-```
-
-### 4. Start Frontend
+Install and run the frontend:
 
 ```powershell
 cd frontend
@@ -134,63 +114,104 @@ Open:
 - `http://localhost:3000/upload`
 - `http://localhost:3000/history`
 
-### 5. Test From The Web Interface
+## Web Interface Test Flow
 
-1. Open `http://localhost:3000/upload`.
-2. Upload an unseen charger, EVDB, or isolator image.
+1. Open `/upload`.
+2. Upload a charger, EVDB, or isolator image.
 3. Confirm `/result` shows `Organizer Required Output`.
-4. Check `Input Component`, `Observation Result`, `Fault Type`, `Recipient`, confidence, and proof prompts.
-5. Confirm the evidence cards match the component: charger shows serial/brand, EVDB shows MCB/RCCB fields, and isolator shows switch state.
-6. If the result says `Vision model unavailable; using fallback interpretation`, confirm `GEMINI_API_KEY` is present in `backend/.env` and restart the backend.
+4. For charger red-light evidence, optionally upload an EV app screenshot from the result page.
+5. Confirm bounding boxes highlight the detected evidence object when available.
+6. Continue to `/guidance` for customer cases or `/escalation` for after-sales cases.
 
-## Gemini / VLM Setup
+If the result shows `Vision model unavailable; using fallback interpretation`, confirm `GEMINI_API_KEY` is configured and restart the backend.
 
-For real image understanding, `backend/.env` must contain:
+## Validation Commands
 
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-3-flash-preview
+```powershell
+cd backend
+py -m pytest -q
+py -m pyright -p pyrightconfig.json
 ```
 
-If Gemini is unavailable, the backend falls back to deterministic Theme 2 heuristics based on the uploaded metadata, symptom text, and follow-up answers.
+```powershell
+cd frontend
+npm.cmd run build
+```
 
-## Frontend Backend Wiring
+Dataset/evaluation utilities:
 
-`frontend/.env.local` should point to the FastAPI backend port used by `backend/run-backend.ps1`:
+```powershell
+py scripts\build_round2_manifest.py --write-summary
+py scripts\check_round2_eval_coverage.py
+py scripts\evaluate_round2_cases.py --mode weak-label-sanity --show-failures
+py scripts\evaluate_round2_cases.py --mode blind-image-eval --show-failures
+py scripts\run_unseen_external_smoke.py
+.\scripts\run_final_validation.ps1
+```
+
+Use `weak-label-sanity` only for pipeline regression checks. Use Gemini-enabled `blind-image-eval` for image-evaluation-like language. Raw images and generated reports stay local.
+
+## Deployment
+
+Frontend deploys on Vercel from `frontend/`.
+
+Backend deploys on Cloud Run from the repo root:
+
+```cmd
+gcloud run deploy rexharge-backend ^
+  --source . ^
+  --region us-central1 ^
+  --allow-unauthenticated ^
+  --memory 512Mi ^
+  --cpu 1 ^
+  --min-instances 0 ^
+  --max-instances 2 ^
+  --timeout 120
+```
+
+Cloud Run should use:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
-API_BASE_URL=http://127.0.0.1:8001
+DATABASE_URL=postgresql://...
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3-flash-preview
+STORAGE_BACKEND=gcs
+GCS_BUCKET=rexharge-uploads-<PROJECT_ID>
+GCS_UPLOAD_PREFIX=incidents
+```
+
+Get the Cloud Run URL:
+
+```cmd
+gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
+```
+
+Set that URL in Vercel:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://YOUR-CLOUD-RUN-URL
+API_BASE_URL=https://YOUR-CLOUD-RUN-URL
 ```
 
 ## Dataset Policy
 
-Full raw Dataset 2 images should stay outside Git. The repo stores rules, demo scenarios, docs, and later may store manifests, pseudo-labels, evaluation cases, and a small curated `data/round2/sample_images/` set.
+Do not commit raw Dataset 2 images/videos, generated pseudo-label JSONL, eval reports, uploaded evidence, or extracted video frames.
 
-Local validation workflow:
+Tracked dataset artifacts are limited to:
 
-```powershell
-python scripts\build_round2_manifest.py --write-summary
-python scripts\pseudo_label_round2_with_theme2.py --limit 5
-python scripts\summarize_round2_pseudo_labels.py
-python scripts\check_round2_eval_coverage.py
-.\scripts\run_final_validation.ps1
-python scripts\evaluate_round2_cases.py --mode weak-label-sanity
-python scripts\evaluate_round2_cases.py --mode blind-image-eval
-python scripts\run_unseen_external_smoke.py
-```
+- `data/round2/theme2_rules.json`
+- `data/round2/manifest.csv`
+- `data/round2/manifest_summary.json`
+- `data/round2/evaluation_cases.json`
+- `data/round2/manual_review_cases.json`
+- `data/round2/pseudo_label_summary.json`
 
-Use `weak-label-sanity` to check weak labels and rule wiring. Use `blind-image-eval` as the closer proxy for judging because it does not pass expected labels into the incident hint.
-Place outside test images in ignored `data/round2/unseen_external/` and run `run_unseen_external_smoke.py` for prediction-only checks with no accuracy claims.
-Use `.\scripts\run_final_validation.ps1 -StrictCoverage` only after adding human-reviewed EVDB, isolator, and exact OCR ground-truth cases.
+Quarantined cases remain in `manual_review_cases.json` until human-reviewed fields are filled and promoted.
 
-No-light routing follows the PDF action sequence: the first customer-facing action is to check whether the EVDB breaker has tripped. The system escalates no-light as a charger issue only after follow-up says the breaker is normal and the charger remains off.
+## Important Docs
 
-See:
-
-- [Theme 2 runtime contract](docs/theme2_runtime_contract.md)
-- [Round 2 dataset strategy](docs/round2_dataset_strategy.md)
-- [Round 2 evaluation methodology](docs/round2_evaluation_methodology.md)
+- [Runtime contract](docs/theme2_runtime_contract.md)
+- [Deployment guide](docs/deployment_cloudrun_vercel.md)
+- [Evaluation methodology](docs/round2_evaluation_methodology.md)
 - [Final demo runbook](docs/final_demo_runbook.md)
 - [Final report metrics template](docs/final_report_metrics_template.md)
-- [Setup guide](docs/setup_guide.md)

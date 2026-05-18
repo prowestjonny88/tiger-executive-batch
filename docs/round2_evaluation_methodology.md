@@ -1,25 +1,50 @@
-# Round 2 Evaluation Methodology
+# Round 2 Evaluation And Dataset Methodology
 
-This project uses two evaluation modes for Theme 2 validation.
+This document describes how the project handles Dataset 2 media, weak labels, clean evaluation cases, quarantined cases, and unseen-image checks.
+
+## Dataset Policy
+
+Raw Dataset 2 images/videos stay outside Git. The repository tracks only reproducible metadata and small structured artifacts:
+
+- `data/round2/theme2_rules.json`
+- `data/round2/manifest.csv`
+- `data/round2/manifest_summary.json`
+- `data/round2/evaluation_cases.json`
+- `data/round2/manual_review_cases.json`
+- `data/round2/pseudo_label_summary.json`
+
+Ignored local data includes:
+
+- `data/round2/images/`
+- `data/round2/raw/`
+- `data/round2/video_frames/`
+- `data/round2/unseen_external/`
+- pseudo-label JSONL outputs
+- eval reports
+- videos
+
+Folder labels are weak labels only. Runtime decisions come from Theme 2 perception plus deterministic organizer rules.
+
+## Manifest Workflow
+
+```powershell
+py scripts\build_round2_manifest.py --write-summary
+```
+
+The manifest builder stores relative paths only and maps folders to weak Theme 2 labels. It can warn or fail for unknown labels depending on flags.
 
 ## Weak-Label Sanity
 
-Run:
-
 ```powershell
-python scripts\evaluate_round2_cases.py --mode weak-label-sanity
+py scripts\evaluate_round2_cases.py --mode weak-label-sanity --show-failures
 ```
 
-This mode includes the expected component, observation, and relative path in the incident hint. It is useful for checking that the manifest, weak labels, Theme 2 fallback, and deterministic rule mapping are wired correctly.
-
-Weak-label sanity metrics are not visual accuracy. They can be inflated because fallback heuristics can read the expected labels from the hint.
+This mode includes expected labels in the incident hint. It is useful for rule/pipeline regression checks, but it is not visual accuracy because fallback logic can read the hint.
 
 ## Blind Image Eval
 
-Run:
-
 ```powershell
-python scripts\evaluate_round2_cases.py --mode blind-image-eval
+py scripts\evaluate_round2_cases.py --mode blind-image-eval --show-failures
 ```
 
 This mode uses a neutral hint:
@@ -28,51 +53,70 @@ This mode uses a neutral hint:
 Photo uploaded for EV charger troubleshooting.
 ```
 
-It does not include expected labels, folder category labels, fault type, or recipient. This is the closest local proxy for judging with unseen images.
+It does not leak expected component, observation, fault type, recipient, or folder-derived labels. With Gemini enabled, this is the closest local proxy for judging unseen images.
 
-With Gemini enabled:
+## Gemini Checks
 
 ```powershell
 $env:GEMINI_API_KEY="your_key"
-python scripts\gemini_smoke_test.py
-python scripts\evaluate_round2_cases.py --mode blind-image-eval
+py scripts\gemini_smoke_test.py
+py scripts\evaluate_round2_cases.py --mode blind-image-eval --show-failures
 ```
 
-## Manual Review Cases
+Fallback-only blind results are conservative behavior checks, not proof of visual accuracy.
 
-`data/round2/manual_review_cases.json` contains quarantined cases that were not clean enough for the baseline evaluation pack. Reviewers should fill the structured `manual_*` fields and set:
+## Manual Review And Quarantine
+
+`data/round2/manual_review_cases.json` stores low-confidence, conflicting, unclear, or unsupported cases. A case should be promoted only after a reviewer fills the relevant `manual_*` fields and sets:
 
 ```text
 manual_review_status = reviewed_include_eval
 ```
 
-Then promote reviewed cases:
+Promotion command:
 
 ```powershell
-python scripts\promote_manual_review_to_eval.py
+py scripts\promote_manual_review_to_eval.py
 ```
 
-By default this writes `data/round2/evaluation_cases.reviewed.json` and does not overwrite the main evaluation file.
+Default output is `data/round2/evaluation_cases.reviewed.json`; it does not overwrite the clean baseline unless `--replace` is passed.
 
-## Serial And Brand Ground Truth
+## Serial And Brand OCR Ground Truth
 
-Do not invent serial or brand/model values from VLM guesses. Only set `serial_number_expected` and `brand_model_expected` after human review. Once those fields are present, the evaluator reports exact-match OCR metrics instead of `n/a`.
+Do not invent serial or brand/model values from VLM guesses. Only set `serial_number_expected` and `brand_model_expected` after human review.
 
-Until those reviewed fields exist, the runtime may still extract visible serial or brand/model values for live charger-label evidence, but report metrics must describe exact OCR validation as partial.
+Until reviewed expected values exist, runtime extraction can still show visible charger identity, but report metrics must describe exact OCR validation as partial or `n/a`.
 
-## Current Coverage Guardrail
+## EV App Screenshot Evidence
 
-The clean baseline is intentionally conservative. Run:
+For charger red-light or blinking-red cases, an optional EV app screenshot can be uploaded. The VLM extracts visible app status text, error codes, fault hints, and flash-count evidence. This can refine blinking-red rules and strengthen evidence notes, but it does not replace the primary hardware photo.
+
+## Coverage Guardrail
 
 ```powershell
-python scripts\check_round2_eval_coverage.py
+py scripts\check_round2_eval_coverage.py
 ```
 
-Warnings for EVDB single-phase, missing/wrong specs, isolator ON/OFF, or exact OCR ground truth mean the runtime can still support those cases, but the committed evaluation pack does not yet prove them with reviewed image ground truth.
+The coverage checker reports missing recommended coverage, including EVDB single phase, EVDB three phase, missing/wrong specs, isolator ON/OFF, blinking-red follow-up cases, and exact charger OCR ground truth.
 
-## Interpreting Metrics
+Use strict mode only when the eval pack is expected to satisfy those recommendations:
 
-- Use weak-label sanity for pipeline regression checks.
-- Use blind image eval with Gemini enabled for visual extraction confidence.
-- Treat fallback-only blind results as conservative behavior checks, not proof of VLM performance.
-- Keep low-confidence, conflict, and video cases quarantined until manually reviewed or converted into extracted frame cases.
+```powershell
+py scripts\check_round2_eval_coverage.py --strict
+```
+
+## Unseen External Smoke
+
+Place external test images locally under:
+
+```text
+data/round2/unseen_external/
+```
+
+Then run:
+
+```powershell
+py scripts\run_unseen_external_smoke.py
+```
+
+This is prediction-only. It should not be reported as accuracy unless expected labels are independently reviewed.

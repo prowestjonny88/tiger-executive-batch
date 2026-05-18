@@ -1,4 +1,4 @@
-from app.core.models import IncidentInput, Theme2PerceptionAssessment, Theme2VisualExtraction
+from app.core.models import IncidentInput, StoredPhotoEvidence, Theme2PerceptionAssessment, Theme2VisualExtraction
 from app.services.theme2_triage import build_theme2_followups, run_theme2_triage
 
 
@@ -39,6 +39,47 @@ def test_theme2_triage_followup_for_blinking_red_without_flash_count():
 
     question_ids = {item.question_id for item in result.follow_up_prompts}
     assert "red_light_flash_count" in question_ids
+
+
+def test_theme2_triage_followup_for_red_light_app_screenshot_when_available():
+    prompts = build_theme2_followups(
+        IncidentInput(site_id="site-mall-01", photo_hint="charger red light"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="charger",
+                observation_result="charger_red_light",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    question_ids = {item.question_id for item in prompts}
+    assert "charger_app_screenshot" in question_ids
+
+
+def test_theme2_triage_skips_red_light_app_screenshot_prompt_after_upload():
+    prompts = build_theme2_followups(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="charger red light",
+            app_screenshot_evidence=StoredPhotoEvidence(
+                filename="app.jpg",
+                media_type="image/jpeg",
+                storage_path="uploads/app.jpg",
+                byte_size=10,
+            ),
+        ),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="charger",
+                observation_result="charger_red_light",
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    question_ids = {item.question_id for item in prompts}
+    assert "charger_app_screenshot" not in question_ids
 
 
 def test_theme2_triage_low_confidence_unknown_requests_clearer_proof():

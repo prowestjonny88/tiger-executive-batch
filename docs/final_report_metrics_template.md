@@ -1,33 +1,53 @@
 # Final Report Metrics Template
 
-## 1. Dataset Overview
+## 1. System Overview
 
-- Dataset: ESUM Theme 2 / Round 2 local working copy.
-- Input categories: charger, EVDB, isolator.
-- Raw images/videos remain outside Git under `data/round2/images/`.
-- Clean eval baseline contains only unambiguous cases; quarantined cases are retained for review.
+RExharge Theme 2 Triage is a VLM-assisted EV charger support prototype. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, extracts Theme 2 observations, applies deterministic organizer rules, and routes to customer guidance or after-sales team `AS_TEAM_01`.
 
-## 2. Rule Mapping Table
+## 2. Architecture
 
-Summarize Theme 2 mappings:
+```text
+Next.js frontend
+-> FastAPI backend
+-> Gemini perception and app-screenshot OCR
+-> Theme 2 rule mapper
+-> Postgres incident/audit history
+-> GCS/local evidence storage
+```
+
+Raw Dataset 2 media is not deployed with the app. Uploaded user evidence is stored separately.
+
+## 3. Organizer Rule Mapping
 
 - Charger red light -> charger issue -> after-sales team.
-- Charger no light -> supply issue -> customer breaker check first; escalates to charger issue / after-sales only when the breaker is confirmed normal and the charger remains off.
-- Blinking red flash counts -> installation/manual/charger issue outcomes.
-- EVDB missing/wrong protection -> protection issue -> after-sales team.
+- Charger no light -> supply issue -> customer breaker check first; escalates only after breaker-normal/still-off follow-up.
+- Blinking red + 6 flashes / ground fault -> installation issue -> after-sales.
+- Blinking red + 7 flashes / emergency stop -> manual error -> customer.
+- Blinking red + 8 flashes / short circuit -> charger issue -> after-sales.
+- Blinking red + 9 flashes / over-temperature -> charger issue -> customer restart/cooldown.
+- EVDB missing MCB/RCCB -> protection issue -> after-sales.
+- EVDB wrong specs or Type AC RCCB -> protection issue -> after-sales.
 - MCB tripped -> protection issue -> customer unless repeated/safety terms escalate.
 - Isolator OFF -> power cut -> customer.
 
-## 3. Evaluation Method
+## 4. Evidence Behavior
 
-- Weak-label sanity: validates rule and folder-label wiring. Do not report as visual accuracy.
-- Blind image eval: neutral prompt, no expected labels leaked into `photo_hint`; use this as image-evaluation-like evidence.
-- OCR exact metrics are reported only when non-null serial/brand ground truth exists.
-- Current runtime contract is implemented, but exact OCR validation remains partial until human-reviewed charger label ground truth is added.
+- Charger photos can produce indicator state, serial number, brand/model, and charger bounding box.
+- EVDB photos can produce MCB/RCCB visibility, amps, poles, Type A/Type AC evidence, spec status, and EVDB bounding box.
+- Isolator photos can produce ON/OFF state and isolator bounding box.
+- EV app screenshots can add visible app status text, error codes, flash counts, and fault hints.
+- Unreadable evidence creates proof prompts rather than guessed values.
 
-## 4. Current Metrics
+## 5. Evaluation Method
 
-Fill after the final run:
+- Weak-label sanity: validates folder-label/rule wiring only. Do not report as visual accuracy.
+- Blind image eval: neutral prompt without expected-label leakage. Use as image-evaluation-like evidence when Gemini is enabled.
+- Unseen external smoke: prediction-only unless expected labels are independently reviewed.
+- OCR exact metrics require human-reviewed serial/brand ground truth.
+
+## 6. Current Metrics
+
+Fill after final local run:
 
 ```text
 Weak-label sanity: __ / __
@@ -36,31 +56,33 @@ Input component accuracy: __
 Observation accuracy: __
 Fault type accuracy: __
 Recipient accuracy: __
+Follow-up requested: __
 Serial exact match: n/a unless reviewed ground truth exists
 Brand/model exact match: n/a unless reviewed ground truth exists
 ```
 
-## 5. Manual-Review Quarantine
+## 7. Quarantine Explanation
 
-Explain that unstable EVDB spec-boundary cases, ambiguous multi-component isolator images, low-confidence outputs, and videos without extracted frames are quarantined in `manual_review_cases.json`.
+Low-confidence images, ambiguous multi-component images, unstable EVDB boundary cases, videos without extracted frames, and cases with conflicting weak/VLM labels remain in `manual_review_cases.json`. They are not discarded; they are held until human review confirms final labels.
 
-## 6. Known Limitations
+## 8. Known Limits
 
-- Exact serial/brand OCR needs human-reviewed expected values.
-- The current clean baseline intentionally does not claim full Dataset 2 coverage; isolator, EVDB single-phase, missing/wrong-spec, and exact OCR ground-truth coverage are tracked by `check_round2_eval_coverage.py`.
-- EVDB Type A vs Type AC markings can be visually unstable without close-up labels.
-- Video support requires extracted frames before normal image evaluation.
-- Raw dataset images are not committed.
+- Exact charger OCR validation needs manually reviewed expected values.
+- EVDB Type A vs Type AC can require close-up labels.
+- Videos require extracted frames before normal image evaluation.
+- App screenshots improve evidence but may be unavailable to some users.
+- The clean eval baseline should not be described as full Dataset 2 coverage.
 
-## 7. Safety And Conservative Behavior
+## 9. Safety And Conservative Behavior
 
-The runtime avoids guessing unreadable serials, brand/model, RCCB type, breaker ratings, and switch state. Unreadable evidence produces follow-up proof prompts rather than overclaiming.
+The runtime avoids guessing unreadable serials, brand/model, RCCB type, breaker ratings, pole counts, hidden app status, and isolator switch state. It asks for clearer proof when evidence is incomplete.
 
-## 8. Demo Screenshots Checklist
+## 10. Screenshot Checklist
 
-- Upload page with Theme 2 tips.
-- Result page showing Organizer Required Output.
+- Landing page.
+- Upload page.
+- Result page with organizer output, confidence, proof prompts, and bounding box overlay.
+- Red-light result with optional EV app screenshot upload.
 - Customer guidance page.
-- After-sales routing page with `AS_TEAM_01`.
-- History page with Theme 2 columns.
-- Advanced debug collapsed by default.
+- After-sales routing page.
+- History page.
