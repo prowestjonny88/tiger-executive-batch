@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Database, Plus } from "lucide-react";
+import { Database, Plus, Search } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import {
   fetchIncidents,
   formatFaultTypeV2,
@@ -20,6 +22,8 @@ export default function HistoryPage() {
   const [incidents, setIncidents] = useState<IncidentHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [recipientFilter, setRecipientFilter] = useState("all");
 
   useEffect(() => {
     fetchIncidents()
@@ -32,6 +36,25 @@ export default function HistoryPage() {
         setLoading(false);
       });
   }, []);
+
+  const filteredIncidents = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return incidents.filter((incident) => {
+      const matchesRecipient = recipientFilter === "all" || incident.latest_recipient_type === recipientFilter;
+      const haystack = [
+        `INC-${incident.id}`,
+        incident.site_id,
+        incident.charger_id,
+        incident.latest_input_component,
+        incident.latest_observation_result,
+        incident.latest_fault_type_v2,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return matchesRecipient && (!normalizedQuery || haystack.includes(normalizedQuery));
+    });
+  }, [incidents, query, recipientFilter]);
 
   if (loading) {
     return (
@@ -59,11 +82,11 @@ export default function HistoryPage() {
           <div className="flex items-center gap-3 mb-2">
             <Database className="w-6 h-6 text-green-700" />
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Incident Database
+              Report History
             </h1>
           </div>
           <p className="text-slate-600 text-lg">
-            Recent charger, EVDB, and isolator assessments.
+            Past charger, EVDB, and isolator checks.
           </p>
         </div>
         <Button asChild size="lg" className="bg-green-700 hover:bg-green-800 rounded-xl h-12 shadow-sm font-bold flex items-center gap-2">
@@ -71,6 +94,26 @@ export default function HistoryPage() {
             <Plus className="w-5 h-5" /> New Incident
           </Link>
         </Button>
+      </div>
+
+      <div className="mb-6 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto] md:items-center">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by incident, site, component, or observation"
+            className="h-11 rounded-xl border-slate-200 bg-slate-50 pl-10 font-medium"
+          />
+        </div>
+        <Tabs value={recipientFilter} onValueChange={setRecipientFilter}>
+          <TabsList className="grid grid-cols-4 rounded-xl bg-slate-100">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="customer">Customer</TabsTrigger>
+            <TabsTrigger value="after_sales_team">After-sales</TabsTrigger>
+            <TabsTrigger value="unknown">Review</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -87,14 +130,14 @@ export default function HistoryPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {incidents.length === 0 ? (
+              {filteredIncidents.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
                     No incidents recorded yet.
                   </td>
                 </tr>
               ) : (
-                incidents.map((incident) => (
+                filteredIncidents.map((incident) => (
                   <tr key={incident.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-5 font-bold text-slate-900 font-mono">INC-{incident.id}</td>
                     <td className="px-6 py-5 text-slate-500 font-medium whitespace-nowrap">
@@ -147,12 +190,12 @@ export default function HistoryPage() {
         </div>
 
         <div className="space-y-3 p-4 md:hidden">
-          {incidents.length === 0 ? (
+          {filteredIncidents.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
               No incidents recorded yet.
             </div>
           ) : (
-            incidents.map((incident) => {
+            filteredIncidents.map((incident) => {
               const card = (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="mb-3 flex items-start justify-between gap-3">

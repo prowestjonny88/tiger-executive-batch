@@ -7,25 +7,15 @@ import svgPaths from "../../imports/4AdaptiveQuestions/svg-9543ytu969";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { fetchTriage, uploadIncidentPhoto } from "../../lib/api";
 import { readSession, writeSession } from "../../lib/triage-session";
 import { PageShell } from "../../components/layout/page-shell";
 import { FollowUpControl } from "../../components/triage/follow-up-control";
+import { CaseContextBar } from "../../components/triage/case-context-bar";
+import { getFollowUpDisplayCopy } from "../../lib/follow-up-copy";
 
 type FollowUpQuestion = { question_id: string; prompt: string };
-
-function splitPrompt(prompt: string) {
-  // A simple heuristic to extract a title from the prompt if it contains a newline or a period followed by space
-  if (prompt.includes("\n")) {
-    const parts = prompt.split("\n");
-    return { title: parts[0], helper: parts.slice(1).join(" ") };
-  }
-  const match = prompt.match(/^(.*?[\.?!])\s+(.*)$/);
-  if (match) {
-    return { title: match[1], helper: match[2] };
-  }
-  return { title: prompt, helper: "Please describe what you can observe to help us make a more accurate assessment." };
-}
 
 function isUploadStyleFollowUp(questionId: string) {
   return [
@@ -150,10 +140,16 @@ export default function AdaptiveQuestions() {
   const currentFile = files[currentQuestion.question_id];
   const session = readSession();
   
-  const { title, helper } = splitPrompt(currentQuestion.prompt);
+  const { title, helper } = getFollowUpDisplayCopy(currentQuestion.question_id, currentQuestion.prompt);
 
   return (
     <PageShell maxWidth="3xl">
+      <CaseContextBar
+        incidentId={session.incidentId}
+        component={session.preview?.quality?.filename ? "unknown" : "unknown"}
+        status="Evidence clarification"
+        className="mx-auto mb-5 w-fit"
+      />
       <Card className="w-full overflow-hidden shadow-sm border-slate-200 mb-8 rounded-2xl bg-white">
         <div className="bg-slate-50 border-b border-slate-200 p-8 flex flex-col gap-4">
           <div className="flex justify-between items-center w-full">
@@ -189,9 +185,12 @@ export default function AdaptiveQuestions() {
           />
 
           {isUploadStyleFollowUp(currentQuestion.question_id) && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
-              Take follow-up photos from a safe distance. Do not open electrical panels unless you are authorized to do so.
-            </div>
+            <Alert variant="warning" className="mt-4 rounded-xl">
+              <AlertTitle>Safe photo reminder</AlertTitle>
+              <AlertDescription>
+                Take follow-up photos from a safe distance. Do not open electrical panels unless you are authorized.
+              </AlertDescription>
+            </Alert>
           )}
 
           {errorMsg && (
@@ -208,7 +207,7 @@ export default function AdaptiveQuestions() {
                 disabled={isSubmitting}
                 className="w-full h-14 text-lg font-bold bg-green-700 hover:bg-green-800 text-white rounded-xl shadow-sm"
               >
-                {isSubmitting ? "Running triage..." : "Submit and See Results"}
+                {isSubmitting ? "Checking evidence..." : "Submit proof and view result"}
               </Button>
             ) : (
               <Button

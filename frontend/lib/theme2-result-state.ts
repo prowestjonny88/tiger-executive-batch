@@ -153,7 +153,7 @@ export function deriveResultState(triage: ApiTriageResponse): DerivedResultState
     return {
       proofState: "verified",
       tone: "slate",
-      title: "Theme 2 Result Captured",
+      title: "Identification Captured",
       status: "No routing required",
       nextStep: "Review the captured Theme 2 output and add fault evidence if troubleshooting is needed.",
       primaryCtaLabel: "Run Triage Again",

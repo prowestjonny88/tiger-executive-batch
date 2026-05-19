@@ -58,7 +58,7 @@ export function ResultVerdictCard({ triage }: { triage: ApiTriageResponse }) {
           </div>
           <div>
             <p className="text-xs font-extrabold uppercase tracking-widest opacity-70">
-              Final Verdict
+              Result
             </p>
             <h2 className="mt-1 text-2xl font-extrabold tracking-tight md:text-3xl">
               {resultState.title}
@@ -79,15 +79,15 @@ export function ResultVerdictCard({ triage }: { triage: ApiTriageResponse }) {
 
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-white/70 bg-white/70 p-4">
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Observation</p>
+          <p className="technical-label text-slate-500">What we found</p>
           <p className="mt-1 font-bold text-slate-950">{formatObservationResult(output.observation_result)}</p>
         </div>
         <div className="rounded-xl border border-white/70 bg-white/70 p-4">
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Fault Type</p>
+          <p className="technical-label text-slate-500">Issue type</p>
           <p className="mt-1 font-bold text-slate-950">{formatFaultTypeV2(output.fault_type_v2)}</p>
         </div>
         <div className="rounded-xl border border-white/70 bg-white/70 p-4">
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Recipient</p>
+          <p className="technical-label text-slate-500">Sent to</p>
           <p className="mt-1 font-bold text-slate-950">{recipient}</p>
           <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{resultState.recipientHelper}</p>
         </div>

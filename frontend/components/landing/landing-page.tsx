@@ -30,8 +30,8 @@ const fadeUp = {
 } as const;
 
 const sectionReveal = {
-  hidden: { opacity: 0, y: 46, scale: 0.985, filter: "blur(10px)" },
-  visible: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0 },
 } as const;
 
 const navItems = [
@@ -155,7 +155,7 @@ function LandingHeader() {
         </nav>
 
         <div className="hidden lg:block">
-          <PillCta href="/upload">Go to Dashboard</PillCta>
+          <PillCta href="/upload">Check a Photo</PillCta>
         </div>
 
         <button
@@ -178,7 +178,7 @@ function LandingHeader() {
               </a>
             ))}
             <Link href="/upload" className="rounded-full bg-[var(--rex-green)] px-5 py-3 text-center text-sm font-bold text-white">
-              Go to Dashboard
+              Check a Photo
             </Link>
           </nav>
         </div>
@@ -195,7 +195,7 @@ function HeroSection() {
         alt="EV charger mounted on a wall"
         className="absolute inset-0 h-full w-full object-cover object-[center_right] opacity-75"
         initial={{ scale: 1 }}
-        animate={{ scale: 1.06 }}
+        animate={{ scale: 1.03 }}
         transition={{ duration: 14, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
       />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.78)_0%,rgba(0,0,0,0.52)_48%,rgba(0,0,0,0.16)_100%)]" />
@@ -205,15 +205,15 @@ function HeroSection() {
             Theme 2 EV Charger Troubleshooting
           </Badge>
           <h1 className="max-w-3xl text-5xl font-extrabold leading-[1.04] tracking-normal md:text-7xl">
-            EV Charger Fault Triage, Made Simple.
+            Snap the issue. Know what to do next.
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-white/78 md:text-xl">
-            Upload a charger, EVDB, or isolator photo. RExharge Assist identifies the observation, maps the fault type, and routes the case to the right next step.
+            Upload a charger, EVDB, or isolator photo. RExharge Assist checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <PillCta href="/upload">Go to Dashboard</PillCta>
+            <PillCta href="/upload">Check a Photo</PillCta>
             <PillCta href="#workflow" dark>
-              See How It Works
+              See the Flow
             </PillCta>
           </div>
           <div className="mt-14 grid max-w-2xl grid-cols-1 gap-4 border-t border-white/18 pt-8 sm:grid-cols-3">
@@ -288,9 +288,9 @@ function ServiceCardsSection() {
     <SectionFrame id="support" className="landing-section bg-white">
       <div className="landing-container">
         <SectionIntro
-          kicker="No-fuss support"
-          title="No-fuss charger support from photo to next action."
-          copy="Charger downtime can come from visible charger indicators, EVDB protection issues, or isolator switch state. The landing flow makes those evidence types clear before users enter the dashboard."
+          kicker="Built for real charger reports"
+          title="Start from the exact part in front of you."
+          copy="Charger downtime can come from visible charger indicators, EVDB protection issues, or isolator switch state. The flow keeps those evidence types clear before users enter the dashboard."
         />
         <div className="grid gap-7 md:grid-cols-3">
           {cards.map((card) => (
@@ -300,7 +300,7 @@ function ServiceCardsSection() {
               className="group overflow-hidden rounded-[24px] border border-[var(--rex-line)] bg-white shadow-[0_18px_50px_rgba(16,21,19,0.08)] transition duration-300 hover:-translate-y-1"
             >
               <div className="aspect-[4/3] overflow-hidden">
-                <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                <img src={card.image} alt={card.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
               </div>
               <div className="p-7">
                 <div className="mb-5 flex items-center justify-between gap-4">
@@ -336,8 +336,8 @@ function ProblemSection() {
       />
       <div className="landing-container relative z-10 grid gap-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <motion.div {...fadeUp}>
-          <p className="landing-kicker mb-4">Field support problem</p>
-          <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)] md:text-5xl">Manual troubleshooting slows down simple fixes.</h2>
+          <p className="landing-kicker mb-4">Why reports get delayed</p>
+          <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)] md:text-5xl">Unclear first evidence slows down simple fixes.</h2>
           <p className="mt-6 text-lg leading-8 text-[var(--rex-muted)]">
             Many charger cases begin with unclear photos, missing proof, or simple switch and breaker issues. A guided triage layer turns the first report into a cleaner support decision.
           </p>
@@ -366,7 +366,7 @@ function WorkflowSection() {
   return (
     <SectionFrame id="workflow" className="landing-section bg-white">
       <div className="landing-container">
-        <SectionIntro kicker="Workflow" title="Upload -> Observe -> Classify -> Route" />
+        <SectionIntro kicker="How the support check works" title="Upload -> Observe -> Classify -> Route" />
         <img
           src={images.arrows}
           alt=""
@@ -404,7 +404,7 @@ function OutputPreviewSection() {
     <SectionFrame id="output" className="landing-section bg-[var(--rex-bg-soft)]">
       <div className="landing-container grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
         <motion.div {...fadeUp}>
-          <p className="landing-kicker mb-4">Product proof</p>
+          <p className="landing-kicker mb-4">What you get back</p>
           <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)] md:text-5xl">A structured support result, not a guess.</h2>
           <p className="mt-6 text-lg leading-8 text-[var(--rex-muted)]">
             The result view is built around organizer-required fields: observation, charger identity when readable, fault type, recipient, team ID, and action message.
@@ -443,8 +443,8 @@ function EvidenceTabsSection() {
     <SectionFrame id="evidence" className="landing-section bg-white">
       <div className="landing-container">
         <SectionIntro
-          kicker="Evidence types"
-          title="Focused on the three photo categories that matter."
+          kicker="What photo should I upload?"
+          title="Focused on the three evidence categories that matter."
           copy="Each tab explains the observation, likely fault type, and next action without turning the page into a technical manual."
         />
         <Tabs defaultValue="evdb" className="mx-auto max-w-4xl">
@@ -495,8 +495,8 @@ function ProofSection() {
           <img src={images.proof} alt="Phone capturing electrical proof" className="h-full min-h-[360px] w-full object-cover" />
         </motion.div>
         <motion.div {...fadeUp}>
-          <p className="mb-4 text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--rex-green)]">Proof first</p>
-          <h2 className="text-3xl font-bold leading-tight md:text-5xl">When evidence is unclear, the system asks for proof.</h2>
+          <p className="mb-4 text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--rex-green)]">If the photo is unclear, we ask</p>
+          <h2 className="text-3xl font-bold leading-tight md:text-5xl">When evidence is unclear, the system asks for the exact proof.</h2>
           <p className="mt-6 leading-8 text-white/70">
             It should not guess unreadable serial numbers, breaker ratings, RCCB type, or hidden switch states. If the image is unclear, it asks for the exact proof needed before routing confidently.
           </p>
@@ -529,7 +529,7 @@ function CaseStudiesSection() {
           {cases.map(([title, image, evidence, observation, route]) => (
             <motion.article key={title} {...fadeUp} className="group overflow-hidden rounded-[24px] border border-[var(--rex-line)] bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
               <div className="aspect-[16/10] overflow-hidden">
-                <img src={image} alt={title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.04]" />
+                <img src={image} alt={title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
               </div>
               <div className="p-6">
                 <h3 className="text-xl font-bold text-[var(--rex-charcoal)]">{title}</h3>
@@ -564,7 +564,7 @@ function MvpAlignmentSection() {
       <div className="landing-container relative z-10">
         <motion.div {...fadeUp} className="grid gap-8 rounded-[28px] bg-white/95 p-8 shadow-sm lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div>
-            <p className="landing-kicker mb-4">Theme 2 MVP</p>
+            <p className="landing-kicker mb-4">Built for the competition output</p>
             <h2 className="text-3xl font-bold leading-tight text-[var(--rex-charcoal)]">Built for Theme 2&apos;s required outputs.</h2>
             <p className="mt-4 leading-7 text-[var(--rex-muted)]">Every report becomes a clear troubleshooting decision rather than an unstructured complaint.</p>
           </div>
@@ -601,10 +601,10 @@ function FinalCtaSection() {
       <div className="landing-container relative z-10">
         <motion.div {...fadeUp} className="mx-auto max-w-3xl">
           <p className="mb-4 text-xs font-extrabold uppercase tracking-[0.16em] text-[var(--rex-green)]">Start report</p>
-          <h2 className="text-4xl font-extrabold leading-tight md:text-6xl">Start a guided charger fault report.</h2>
+          <h2 className="text-4xl font-extrabold leading-tight md:text-6xl">Start a guided charger support check.</h2>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-white/72">Open the dashboard, upload evidence, and generate a structured support result.</p>
           <div className="mt-9">
-            <PillCta href="/upload">Go to Dashboard</PillCta>
+            <PillCta href="/upload">Check a Photo</PillCta>
           </div>
           <p className="mt-5 text-sm font-semibold text-white/62">Demo mode is available for judge walkthroughs.</p>
         </motion.div>

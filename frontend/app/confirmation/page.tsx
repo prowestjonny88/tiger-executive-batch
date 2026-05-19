@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Home, Plus } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle, Home, Plus, ReceiptText } from "lucide-react";
 
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
@@ -66,7 +67,7 @@ export default function Confirmation() {
           </div>
 
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-8 tracking-tight leading-tight">
-            {incidentId ? "Report Submitted" : "Assessment Complete"}
+            Report Complete
           </h1>
 
           <div className="bg-green-50/50 border border-green-200 text-green-800 font-bold text-sm tracking-widest uppercase px-6 py-3 rounded-full shadow-sm mb-6">
@@ -101,6 +102,18 @@ export default function Confirmation() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
+            {incidentId && (
+              <Button
+                asChild
+                variant="outline"
+                className="text-slate-700 border-slate-200 hover:bg-slate-50 font-bold text-lg h-14 px-8 rounded-xl w-full sm:w-auto flex items-center gap-2"
+                size="lg"
+              >
+                <Link href={`/result?replay=${incidentId}`}>
+                  <ReceiptText className="w-5 h-5" /> View Report Again
+                </Link>
+              </Button>
+            )}
             <Button
               id="confirmation-new-triage-btn"
               onClick={handleStartNew}

@@ -1,22 +1,33 @@
 "use client";
 
-import { ShieldAlert, Zap, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { PageShell } from "../../components/layout/page-shell";
 import { Card, CardContent } from "../../components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 
 export default function SafetyPage() {
   return (
     <PageShell maxWidth="4xl">
-      <div className="mb-8 flex items-center gap-3">
-        <ShieldAlert className="w-8 h-8 text-green-700" />
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
-          Safety Guidelines
-        </h1>
+      <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
+        <div className="mb-5 flex items-center gap-3">
+          <ShieldAlert className="w-8 h-8 text-green-700" />
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+            Stay safe first.
+          </h1>
+        </div>
+        <p className="max-w-3xl text-lg leading-8 text-slate-600">
+          Take photos only from a safe distance. RExharge can guide visible evidence checks, but electrical repair decisions should be verified by qualified personnel.
+        </p>
       </div>
-      
-      <p className="text-lg text-slate-600 mb-8 max-w-3xl">
-        Your safety is our priority. Please review these critical safety guidelines before interacting with any electrical components related to EV chargers.
-      </p>
+
+      <Alert variant="destructive" className="mb-6 rounded-2xl">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Stop immediately if hazards are visible</AlertTitle>
+        <AlertDescription>
+          If you see smoke, heat, sparks, water ingress, exposed conductors, or melted parts, stop using the charger and escalate.
+        </AlertDescription>
+      </Alert>
 
       <div className="grid gap-6">
         <Card className="border-red-200 shadow-sm rounded-2xl overflow-hidden bg-white">
@@ -26,62 +37,55 @@ export default function SafetyPage() {
           </div>
           <CardContent className="p-6 md:p-8">
             <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-sm mt-0.5">1</span>
-                <div>
-                  <strong className="text-slate-900 block mb-1">Never open internal electrical panels</strong>
-                  <p className="text-slate-600">Only qualified and certified technicians should open the internal casing of EV chargers or primary distribution boards.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-sm mt-0.5">2</span>
-                <div>
-                  <strong className="text-slate-900 block mb-1">Do not touch exposed wires</strong>
-                  <p className="text-slate-600">If you see any exposed wiring, melted components, or physical damage, stay away and escalate immediately.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-sm mt-0.5">3</span>
-                <div>
-                  <strong className="text-slate-900 block mb-1">Water and electricity do not mix</strong>
-                  <p className="text-slate-600">Do not interact with the charger or EVDB if there is standing water around the equipment or if the equipment is heavily submerged.</p>
-                </div>
-              </li>
+              {[
+                ["Never open internal electrical panels", "Only qualified and certified technicians should open the internal casing of EV chargers or primary distribution boards."],
+                ["Do not touch exposed wires", "If you see exposed wiring, melted components, or physical damage, stay away and escalate immediately."],
+                ["Water and electricity do not mix", "Do not interact with the charger or EVDB if there is standing water around the equipment."],
+              ].map(([title, text], index) => (
+                <li key={title} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <strong className="block mb-1 text-slate-900">{title}</strong>
+                    <p className="text-slate-600">{text}</p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </CardContent>
         </Card>
 
         <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <div className="bg-slate-50 border-b border-slate-100 p-5 flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-slate-600" />
-            <h2 className="text-lg font-bold text-slate-800 uppercase tracking-widest">Safe Interactions</h2>
-          </div>
           <CardContent className="p-6 md:p-8">
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <Zap className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <strong className="text-slate-900 block mb-1">Checking indicator lights</strong>
-                  <p className="text-slate-600">It is completely safe to observe and photograph the external indicator lights on the charger.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <Zap className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <strong className="text-slate-900 block mb-1">Reading serial numbers</strong>
-                  <p className="text-slate-600">You may safely photograph labels, QR codes, and serial numbers located on the exterior casing.</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-3">
-                <Zap className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <strong className="text-slate-900 block mb-1">Operating accessible switches</strong>
-                  <p className="text-slate-600">Resetting external, customer-accessible MCBs/RCCBs or Isolator switches is safe when following guided instructions. Do not force switches that refuse to stay closed (tripped state).</p>
-                </div>
-              </li>
-            </ul>
+            <Accordion type="single" collapsible defaultValue="before-photo">
+              {[
+                ["before-photo", "Before taking a photo", "Stand back, use zoom if needed, and keep hands away from live parts."],
+                ["safe-checks", "Safe things you can check", "External charger lights, exterior labels, accessible isolator position, and visible breaker state."],
+                ["technician-only", "What only technicians should do", "Opening internal casing, touching wiring, replacing breakers, or working near exposed conductors."],
+              ].map(([value, title, text]) => (
+                <AccordionItem key={value} value={value}>
+                  <AccordionTrigger className="text-left font-extrabold">{title}</AccordionTrigger>
+                  <AccordionContent className="text-sm font-medium leading-7 text-slate-600">{text}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </CardContent>
         </Card>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            ["Charger Unit", "Safe to photograph indicator and exterior label."],
+            ["EVDB", "Do not open internal covers unless authorized."],
+            ["Isolator", "Only operate accessible external switch if safe."],
+          ].map(([title, text]) => (
+            <div key={title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <CheckCircle2 className="mb-3 size-5 text-green-700" />
+              <p className="font-extrabold text-slate-950">{title}</p>
+              <p className="mt-2 text-sm font-medium leading-6 text-slate-500">{text}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </PageShell>
   );

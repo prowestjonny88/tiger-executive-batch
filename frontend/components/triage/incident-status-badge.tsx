@@ -6,14 +6,16 @@ interface IncidentStatusBadgeProps {
 
 export function IncidentStatusBadge({ recipientType }: IncidentStatusBadgeProps) {
   let variant: "default" | "secondary" | "success" | "warning" = "secondary";
-  let label = "Pending";
+  let label = "Needs Review";
 
   if (recipientType === "customer") {
     variant = "success";
-    label = "Resolved (Customer)";
+    label = "Customer Action";
   } else if (recipientType === "after_sales_team") {
     variant = "warning";
-    label = "Escalated";
+    label = "After-sales";
+  } else if (recipientType === "none") {
+    label = "Identification Only";
   }
 
   return (

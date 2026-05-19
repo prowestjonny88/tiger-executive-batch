@@ -32,6 +32,18 @@ export function FollowUpControl({ questionId, value, onChange, onFileSelect, fil
             if (onFileSelect) onFileSelect(file);
           }}
           fileName={fileName}
+          title={
+            questionId === "evdb_label_closeup"
+              ? "Upload EVDB label close-up"
+              : questionId === "charger_identity_closeup"
+                ? "Upload charger label close-up"
+                : questionId === "charger_app_screenshot"
+                  ? "Upload EV app screenshot"
+                  : questionId === "isolator_switch_state"
+                    ? "Upload isolator switch photo"
+                    : "Upload clearer proof photo"
+          }
+          subtitle="Use clear lighting and keep all labels readable."
         />
         {isIsolator && (
           <div className="space-y-3">
@@ -59,17 +71,24 @@ export function FollowUpControl({ questionId, value, onChange, onFileSelect, fil
   if (isRedLightCount) {
     return (
       <div className="space-y-3">
-        <RadioGroup value={value} onValueChange={onChange} className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          {["6", "7", "8", "9", "Not sure"].map((option) => (
+        <RadioGroup value={value} onValueChange={onChange} className="grid grid-cols-1 gap-3 md:grid-cols-5">
+          {[
+            ["6", "Ground fault / installation review"],
+            ["7", "Emergency stop / manual error"],
+            ["8", "Short circuit / after-sales"],
+            ["9", "Over-temperature / restart"],
+            ["Not sure", "Upload app screenshot if available"],
+          ].map(([option, helper]) => (
             <Label
               key={option}
               htmlFor={option}
-              className={`flex flex-col items-center justify-center p-4 border rounded-xl cursor-pointer transition-colors ${
+              className={`flex min-h-[108px] flex-col justify-center p-4 border rounded-xl cursor-pointer transition-colors ${
                 value === option ? "border-green-600 bg-green-50" : "border-slate-200 hover:bg-slate-50"
               }`}
             >
               <RadioGroupItem value={option} id={option} className="sr-only" />
               <span className="font-bold text-lg">{option}</span>
+              <span className="mt-1 text-xs font-semibold leading-5 text-slate-500">{helper}</span>
             </Label>
           ))}
         </RadioGroup>

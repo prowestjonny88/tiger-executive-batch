@@ -3,7 +3,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: var(--font-inter), Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
 }
 
 :root {
@@ -13,11 +13,22 @@
   --rex-green-soft: #EAF8EF;
   --rex-charcoal: #101513;
   --rex-dark: #050807;
-  --rex-text: #262626;
-  --rex-muted: #707070;
-  --rex-line: #E6E6E6;
+  --rex-panel: #121A18;
+  --rex-text: #1C2421;
+  --rex-muted: #66736C;
+  --rex-line: #E2E7E3;
   --rex-bg: #FFFFFF;
   --rex-bg-soft: #F7F8F5;
+  --rex-bg-app: #FBFAF7;
+  --rex-amber: #D97706;
+  --rex-amber-soft: #FFF7E6;
+  --rex-blue: #2563EB;
+  --rex-blue-soft: #EFF6FF;
+  --rex-red: #DC2626;
+  --rex-red-soft: #FEF2F2;
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-manrope);
+  --font-technical: var(--font-mono);
   --background: #FBFAF7;
   --foreground: #0F172A;
   --card: #FFFFFF;
@@ -142,6 +153,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body), Arial, Helvetica, sans-serif;
   }
 
   html {
@@ -195,7 +207,14 @@
   .landing-root {
     background: var(--rex-bg);
     color: var(--rex-text);
-    font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+    font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  }
+
+  .landing-root h1,
+  .landing-root h2,
+  .landing-root h3,
+  .landing-display {
+    font-family: var(--font-display), Arial, Helvetica, sans-serif;
   }
 
   .landing-container {
@@ -238,9 +257,54 @@
 
   .landing-kicker {
     color: var(--rex-green-dark);
+    font-family: var(--font-technical), monospace;
     font-size: 0.75rem;
     font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
+  }
+
+  .app-surface {
+    background: var(--rex-bg-app);
+  }
+
+  .app-card {
+    background: white;
+    border: 1px solid var(--rex-line);
+    border-radius: 1.25rem;
+    box-shadow: 0 10px 30px rgba(16, 21, 19, 0.04);
+  }
+
+  .field-card {
+    background: white;
+    border: 1px solid var(--rex-line);
+    border-radius: 1rem;
+    padding: 1rem;
+  }
+
+  .technical-label {
+    font-family: var(--font-technical), monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .soft-grid-bg {
+    background-image:
+      linear-gradient(rgba(16, 21, 19, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 21, 19, 0.035) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
   }
 }

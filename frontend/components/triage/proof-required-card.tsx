@@ -34,9 +34,12 @@ export function ProofRequiredCard({
       <div className="flex items-center gap-2 mb-3">
         <AlertCircle className="w-5 h-5 text-amber-600" />
         <strong className="text-amber-800 text-sm font-bold uppercase tracking-widest">
-          Verification Required
+          More proof needed
         </strong>
       </div>
+      <p className="mb-2 text-sm font-semibold text-amber-800">
+        Evidence may be confident, but one clearer proof item is still needed before closing the report.
+      </p>
       {visibleProofNext && <p className="text-amber-900 font-medium mb-2">{visibleProofNext}</p>}
       {visiblePrompts.length > 0 && (
         <ul className="list-disc pl-5 text-amber-800 space-y-1 text-sm mt-2">

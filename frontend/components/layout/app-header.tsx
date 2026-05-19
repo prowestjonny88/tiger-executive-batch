@@ -24,9 +24,9 @@ export function AppHeader() {
   };
 
   const navLinks = [
-    { name: "Dashboard", href: "/", activeKey: "/" },
+    { name: "Home", href: "/", activeKey: "/" },
+    { name: "New Report", href: "/upload", activeKey: "/support" },
     { name: "History", href: "/history", activeKey: "/history" },
-    { name: "Support", href: "/upload", activeKey: "/support" },
     { name: "Safety", href: "/safety", activeKey: "/safety" },
   ];
 
@@ -35,7 +35,7 @@ export function AppHeader() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
           <Zap className="w-6 h-6 text-green-700" />
-          RExharge
+          RExharge Assist
         </Link>
         
         {/* Desktop Nav */}
@@ -69,7 +69,7 @@ export function AppHeader() {
             href="/upload"
             className="bg-green-700 hover:bg-green-800 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm flex items-center gap-2"
           >
-            Get Help
+            Check Photo
           </Link>
         </div>
 
@@ -83,6 +83,10 @@ export function AppHeader() {
               </button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px] pt-12">
+              <div className="mb-8 border-b border-slate-100 pb-6">
+                <p className="text-xl font-extrabold text-slate-950">RExharge Assist</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">EV charger support flow</p>
+              </div>
               <nav className="flex flex-col gap-6">
                 {navLinks.map((link) => (
                   <Link
@@ -102,7 +106,7 @@ export function AppHeader() {
                     onClick={() => setOpen(false)}
                     className="flex justify-center bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-sm w-full"
                   >
-                    Get Help
+                    Check Photo
                   </Link>
                 </div>
               </nav>

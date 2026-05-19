@@ -52,7 +52,8 @@ def test_result_page_uses_safe_hierarchy_and_collapsed_internal_trace():
     assert "resultState.nextStep" in source
     assert "resultState.primaryCtaLabel" in source
     assert "resultState.primaryCtaHref" in source
-    assert "Required Output" in source
+    assert "Result Summary" in source
+    assert "Theme 2 required output" in source
     assert "Component Evidence" in source
     assert "Show routing decision trace" in source
     assert source.index("Show routing decision trace") < source.rindex("<DecisionChain")
@@ -77,7 +78,7 @@ def test_evidence_panel_accepts_theme2_object_annotations():
 def test_proof_required_card_uses_verification_language_and_evdb_filter():
     source = _read(FRONTEND_ROOT / "components" / "triage" / "proof-required-card.tsx")
 
-    assert "Verification Required" in source
+    assert "More proof needed" in source
     assert "suppressGenericEvdbProof" in source
     assert "resultProofState" in source
     assert "evdb_label_closeup" in source

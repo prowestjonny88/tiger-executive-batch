@@ -26,6 +26,8 @@ import {
   type OrganizerOutputField,
 } from "../../lib/theme2-result-fields";
 import { deriveResultState } from "../../lib/theme2-result-state";
+import { FieldCard } from "../../components/triage/field-card";
+import { RouteBadge } from "../../components/triage/route-badge";
 
 export default function ResultAssessmentPage() {
   return (
@@ -195,11 +197,15 @@ function ResultAssessment() {
           <section className="rounded-2xl border border-green-100 bg-green-50/45 p-5 md:p-6">
             <div className="mb-5">
               <p className="text-xs font-extrabold uppercase tracking-widest text-green-700">
-                Organizer Required Output
+                Result Summary
               </p>
-              <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-                Required Output
-              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-extrabold text-slate-900">What RExharge found</h2>
+                <span className="rounded-full border border-green-200 bg-white px-3 py-1 text-xs font-bold text-green-800">
+                  Theme 2 required output
+                </span>
+                <RouteBadge recipientType={output.recipient_type} />
+              </div>
             </div>
             <FieldGrid fields={coreFields} />
           </section>
@@ -210,7 +216,7 @@ function ResultAssessment() {
                 Component Evidence
               </p>
               <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-                Evidence fields for the detected component
+                Evidence details for the detected component
               </h2>
             </div>
             <FieldGrid fields={componentEvidenceFields} />
@@ -359,14 +365,7 @@ function FieldGrid({ fields }: { fields: OrganizerOutputField[] }) {
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {fields.map(({ label, value }) => (
-        <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
-            {label}
-          </p>
-          <p className="mt-1 text-base font-bold leading-6 text-slate-950">
-            {value}
-          </p>
-        </div>
+        <FieldCard key={label} label={label} value={value} />
       ))}
     </div>
   );

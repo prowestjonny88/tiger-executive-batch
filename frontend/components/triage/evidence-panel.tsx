@@ -1,4 +1,5 @@
 import { AnnotatedImage, type Annotation } from "../ui/annotated-image";
+import { EvidenceDialog } from "./evidence-dialog";
 
 interface EvidencePanelProps {
   imageUrl: string | null | undefined;
@@ -17,16 +18,27 @@ export function EvidencePanel({ imageUrl, annotations = [] }: EvidencePanelProps
   }
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
-      <div className="w-full h-full relative aspect-video md:aspect-square lg:aspect-auto flex items-center justify-center">
-        <AnnotatedImage src={imageUrl} annotations={annotations} className="max-h-[500px] w-auto object-contain rounded-lg" />
+    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px] shadow-sm">
+      <div className="mb-3 flex w-full items-center justify-between gap-3 text-white">
+        <div>
+          <p className="technical-label text-white/55">Highlighted evidence</p>
+          <p className="text-sm font-semibold text-white/80">VLM / heuristic boxes</p>
+        </div>
+        {annotations.length > 0 ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{annotations.length} boxes</span> : null}
       </div>
+      <EvidenceDialog imageUrl={imageUrl} annotations={annotations}>
+        <button type="button" className="w-full cursor-zoom-in rounded-xl bg-slate-900 p-2 focus:outline-none focus:ring-2 focus:ring-green-400">
+          <div className="w-full h-full relative aspect-video md:aspect-square lg:aspect-auto flex items-center justify-center">
+            <AnnotatedImage src={imageUrl} annotations={annotations} className="max-h-[500px] w-auto object-contain rounded-lg" />
+          </div>
+        </button>
+      </EvidenceDialog>
       {uniqueLabels.length > 0 && (
         <div className="mt-4 flex w-full flex-wrap justify-center gap-2">
           {uniqueLabels.map((label) => (
             <span
               key={label}
-              className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800"
+              className="rounded-full border border-amber-300/50 bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900"
             >
               {label}
             </span>
