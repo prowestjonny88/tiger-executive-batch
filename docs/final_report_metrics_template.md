@@ -2,7 +2,7 @@
 
 ## 1. System Overview
 
-RExharge Theme 2 Triage is a VLM-assisted EV charger support prototype. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, extracts Theme 2 observations, applies deterministic organizer rules, and routes to customer guidance or after-sales team `AS_TEAM_01`.
+ChargerDoc Theme 2 Triage is a VLM-assisted EV charger support prototype. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, extracts Theme 2 observations, applies deterministic organizer rules, and routes to customer guidance or after-sales team `AS_TEAM_01`.
 
 ## 2. Architecture
 

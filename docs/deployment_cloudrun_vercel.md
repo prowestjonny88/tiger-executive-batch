@@ -1,6 +1,6 @@
 # Cloud Run And Vercel Deployment Guide
 
-This guide deploys the current RExharge Theme 2 app:
+This guide deploys the current ChargerDoc Theme 2 app:
 
 - Frontend: Vercel
 - Backend: Google Cloud Run
@@ -42,14 +42,14 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3-flash-preview
 STORAGE_BACKEND=gcs
-GCS_BUCKET=rexharge-uploads-<PROJECT_ID>
+GCS_BUCKET=chargerdoc-uploads-<PROJECT_ID>
 GCS_UPLOAD_PREFIX=incidents
 ```
 
 Temporary local-disk smoke mode only:
 
 ```env
-UPLOAD_ROOT=/tmp/rexharge/uploads
+UPLOAD_ROOT=/tmp/chargerdoc/uploads
 ```
 
 ## Frontend Environment Variables
@@ -83,8 +83,8 @@ gcloud services enable storage.googleapis.com
 Create the upload bucket:
 
 ```cmd
-set PROJECT_ID=rexharge-experiment
-set BUCKET=rexharge-uploads-%PROJECT_ID%
+set PROJECT_ID=chargerdoc-experiment
+set BUCKET=chargerdoc-uploads-%PROJECT_ID%
 
 gcloud storage buckets create gs://%BUCKET% ^
   --location=US-CENTRAL1 ^
@@ -110,7 +110,7 @@ gcloud storage buckets add-iam-policy-binding gs://%BUCKET% ^
 Run from the repo root:
 
 ```cmd
-gcloud run deploy rexharge-backend ^
+gcloud run deploy chargerdoc-backend ^
   --source . ^
   --region us-central1 ^
   --allow-unauthenticated ^
@@ -126,7 +126,7 @@ If the service already has environment variables configured, this redeploy keeps
 Get the service URL:
 
 ```cmd
-gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
+gcloud run services describe chargerdoc-backend --region us-central1 --format="value(status.url)"
 ```
 
 Health check:
@@ -149,7 +149,7 @@ Expected fields:
 Read backend logs:
 
 ```cmd
-gcloud run services logs read rexharge-backend --region us-central1 --limit 100
+gcloud run services logs read chargerdoc-backend --region us-central1 --limit 100
 ```
 
 ## Vercel Frontend

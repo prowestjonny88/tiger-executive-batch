@@ -37,7 +37,7 @@ def test_local_store_and_read_photo_bytes(monkeypatch):
 
 def test_gcs_store_and_read_photo_bytes(monkeypatch):
     monkeypatch.setenv("STORAGE_BACKEND", "gcs")
-    monkeypatch.setenv("GCS_BUCKET", "rexharge-uploads-test")
+    monkeypatch.setenv("GCS_BUCKET", "chargerdoc-uploads-test")
     monkeypatch.setenv("GCS_UPLOAD_PREFIX", "incidents")
 
     uploaded: dict[str, object] = {}
@@ -67,7 +67,7 @@ def test_gcs_store_and_read_photo_bytes(monkeypatch):
     assert evidence.storage_provider == "gcs"
     assert evidence.storage_key is not None
     assert evidence.storage_key.startswith("incidents/")
-    assert evidence.storage_path.startswith("gcs://rexharge-uploads-test/incidents/")
+    assert evidence.storage_path.startswith("gcs://chargerdoc-uploads-test/incidents/")
     assert evidence.display_url == f"/api/v1/evidence/{evidence.storage_key}"
     assert storage.read_photo_bytes(evidence) == b"gcs-bytes"
 

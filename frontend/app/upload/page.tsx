@@ -215,7 +215,7 @@ export default function PhotoUpload() {
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Start a charger support check</h1>
           </div>
           <p className="text-slate-600 text-lg">
-            Upload a clear charger, EVDB, or isolator photo. RExharge Assist will guide the next step.
+            Upload a clear charger, EVDB, or isolator photo. ChargerDoc Assist will guide the next step.
           </p>
         </div>
 

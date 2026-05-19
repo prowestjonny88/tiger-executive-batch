@@ -18,7 +18,7 @@ from app.services.storage import get_upload_root, read_evidence_object
 from app.services.theme2_rules import load_theme2_rules
 from app.services.theme2_triage import run_theme2_triage_with_debug
 
-app = FastAPI(title="RExharge Theme 2 API", version="0.2.0")
+app = FastAPI(title="ChargerDoc Theme 2 API", version="0.2.0")
 app.mount("/uploads", StaticFiles(directory=get_upload_root(), check_dir=False), name="uploads")
 request_logger = logging.getLogger("omnitriage.request")
 runtime_logger = logging.getLogger("omnitriage.runtime")

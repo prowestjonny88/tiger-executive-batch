@@ -28,7 +28,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RExharge Precision Flow",
+  title: "ChargerDoc Precision Flow",
   description: "Confidence-aware EV charger troubleshooting with a premium technical-manual interface.",
 };
 

@@ -17,7 +17,7 @@ export default function SafetyPage() {
           </h1>
         </div>
         <p className="max-w-3xl text-lg leading-8 text-slate-600">
-          Take photos only from a safe distance. RExharge can guide visible evidence checks, but electrical repair decisions should be verified by qualified personnel.
+          Take photos only from a safe distance. ChargerDoc can guide visible evidence checks, but electrical repair decisions should be verified by qualified personnel.
         </p>
       </div>
 

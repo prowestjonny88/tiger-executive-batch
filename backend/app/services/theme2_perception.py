@@ -722,7 +722,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         raise RuntimeError("gemini_sdk_unavailable")
 
     prompt = (
-        "You are RExharge Theme 2 EV charger troubleshooting perception. Inspect the image and return JSON only.\n"
+        "You are ChargerDoc Theme 2 EV charger troubleshooting perception. Inspect the image and return JSON only.\n"
         "Use exactly these keys:\n"
         "evidence_type, scene_summary, components_visible, visible_abnormalities, ocr_findings, hazard_signals, "
         "uncertainty_notes, confidence_score, input_component, observation_result, charger_serial_number, "
@@ -827,7 +827,7 @@ def _call_gemini_app_screenshot(incident: IncidentInput) -> tuple[dict[str, obje
         raise RuntimeError("gemini_sdk_unavailable")
 
     prompt = (
-        "You are reading an EV charging app screenshot for RExharge Theme 2. Return JSON only.\n"
+        "You are reading an EV charging app screenshot for ChargerDoc Theme 2. Return JSON only.\n"
         "Use exactly these keys: app_status_summary, app_visible_text, app_error_code, app_fault_hint, "
         "app_uncertainty_notes, confidence_score.\n"
         "Extract only visible app text. Do not infer hidden status. If text is unreadable, use null and add an uncertainty note.\n"

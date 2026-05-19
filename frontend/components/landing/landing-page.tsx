@@ -88,6 +88,17 @@ function SectionIntro({ kicker, title, copy }: { kicker: string; title: string; 
   );
 }
 
+function WorkflowIntro() {
+  return (
+    <motion.div {...fadeUp} className="mx-auto mb-14 max-w-6xl text-center">
+      <p className="landing-kicker mb-4">How the support check works</p>
+      <h2 className="whitespace-normal text-3xl font-bold leading-tight tracking-normal text-[var(--rex-charcoal)] sm:text-4xl lg:whitespace-nowrap lg:text-6xl">
+        Upload -&gt; Observe -&gt; Classify -&gt; Route
+      </h2>
+    </motion.div>
+  );
+}
+
 function SectionFrame({
   id,
   className,
@@ -139,7 +150,7 @@ function LandingHeader() {
           <span className="grid size-10 place-items-center rounded-full bg-[var(--rex-green)] text-white">
             <Zap className="size-5" />
           </span>
-          <span className="text-lg tracking-normal">RExharge Assist</span>
+          <span className="text-lg tracking-normal">ChargerDoc Assist</span>
         </Link>
 
         <nav className="hidden items-center gap-8 lg:flex">
@@ -208,7 +219,7 @@ function HeroSection() {
             Snap the issue. Know what to do next.
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-white/78 md:text-xl">
-            Upload a charger, EVDB, or isolator photo. RExharge Assist checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
+            Upload a charger, EVDB, or isolator photo. ChargerDoc Assist checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <PillCta href="/upload">Check a Photo</PillCta>
@@ -366,7 +377,7 @@ function WorkflowSection() {
   return (
     <SectionFrame id="workflow" className="landing-section bg-white">
       <div className="landing-container">
-        <SectionIntro kicker="How the support check works" title="Upload -> Observe -> Classify -> Route" />
+        <WorkflowIntro />
         <img
           src={images.arrows}
           alt=""
@@ -629,7 +640,7 @@ function LandingFooter() {
             <span className="grid size-10 place-items-center rounded-full bg-[var(--rex-green)]">
               <Zap className="size-5" />
             </span>
-            RExharge Assist
+            ChargerDoc Assist
           </div>
           <p className="mt-5 max-w-md text-sm leading-7 text-white/62">EV charger fault triage prototype for Theme 2. Electrical repair decisions should be verified by qualified personnel where required.</p>
         </div>

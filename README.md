@@ -1,6 +1,6 @@
-# RExharge Theme 2 Triage
+# ChargerDoc Theme 2 Triage
 
-RExharge Theme 2 Triage is an EV charger troubleshooting prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, and routes the result either to the customer or to `AS_TEAM_01`.
+ChargerDoc Theme 2 Triage is an EV charger troubleshooting prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, and routes the result either to the customer or to `AS_TEAM_01`.
 
 The current product is Theme 2 only. Round 1 known-case retrieval, pgvector, KB gates, `issue_family`, and `resolver_tier` are archived under `_archive/round1/` and are not part of the live runtime.
 
@@ -158,7 +158,7 @@ Frontend deploys on Vercel from `frontend/`.
 Backend deploys on Cloud Run from the repo root:
 
 ```cmd
-gcloud run deploy rexharge-backend ^
+gcloud run deploy chargerdoc-backend ^
   --source . ^
   --region us-central1 ^
   --allow-unauthenticated ^
@@ -176,14 +176,14 @@ DATABASE_URL=postgresql://...
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3-flash-preview
 STORAGE_BACKEND=gcs
-GCS_BUCKET=rexharge-uploads-<PROJECT_ID>
+GCS_BUCKET=chargerdoc-uploads-<PROJECT_ID>
 GCS_UPLOAD_PREFIX=incidents
 ```
 
 Get the Cloud Run URL:
 
 ```cmd
-gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
+gcloud run services describe chargerdoc-backend --region us-central1 --format="value(status.url)"
 ```
 
 Set that URL in Vercel:

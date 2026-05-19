@@ -20,7 +20,7 @@ export function SiteShell({ activeNav = "home", children }: Props) {
       <header className="app-header">
         <div className="app-header__inner">
           <Link className="brand" href="/">
-            RExharge
+            ChargerDoc
           </Link>
           <nav className="app-nav" aria-label="Primary">
             {navItems.map((item) => (
@@ -35,7 +35,7 @@ export function SiteShell({ activeNav = "home", children }: Props) {
       <main className="app-main">{children}</main>
       <footer className="app-footer">
         <div className="app-footer__inner">
-          <span>(c) 2026 RExharge Precision Systems</span>
+          <span>(c) 2026 ChargerDoc Precision Systems</span>
           <div className="app-footer__links">
             <span>Privacy Policy</span>
             <span>Terms of Service</span>
