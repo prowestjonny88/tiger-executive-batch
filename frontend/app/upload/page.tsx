@@ -28,10 +28,6 @@ import { Textarea } from "../../components/ui/textarea";
 import { Label } from "../../components/ui/label";
 import { Button } from "../../components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
-import {
-  EvidenceTypeSelector,
-  type EvidenceTypeOption,
-} from "../../components/triage/evidence-type-selector";
 
 type UploadState = "idle" | "uploading" | "previewing" | "done" | "error";
 type Mode = "manual" | "demo";
@@ -44,7 +40,6 @@ export default function PhotoUpload() {
   const [errorMsg, setErrorMsg] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [evidenceType, setEvidenceType] = useState<EvidenceTypeOption>("unknown");
   const [chargerId, setChargerId] = useState("");
   const [symptomText, setSymptomText] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -149,8 +144,7 @@ export default function PhotoUpload() {
         photoEvidence = uploaded;
       }
 
-      const evidenceHint = evidenceType === "unknown" ? "" : `User selected evidence type: ${evidenceType}. `;
-      const photoHint = file ? `${evidenceHint}Photo: ${file.name}` : evidenceHint.trim();
+      const photoHint = file ? `Photo: ${file.name}` : "";
       writeSession({
         siteId,
         chargerId: chargerId || undefined,
@@ -212,8 +206,8 @@ export default function PhotoUpload() {
   const manualRequiresPhoto = mode === "manual" && !file;
 
   return (
-    <PageShell maxWidth="6xl">
-      <Card className="app-card w-full overflow-hidden p-6 md:p-8">
+    <PageShell maxWidth="3xl">
+      <Card className="app-card w-full overflow-hidden p-8 md:p-12">
         
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -221,7 +215,7 @@ export default function PhotoUpload() {
             <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Start a charger support check</h1>
           </div>
           <p className="text-slate-600 text-lg">
-            Choose what you are photographing, upload a clear photo, and RExharge Assist will guide the next step.
+            Upload a clear charger, EVDB, or isolator photo. RExharge Assist will guide the next step.
           </p>
         </div>
 
@@ -232,88 +226,66 @@ export default function PhotoUpload() {
           </TabsList>
           
           <TabsContent value="manual" className="space-y-8">
-            <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-6">
-                <div>
-                  <p className="technical-label mb-3 text-slate-500">Step 1 - What are you photographing?</p>
-                  <EvidenceTypeSelector value={evidenceType} onChange={setEvidenceType} />
-                </div>
+            <UploadDropzone
+              onFileSelect={handleFile}
+              fileName={file?.name}
+              fileSize={file?.size}
+              previewUrl={previewUrl}
+              title="Upload a clear charger support photo"
+              subtitle="Show the charger, EVDB, or isolator involved."
+              className="bg-slate-50 hover:bg-slate-50/80"
+            />
 
-                <UploadDropzone
-                  onFileSelect={handleFile}
-                  fileName={file?.name}
-                  fileSize={file?.size}
-                  previewUrl={previewUrl}
-                  title={
-                    evidenceType === "charger"
-                      ? "Capture the charger front clearly"
-                      : evidenceType === "evdb"
-                        ? "Capture the EVDB labels clearly"
-                        : evidenceType === "isolator"
-                          ? "Capture the switch position clearly"
-                          : "Upload a clear charger support photo"
-                  }
-                  subtitle={
-                    evidenceType === "charger"
-                      ? "Include the indicator light and serial label if possible."
-                      : evidenceType === "evdb"
-                        ? "Make MCB/RCCB ratings and type readable."
-                        : evidenceType === "isolator"
-                          ? "Make the ON/OFF label visible."
-                          : "Show the charger, EVDB, or isolator involved."
-                  }
-                  className="bg-slate-50 hover:bg-slate-50/80"
-                />
+            {manualRequiresPhoto && (
+              <Alert>
+                <ImageIcon className="h-4 w-4" />
+                <AlertTitle>Upload a photo first</AlertTitle>
+                <AlertDescription>Please upload a charger, EVDB, or isolator photo before checking evidence.</AlertDescription>
+              </Alert>
+            )}
 
-                {manualRequiresPhoto && (
-                  <Alert>
-                    <ImageIcon className="h-4 w-4" />
-                    <AlertTitle>Upload a photo first</AlertTitle>
-                    <AlertDescription>Please upload a charger, EVDB, or isolator photo before checking evidence.</AlertDescription>
-                  </Alert>
-                )}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="h-px bg-slate-200 flex-1"></div>
+                <h3 className="technical-label text-slate-500">Photo tips</h3>
+                <div className="h-px bg-slate-200 flex-1"></div>
               </div>
 
-              <div className="space-y-6">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <p className="technical-label mb-4 text-slate-500">Photo tips</p>
-                  <div className="grid gap-3">
-                    <CaptureTipCard icon={<ImageIcon className="w-5 h-5" />} text="Charger: indicator and serial label" />
-                    <CaptureTipCard icon={<Power className="w-5 h-5" />} text="EVDB: MCB/RCCB labels clearly" />
-                    <CaptureTipCard icon={<Zap className="w-5 h-5" />} text="Isolator: ON/OFF switch clearly" />
-                  </div>
-                  <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">
-                    Large photos are optimized before upload to keep labels readable while avoiding deployment upload limits.
-                  </p>
-                </div>
-
-                <Alert variant="warning" className="rounded-2xl">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Safe photo reminder</AlertTitle>
-                  <AlertDescription>
-                    Take photos from a safe distance. Do not open electrical panels unless you are authorized.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                  <p className="technical-label mb-4 text-slate-500">Optional details</p>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="chargerId" className="text-xs font-bold uppercase tracking-widest text-slate-500">Charger ID</Label>
-                      <Input id="chargerId" placeholder="e.g. RX-2049-A" value={chargerId} onChange={(e) => setChargerId(e.target.value)} className="bg-slate-50 border-slate-200 text-base py-6" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="errorCode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Error Code / App Code</Label>
-                      <Input id="errorCode" placeholder="e.g. E-04" value={errorCode} onChange={(e) => setErrorCode(e.target.value)} className="bg-slate-50 border-slate-200 text-base py-6" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="symptom" className="text-xs font-bold uppercase tracking-widest text-slate-500">Describe the Issue</Label>
-                      <Textarea id="symptom" placeholder="e.g. Charger not responding, lights off..." value={symptomText} onChange={(e) => setSymptomText(e.target.value)} className="bg-slate-50 border-slate-200 min-h-[100px] text-base resize-none" />
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <CaptureTipCard icon={<ImageIcon className="w-5 h-5" />} text="Charger: indicator and serial label" />
+                <CaptureTipCard icon={<Power className="w-5 h-5" />} text="EVDB: MCB/RCCB labels clearly" />
+                <CaptureTipCard icon={<Zap className="w-5 h-5" />} text="Isolator: ON/OFF switch clearly" />
               </div>
+              <p className="text-xs font-semibold leading-5 text-slate-500">
+                Large photos are optimized before upload to keep labels readable while avoiding deployment upload limits.
+              </p>
             </div>
+
+            <Alert variant="warning" className="rounded-2xl">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Safe photo reminder</AlertTitle>
+              <AlertDescription>
+                Take photos from a safe distance. Do not open electrical panels unless you are authorized.
+              </AlertDescription>
+            </Alert>
+
+            <details className="rounded-2xl border border-slate-200 bg-white p-5">
+              <summary className="cursor-pointer technical-label text-slate-500">Optional details</summary>
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="chargerId" className="text-xs font-bold uppercase tracking-widest text-slate-500">Charger ID</Label>
+                  <Input id="chargerId" placeholder="e.g. RX-2049-A" value={chargerId} onChange={(e) => setChargerId(e.target.value)} className="bg-slate-50 border-slate-200 text-base py-6" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="errorCode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Error Code / App Code</Label>
+                  <Input id="errorCode" placeholder="e.g. E-04" value={errorCode} onChange={(e) => setErrorCode(e.target.value)} className="bg-slate-50 border-slate-200 text-base py-6" />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <Label htmlFor="symptom" className="text-xs font-bold uppercase tracking-widest text-slate-500">Describe the Issue</Label>
+                  <Textarea id="symptom" placeholder="e.g. Charger not responding, lights off..." value={symptomText} onChange={(e) => setSymptomText(e.target.value)} className="bg-slate-50 border-slate-200 min-h-[100px] text-base resize-none" />
+                </div>
+              </div>
+            </details>
           </TabsContent>
 
           <TabsContent value="demo" className="space-y-8">
