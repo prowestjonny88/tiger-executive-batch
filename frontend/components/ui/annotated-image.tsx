@@ -23,6 +23,11 @@ export function AnnotatedImage({
   className?: string;
 }) {
   const [hoveredAnnotation, setHoveredAnnotation] = useState<string | null>(null);
+  const orderedAnnotations = [...annotations].sort((a, b) => {
+    const areaA = a.width * a.height;
+    const areaB = b.width * b.height;
+    return areaB - areaA;
+  });
 
   // Use placehold.co if image doesn't exist
   const [imgSrc, setImgSrc] = useState(src);
@@ -38,30 +43,42 @@ export function AnnotatedImage({
       />
 
       {/* Render bounding boxes */}
-      {annotations.map((ann) => (
-        <div
-          key={ann.id}
-          className={`absolute border-2 transition-colors duration-200 cursor-pointer ${
-            hoveredAnnotation === ann.id
-              ? "border-red-500 bg-red-500/20"
-              : "border-amber-400 bg-amber-400/10"
-          }`}
-          style={{
-            left: `${ann.x}%`,
-            top: `${ann.y}%`,
-            width: `${ann.width}%`,
-            height: `${ann.height}%`,
-          }}
-          onMouseEnter={() => setHoveredAnnotation(ann.id)}
-          onMouseLeave={() => setHoveredAnnotation(null)}
-        >
-          {(hoveredAnnotation === ann.id || annotations.length === 1) && (
-            <div className="absolute -bottom-7 left-0 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-md z-10">
-              {ann.label}
-            </div>
-          )}
-        </div>
-      ))}
+      {orderedAnnotations.map((ann) => {
+        const labelAbove = ann.y + ann.height > 84;
+        const isHovered = hoveredAnnotation === ann.id;
+        return (
+          <div
+            key={ann.id}
+            className={`absolute border-2 transition-colors duration-200 cursor-pointer ${
+              isHovered
+                ? "border-red-500 bg-red-500/20"
+                : "border-amber-400 bg-amber-400/10 hover:border-red-500 hover:bg-red-500/20"
+            }`}
+            style={{
+              left: `${ann.x}%`,
+              top: `${ann.y}%`,
+              width: `${ann.width}%`,
+              height: `${ann.height}%`,
+            }}
+            onMouseEnter={() => setHoveredAnnotation(ann.id)}
+            onMouseLeave={() => setHoveredAnnotation(null)}
+            onFocus={() => setHoveredAnnotation(ann.id)}
+            onBlur={() => setHoveredAnnotation(null)}
+            tabIndex={0}
+            aria-label={`Detected ${ann.label}`}
+          >
+            {(isHovered || annotations.length === 1) && (
+              <div
+                className={`absolute left-0 z-10 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-md ${
+                  labelAbove ? "-top-7" : "-bottom-7"
+                }`}
+              >
+                {ann.label}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
