@@ -35,7 +35,7 @@ export function EvidencePanel({ imageUrl, annotations = [] }: EvidencePanelProps
       )}
       <p className="text-xs text-slate-400 mt-4 text-center">
         {annotations.length > 0
-          ? "Highlighted object evidence used for visual assessment"
+          ? "Detected components used for visual assessment. Clearer close-ups may be required for label verification."
           : "No visual boxes returned. The image was still used for VLM assessment."}
       </p>
     </div>

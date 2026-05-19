@@ -13,11 +13,10 @@ import {
   formatRecipientType,
   type ApiTriageResponse,
 } from "../../lib/api";
+import { deriveResultState, type ResultTone } from "../../lib/theme2-result-state";
 import { ConfidencePill } from "./confidence-pill";
 
-type VerdictTone = "green" | "blue" | "amber" | "red" | "slate";
-
-const toneClasses: Record<VerdictTone, string> = {
+const toneClasses: Record<ResultTone, string> = {
   green: "border-green-200 bg-green-50 text-green-950",
   blue: "border-blue-200 bg-blue-50 text-blue-950",
   amber: "border-amber-200 bg-amber-50 text-amber-950",
@@ -25,7 +24,7 @@ const toneClasses: Record<VerdictTone, string> = {
   slate: "border-slate-200 bg-slate-50 text-slate-950",
 };
 
-const iconClasses: Record<VerdictTone, string> = {
+const iconClasses: Record<ResultTone, string> = {
   green: "bg-green-100 text-green-700",
   blue: "bg-blue-100 text-blue-700",
   amber: "bg-amber-100 text-amber-700",
@@ -33,89 +32,28 @@ const iconClasses: Record<VerdictTone, string> = {
   slate: "bg-slate-100 text-slate-700",
 };
 
-function hasSafetySignal(triage: ApiTriageResponse) {
-  const output = triage.competition_output;
-  const overrideKey = typeof triage.debug.extra?.override_key === "string" ? triage.debug.extra.override_key : "";
-  if (/safety/i.test(overrideKey)) return true;
-
-  const text = [
-    output.action_message,
-    output.required_proof_next,
-    ...output.evidence_notes,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return /stop[- ]use|stop using|burnt|burning smell|smoke|sparking|melted|hot to touch|water ingress|exposed conductor/i.test(text);
-}
-
-function verdictFor(triage: ApiTriageResponse): {
-  tone: VerdictTone;
-  title: string;
-  status: string;
-  Icon: LucideIcon;
-} {
-  const output = triage.competition_output;
-  const needsProof = Boolean(output.required_proof_next || triage.follow_up_prompts.length > 0);
-
-  if (hasSafetySignal(triage)) {
-    return {
-      tone: "red",
-      title: "Safety Review Required",
-      status: "Stop-use or hazard evidence detected",
-      Icon: ShieldAlert,
-    };
-  }
-
-  if (output.recipient_type === "after_sales_team") {
-    return {
-      tone: "blue",
-      title: "After-sales Routing Ready",
-      status: `Message routed to After-sales Team: ${output.assigned_team_id || "AS_TEAM_01"}`,
-      Icon: Headphones,
-    };
-  }
-
-  if (needsProof || output.recipient_type === "unknown" || output.fault_type_v2 === "unknown") {
-    return {
-      tone: "amber",
-      title: "Verification Required",
-      status: "More proof is needed before the result is final",
-      Icon: AlertTriangle,
-    };
-  }
-
-  if (output.recipient_type === "customer") {
-    return {
-      tone: "green",
-      title: "Customer Action Ready",
-      status: "Result displayed to customer",
-      Icon: CheckCircle2,
-    };
-  }
-
-  return {
-    tone: "slate",
-    title: "Theme 2 Result Captured",
-    status: "No routing required",
-    Icon: HelpCircle,
-  };
+function iconForTone(tone: ResultTone): LucideIcon {
+  if (tone === "red") return ShieldAlert;
+  if (tone === "blue") return Headphones;
+  if (tone === "amber") return AlertTriangle;
+  if (tone === "green") return CheckCircle2;
+  return HelpCircle;
 }
 
 export function ResultVerdictCard({ triage }: { triage: ApiTriageResponse }) {
   const output = triage.competition_output;
-  const verdict = verdictFor(triage);
-  const Icon = verdict.Icon;
+  const resultState = deriveResultState(triage);
+  const Icon = iconForTone(resultState.tone);
   const recipient =
     output.recipient_type === "after_sales_team" && output.assigned_team_id
       ? `${formatRecipientType(output.recipient_type)}: ${output.assigned_team_id}`
       : formatRecipientType(output.recipient_type);
 
   return (
-    <section className={`rounded-2xl border p-5 shadow-sm md:p-6 ${toneClasses[verdict.tone]}`}>
+    <section className={`rounded-2xl border p-5 shadow-sm md:p-6 ${toneClasses[resultState.tone]}`}>
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="flex gap-4">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClasses[verdict.tone]}`}>
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconClasses[resultState.tone]}`}>
             <Icon className="h-6 w-6" />
           </div>
           <div>
@@ -123,10 +61,10 @@ export function ResultVerdictCard({ triage }: { triage: ApiTriageResponse }) {
               Final Verdict
             </p>
             <h2 className="mt-1 text-2xl font-extrabold tracking-tight md:text-3xl">
-              {verdict.title}
+              {resultState.title}
             </h2>
             <p className="mt-2 text-sm font-semibold opacity-80">
-              {verdict.status}
+              {resultState.status}
             </p>
           </div>
         </div>
@@ -151,6 +89,7 @@ export function ResultVerdictCard({ triage }: { triage: ApiTriageResponse }) {
         <div className="rounded-xl border border-white/70 bg-white/70 p-4">
           <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Recipient</p>
           <p className="mt-1 font-bold text-slate-950">{recipient}</p>
+          <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{resultState.recipientHelper}</p>
         </div>
       </div>
     </section>

@@ -23,9 +23,23 @@ def test_result_field_builder_uses_component_specific_evidence_cards():
     assert '"MCB Evidence"' in source
     assert '"RCCB Evidence"' in source
     assert '"EVDB Spec Status"' in source
-    assert '"Correct specs readable"' in source
-    assert '"Verification incomplete"' in source
+    assert '"Correct specs verified"' in source
+    assert '"Correct specs readable"' not in source
+    assert '"Readable but needs verification"' in source
     assert '"Switch State"' in source
+
+
+def test_result_state_utility_centralizes_verdict_cta_and_next_step():
+    source = _read(FRONTEND_ROOT / "lib" / "theme2-result-state.ts")
+
+    assert "deriveResultState" in source
+    assert "proofState" in source
+    assert "primaryCtaLabel" in source
+    assert "primaryCtaHref" in source
+    assert "nextStep" in source
+    assert "recipientHelper" in source
+    assert "isEvdbSpecCompleteAndCorrect" in source
+    assert '"View Verification Guidance"' in source
 
 
 def test_result_page_uses_safe_hierarchy_and_collapsed_internal_trace():
@@ -34,11 +48,16 @@ def test_result_page_uses_safe_hierarchy_and_collapsed_internal_trace():
     assert "ResultVerdictCard" in source
     assert "buildCoreOrganizerOutputFields" in source
     assert "buildComponentEvidenceFields" in source
+    assert "deriveResultState" in source
+    assert "resultState.nextStep" in source
+    assert "resultState.primaryCtaLabel" in source
+    assert "resultState.primaryCtaHref" in source
     assert "Required Output" in source
     assert "Component Evidence" in source
-    assert "Show decision trace" in source
-    assert source.index("Show decision trace") < source.rindex("<DecisionChain")
+    assert "Show routing decision trace" in source
+    assert source.index("Show routing decision trace") < source.rindex("<DecisionChain")
     assert "Advanced Debug Info" in source
+    assert "For development and judging audit only." in source
     assert "triage.perception.extraction.bounding_boxes ?? []" in source
     assert "ConfidencePill" not in source
     assert '"Charger Serial Number"' not in source
@@ -51,7 +70,7 @@ def test_evidence_panel_accepts_theme2_object_annotations():
     assert "type Annotation" in source
     assert "annotations?: Annotation[]" in source
     assert "annotations={annotations}" in source
-    assert "Highlighted object evidence" in source
+    assert "Detected components used for visual assessment. Clearer close-ups may be required for label verification." in source
     assert "No visual boxes returned. The image was still used for VLM assessment." in source
 
 
@@ -60,6 +79,7 @@ def test_proof_required_card_uses_verification_language_and_evdb_filter():
 
     assert "Verification Required" in source
     assert "suppressGenericEvdbProof" in source
+    assert "resultProofState" in source
     assert "evdb_label_closeup" in source
 
 
@@ -88,6 +108,7 @@ def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():
         FRONTEND_ROOT / "components" / "triage" / "result-verdict-card.tsx",
         FRONTEND_ROOT / "components" / "triage" / "confidence-pill.tsx",
         FRONTEND_ROOT / "lib" / "theme2-result-fields.ts",
+        FRONTEND_ROOT / "lib" / "theme2-result-state.ts",
     ]
 
     for path in scanned_paths:

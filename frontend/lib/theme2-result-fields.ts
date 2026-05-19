@@ -32,6 +32,11 @@ function formatRccbType(value: string | null | undefined) {
   return "Type unknown";
 }
 
+function ratingIncludesAmp(rating: string | null | undefined, amp: number | null | undefined) {
+  if (!rating || typeof amp !== "number") return false;
+  return new RegExp(`\\b${amp}\\s*A\\b`, "i").test(rating);
+}
+
 function expectedEvdbPole(extraction: Theme2VisualExtraction) {
   if (extraction.evdb_phase_type === "single_phase" || extraction.observation_result === "evdb_single_phase") {
     return "2p";
@@ -64,8 +69,8 @@ function formatSpecStatusWithExtraction(
   switch (value) {
     case "correct":
       return extraction && isEvdbSpecCompleteAndCorrect(extraction)
-        ? "Correct specs readable"
-        : "Verification incomplete";
+        ? "Correct specs verified"
+        : "Readable but needs verification";
     case "wrong":
       return "Wrong specs detected";
     case "missing":
@@ -74,7 +79,7 @@ function formatSpecStatusWithExtraction(
       return "Spec labels incomplete";
     default:
       return extraction && isEvdbSpecCompleteAndCorrect(extraction)
-        ? "Correct specs readable"
+        ? "Correct specs verified"
         : "Spec status unknown";
   }
 }
@@ -86,7 +91,17 @@ function formatSwitchState(value: string | null | undefined) {
 }
 
 function compactParts(parts: Array<string | null | undefined>, fallback: string) {
-  const text = parts.filter(Boolean).join(" / ");
+  const seen = new Set<string>();
+  const uniqueParts = parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .filter((part) => {
+      const key = part.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const text = uniqueParts.join(" / ");
   return text || fallback;
 }
 
@@ -94,7 +109,9 @@ function mcbEvidence(extraction: Theme2VisualExtraction) {
   return compactParts(
     [
       extraction.mcb_visible === false ? "Not visible" : undefined,
-      formatAmp(extraction.mcb_current_amp),
+      ratingIncludesAmp(extraction.mcb_rating, extraction.mcb_current_amp)
+        ? undefined
+        : formatAmp(extraction.mcb_current_amp),
       formatPoles(extraction.mcb_poles),
       extraction.mcb_rating,
       extraction.mcb_brand_model,
@@ -107,7 +124,9 @@ function rccbEvidence(extraction: Theme2VisualExtraction) {
   return compactParts(
     [
       extraction.rccb_visible === false ? "Not visible" : undefined,
-      formatAmp(extraction.rccb_current_amp),
+      ratingIncludesAmp(extraction.rccb_rating, extraction.rccb_current_amp)
+        ? undefined
+        : formatAmp(extraction.rccb_current_amp),
       formatPoles(extraction.rccb_poles),
       formatRccbType(extraction.rccb_type),
       extraction.rccb_rating,

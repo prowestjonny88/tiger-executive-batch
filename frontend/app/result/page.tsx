@@ -23,9 +23,9 @@ import { UploadDropzone } from "../../components/triage/upload-dropzone";
 import {
   buildComponentEvidenceFields,
   buildCoreOrganizerOutputFields,
-  isEvdbSpecCompleteAndCorrect,
   type OrganizerOutputField,
 } from "../../lib/theme2-result-fields";
+import { deriveResultState } from "../../lib/theme2-result-state";
 
 export default function ResultAssessmentPage() {
   return (
@@ -130,13 +130,9 @@ function ResultAssessment() {
 
   const output = triage.competition_output;
   const imageUrl = resolveEvidenceUrl(triage.incident.photo_evidence);
-  const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
+  const resultState = deriveResultState(triage);
   const coreFields = buildCoreOrganizerOutputFields(output, triage.perception.extraction);
   const componentEvidenceFields = buildComponentEvidenceFields(output, triage.perception.extraction);
-  const suppressGenericEvdbProof =
-    output.input_component === "evdb" &&
-    (triage.perception.extraction.evdb_spec_status === "correct" ||
-      isEvdbSpecCompleteAndCorrect(triage.perception.extraction));
   const appScreenshotPrompt = triage.follow_up_prompts.find((prompt) => prompt.question_id === "charger_app_screenshot");
   const hasAppScreenshot = Boolean(triage.incident.app_screenshot_evidence);
 
@@ -246,7 +242,7 @@ function ResultAssessment() {
               <ProofRequiredCard
                 proofNext={output.required_proof_next}
                 prompts={triage.follow_up_prompts}
-                suppressGenericEvdbProof={suppressGenericEvdbProof}
+                resultProofState={resultState.proofState}
               />
 
               {(appScreenshotPrompt || hasAppScreenshot) && (
@@ -293,16 +289,19 @@ function ResultAssessment() {
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 md:p-6">
+            <div className="self-start rounded-2xl border border-slate-200 bg-slate-50 p-5 md:p-6">
               <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Next Step</h2>
               <p className="mt-2 text-base font-semibold text-slate-900">
-                {output.action_message}
+                {resultState.nextStep}
               </p>
+              <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Case Status</p>
+                <p className="mt-1 text-sm font-bold text-slate-900">{resultState.status}</p>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{resultState.recipientHelper}</p>
+              </div>
               <div className="mt-6 space-y-3">
                 <Button asChild size="lg" className="h-14 w-full rounded-xl bg-green-700 text-lg font-bold shadow-sm hover:bg-green-800">
-                  <a href={nextHref}>
-                    {output.recipient_type === "after_sales_team" ? "View After-sales Routing" : "View Customer Guidance"}
-                  </a>
+                  <a href={resultState.primaryCtaHref}>{resultState.primaryCtaLabel}</a>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="h-14 w-full rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-white">
                   <a href="/upload">Run Triage Again</a>
@@ -313,7 +312,7 @@ function ResultAssessment() {
 
           <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-500 hover:text-slate-700">
-              Show decision trace
+              Show routing decision trace
             </summary>
             <div className="mt-6">
               <DecisionChain
@@ -331,6 +330,9 @@ function ResultAssessment() {
               Advanced Debug Info
             </summary>
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                For development and judging audit only.
+              </p>
               <pre className="whitespace-pre-wrap break-words font-mono text-xs text-slate-600">
                 {JSON.stringify(
                   {
