@@ -78,8 +78,6 @@ export function deriveResultState(triage: ApiTriageResponse): DerivedResultState
 
   if (output.input_component === "evdb") {
     const isWrongOrMissing =
-      extraction.evdb_spec_status === "wrong" ||
-      extraction.evdb_spec_status === "missing" ||
       output.observation_result === "wrong_component_specs" ||
       output.observation_result === "missing_mcb_rccb";
 

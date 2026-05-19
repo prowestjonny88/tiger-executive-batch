@@ -386,22 +386,90 @@ def test_isolator_unknown_requests_switch_state_proof():
     assert output.required_proof_next == "Clear photo showing whether the isolator switch is ON or OFF."
 
 
-def test_mcb_tripped_is_not_overridden_by_spec_refinement():
+def test_pure_mcb_tripped_routes_to_customer_reset_check():
     output, _ = build_competition_output(
         IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped"),
         _perception(
             Theme2VisualExtraction(
                 input_component="evdb",
                 observation_result="mcb_tripped",
-                evdb_phase_type="single_phase",
-                rccb_type="type_ac",
-                rccb_rating="40A 4P",
                 confidence_score=0.82,
             )
         ),
     )
 
     assert output.observation_result == "mcb_tripped"
+    assert output.fault_type_v2 == "protection_issue"
+    assert output.recipient_type == "customer"
+    assert output.assigned_team_id is None
+
+
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="mcb_tripped",
+            evdb_phase_type="single_phase",
+            rccb_type="type_ac",
+            rccb_rating="40A 2P",
+            confidence_score=0.82,
+        ),
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="mcb_tripped",
+            evdb_phase_type="single_phase",
+            mcb_current_amp=32,
+            rccb_current_amp=40,
+            mcb_poles="2p",
+            rccb_poles="2p",
+            rccb_type="type_a",
+            confidence_score=0.82,
+        ),
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="mcb_tripped",
+            evdb_phase_type="three_phase",
+            mcb_current_amp=40,
+            rccb_current_amp=40,
+            mcb_poles="2p",
+            rccb_poles="4p",
+            rccb_type="type_a",
+            confidence_score=0.82,
+        ),
+    ],
+)
+def test_mcb_tripped_with_wrong_specs_refines_to_after_sales(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped with EVDB labels visible"),
+        _perception(theme2),
+    )
+
+    assert output.observation_result == "wrong_component_specs"
+    assert output.fault_type_v2 == "protection_issue"
+    assert output.recipient_type == "after_sales_team"
+    assert output.assigned_team_id == "AS_TEAM_01"
+
+
+def test_mcb_tripped_with_missing_protection_refines_to_after_sales():
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped and rccb missing"),
+        _perception(
+            Theme2VisualExtraction(
+                input_component="evdb",
+                observation_result="mcb_tripped",
+                evdb_phase_type="single_phase",
+                mcb_visible=True,
+                rccb_visible=False,
+                confidence_score=0.82,
+            )
+        ),
+    )
+
+    assert output.observation_result == "missing_mcb_rccb"
+    assert output.fault_type_v2 == "protection_issue"
+    assert output.recipient_type == "after_sales_team"
+    assert output.assigned_team_id == "AS_TEAM_01"
 
 
 def test_safety_signal_escalates_to_after_sales():
