@@ -35,7 +35,7 @@ export function AppHeader() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
           <Zap className="w-6 h-6 text-green-700" />
-          ChargerDoc Assist
+          ChargerDoc
         </Link>
         
         {/* Desktop Nav */}
@@ -84,7 +84,7 @@ export function AppHeader() {
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px] pt-12">
               <div className="mb-8 border-b border-slate-100 pb-6">
-                <p className="text-xl font-extrabold text-slate-950">ChargerDoc Assist</p>
+                <p className="text-xl font-extrabold text-slate-950">ChargerDoc</p>
                 <p className="mt-1 text-sm font-semibold text-slate-500">EV charger support flow</p>
               </div>
               <nav className="flex flex-col gap-6">

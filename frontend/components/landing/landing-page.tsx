@@ -150,7 +150,7 @@ function LandingHeader() {
           <span className="grid size-10 place-items-center rounded-full bg-[var(--rex-green)] text-white">
             <Zap className="size-5" />
           </span>
-          <span className="text-lg tracking-normal">ChargerDoc Assist</span>
+          <span className="text-lg tracking-normal">ChargerDoc</span>
         </Link>
 
         <nav className="hidden items-center gap-8 lg:flex">
@@ -219,7 +219,7 @@ function HeroSection() {
             Snap the issue. Know what to do next.
           </h1>
           <p className="mt-7 max-w-2xl text-lg leading-8 text-white/78 md:text-xl">
-            Upload a charger, EVDB, or isolator photo. ChargerDoc Assist checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
+            Upload a charger, EVDB, or isolator photo. ChargerDoc checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
             <PillCta href="/upload">Check a Photo</PillCta>
@@ -640,7 +640,7 @@ function LandingFooter() {
             <span className="grid size-10 place-items-center rounded-full bg-[var(--rex-green)]">
               <Zap className="size-5" />
             </span>
-            ChargerDoc Assist
+            ChargerDoc
           </div>
           <p className="mt-5 max-w-md text-sm leading-7 text-white/62">EV charger fault triage prototype for Theme 2. Electrical repair decisions should be verified by qualified personnel where required.</p>
         </div>
