@@ -133,7 +133,10 @@ function ResultAssessment() {
   const nextHref = output.recipient_type === "after_sales_team" ? "/escalation" : "/guidance";
   const coreFields = buildCoreOrganizerOutputFields(output, triage.perception.extraction);
   const componentEvidenceFields = buildComponentEvidenceFields(output, triage.perception.extraction);
-  const suppressGenericEvdbProof = isEvdbSpecCompleteAndCorrect(triage.perception.extraction);
+  const suppressGenericEvdbProof =
+    output.input_component === "evdb" &&
+    (triage.perception.extraction.evdb_spec_status === "correct" ||
+      isEvdbSpecCompleteAndCorrect(triage.perception.extraction));
   const appScreenshotPrompt = triage.follow_up_prompts.find((prompt) => prompt.question_id === "charger_app_screenshot");
   const hasAppScreenshot = Boolean(triage.incident.app_screenshot_evidence);
 

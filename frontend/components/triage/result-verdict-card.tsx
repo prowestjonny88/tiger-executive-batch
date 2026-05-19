@@ -35,16 +35,18 @@ const iconClasses: Record<VerdictTone, string> = {
 
 function hasSafetySignal(triage: ApiTriageResponse) {
   const output = triage.competition_output;
+  const overrideKey = typeof triage.debug.extra?.override_key === "string" ? triage.debug.extra.override_key : "";
+  if (/safety/i.test(overrideKey)) return true;
+
   const text = [
     output.action_message,
     output.required_proof_next,
     ...output.evidence_notes,
-    ...triage.perception.hazard_signals,
   ]
     .filter(Boolean)
     .join(" ");
 
-  return /burn|smoke|spark|melt|hot|water|exposed|stop using|safety/i.test(text);
+  return /stop[- ]use|stop using|burnt|burning smell|smoke|sparking|melted|hot to touch|water ingress|exposed conductor/i.test(text);
 }
 
 function verdictFor(triage: ApiTriageResponse): {
