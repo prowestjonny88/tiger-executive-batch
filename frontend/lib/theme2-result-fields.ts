@@ -32,10 +32,40 @@ function formatRccbType(value: string | null | undefined) {
   return "Type unknown";
 }
 
-function formatSpecStatus(value: string | null | undefined) {
+function expectedEvdbPole(extraction: Theme2VisualExtraction) {
+  if (extraction.evdb_phase_type === "single_phase" || extraction.observation_result === "evdb_single_phase") {
+    return "2p";
+  }
+  if (extraction.evdb_phase_type === "three_phase" || extraction.observation_result === "evdb_three_phase") {
+    return "4p";
+  }
+  return "unknown";
+}
+
+export function isEvdbSpecCompleteAndCorrect(extraction: Theme2VisualExtraction) {
+  const expectedPole = expectedEvdbPole(extraction);
+  if (expectedPole === "unknown") return false;
+
+  return (
+    extraction.mcb_visible !== false &&
+    extraction.rccb_visible !== false &&
+    extraction.mcb_current_amp === 40 &&
+    extraction.rccb_current_amp === 40 &&
+    extraction.mcb_poles === expectedPole &&
+    extraction.rccb_poles === expectedPole &&
+    extraction.rccb_type === "type_a"
+  );
+}
+
+function formatSpecStatusWithExtraction(
+  value: string | null | undefined,
+  extraction: Theme2VisualExtraction | undefined
+) {
   switch (value) {
     case "correct":
-      return "Correct specs readable";
+      return extraction && isEvdbSpecCompleteAndCorrect(extraction)
+        ? "Correct specs readable"
+        : "Verification incomplete";
     case "wrong":
       return "Wrong specs detected";
     case "missing":
@@ -43,7 +73,9 @@ function formatSpecStatus(value: string | null | undefined) {
     case "incomplete":
       return "Spec labels incomplete";
     default:
-      return "Spec status unknown";
+      return extraction && isEvdbSpecCompleteAndCorrect(extraction)
+        ? "Correct specs readable"
+        : "Spec status unknown";
   }
 }
 
@@ -90,6 +122,7 @@ function componentEvidenceFields(output: CompetitionOutput, extraction: Theme2Vi
     return [
       ["Charger Serial Number", readable(output.charger_serial_number || extraction.charger_serial_number)],
       ["Brand / Model", readable(output.charger_brand_model || extraction.charger_brand_model)],
+      ["Indicator Status", formatObservationResult(extraction.observation_result)],
     ].map(([label, value]) => ({ label, value }));
   }
 
@@ -97,7 +130,7 @@ function componentEvidenceFields(output: CompetitionOutput, extraction: Theme2Vi
     return [
       { label: "MCB Evidence", value: mcbEvidence(extraction) },
       { label: "RCCB Evidence", value: rccbEvidence(extraction) },
-      { label: "EVDB Spec Status", value: formatSpecStatus(extraction.evdb_spec_status) },
+      { label: "EVDB Spec Status", value: formatSpecStatusWithExtraction(extraction.evdb_spec_status, extraction) },
     ];
   }
 
@@ -120,9 +153,9 @@ function componentEvidenceFields(output: CompetitionOutput, extraction: Theme2Vi
   ];
 }
 
-export function buildOrganizerOutputFields(
+export function buildCoreOrganizerOutputFields(
   output: CompetitionOutput,
-  extraction: Theme2VisualExtraction
+  _extraction?: Theme2VisualExtraction
 ): OrganizerOutputField[] {
   const recipient =
     output.recipient_type === "after_sales_team" && output.assigned_team_id
@@ -132,9 +165,25 @@ export function buildOrganizerOutputFields(
   return [
     { label: "Input Component", value: formatInputComponent(output.input_component) },
     { label: "Observation Result", value: formatObservationResult(output.observation_result) },
-    ...componentEvidenceFields(output, extraction),
     { label: "Fault Type", value: formatFaultTypeV2(output.fault_type_v2) },
     { label: "Recipient", value: recipient },
     { label: "Action Message", value: output.action_message },
+  ];
+}
+
+export function buildComponentEvidenceFields(
+  output: CompetitionOutput,
+  extraction: Theme2VisualExtraction
+): OrganizerOutputField[] {
+  return componentEvidenceFields(output, extraction);
+}
+
+export function buildOrganizerOutputFields(
+  output: CompetitionOutput,
+  extraction: Theme2VisualExtraction
+): OrganizerOutputField[] {
+  return [
+    ...buildCoreOrganizerOutputFields(output),
+    ...buildComponentEvidenceFields(output, extraction),
   ];
 }

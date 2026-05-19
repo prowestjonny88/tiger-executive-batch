@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Info } from "lucide-react";
 
@@ -89,6 +90,9 @@ export default function SafeGuidance() {
             size="lg"
           >
             Close Case and Report
+          </Button>
+          <Button asChild variant="outline" size="lg" className="mt-3 h-14 w-full rounded-xl border-slate-200 font-bold text-slate-700">
+            <Link href="/result">Back to result summary</Link>
           </Button>
         </CardContent>
       </Card>

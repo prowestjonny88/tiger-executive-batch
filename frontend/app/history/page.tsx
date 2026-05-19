@@ -74,7 +74,7 @@ export default function HistoryPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
               <tr>
@@ -144,6 +144,56 @@ export default function HistoryPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="space-y-3 p-4 md:hidden">
+          {incidents.length === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm font-medium text-slate-500">
+              No incidents recorded yet.
+            </div>
+          ) : (
+            incidents.map((incident) => {
+              const card = (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm font-extrabold text-slate-900">INC-{incident.id}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <IncidentStatusBadge recipientType={incident.latest_recipient_type} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-base font-extrabold text-slate-950">
+                      {formatObservationResult(incident.latest_observation_result)}
+                    </p>
+                    <p className="text-sm font-semibold text-slate-600">
+                      {formatInputComponent(incident.latest_input_component)} / {formatFaultTypeV2(incident.latest_fault_type_v2)}
+                    </p>
+                    <p className="text-xs font-mono uppercase tracking-widest text-slate-500">
+                      {incident.charger_id || incident.site_id}
+                    </p>
+                    {typeof incident.latest_confidence_score === "number" && (
+                      <p className="text-xs font-medium text-slate-500">
+                        Confidence: {Math.round(incident.latest_confidence_score * 100)}%
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+
+              return incident.latest_stage === "triage_result" ? (
+                <Link key={incident.id} href={`/result?replay=${incident.id}`} className="block">
+                  {card}
+                </Link>
+              ) : (
+                <div key={incident.id} className="opacity-75">
+                  {card}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </PageShell>

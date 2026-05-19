@@ -44,8 +44,8 @@ export default function Escalation() {
   return (
     <PageShell maxWidth="3xl">
       <Card className="w-full shadow-sm border-slate-200 rounded-2xl overflow-hidden bg-white">
-        <div className="bg-amber-50/50 border-b border-amber-100 p-8 md:p-10 text-center">
-          <div className="mx-auto w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mb-6">
+        <div className="bg-blue-50/60 border-b border-blue-100 p-8 md:p-10 text-center">
+          <div className="mx-auto w-16 h-16 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center mb-6">
             <Headphones className="w-8 h-8" />
           </div>
           <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 mb-3">
@@ -54,7 +54,7 @@ export default function Escalation() {
           <p className="text-lg text-slate-600 max-w-lg mx-auto">
             {formatObservationResult(output.observation_result)} requires {formatFaultTypeV2(output.fault_type_v2).toLowerCase()} handling.
           </p>
-          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-amber-700 font-mono font-bold tracking-wider bg-white px-4 py-2 rounded-lg border border-amber-200 w-fit mx-auto">
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm text-blue-700 font-mono font-bold tracking-wider bg-white px-4 py-2 rounded-lg border border-blue-200 w-fit mx-auto">
             INC-{triage.incident_id}
           </div>
         </div>
@@ -126,6 +126,9 @@ export default function Escalation() {
 
           <Button asChild size="lg" className="w-full h-14 rounded-xl font-bold bg-green-700 hover:bg-green-800 text-lg shadow-sm">
             <Link href="/confirmation">Confirm Routing</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="mt-3 h-14 w-full rounded-xl border-slate-200 font-bold text-slate-700">
+            <Link href="/result">Back to result summary</Link>
           </Button>
         </CardContent>
       </Card>

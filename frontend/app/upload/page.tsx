@@ -64,6 +64,11 @@ export default function PhotoUpload() {
 
   const handleContinue = async () => {
     if (state === "uploading" || state === "previewing") return;
+    if (mode === "manual" && !file) {
+      setErrorMsg("Please upload a charger, EVDB, or isolator photo.");
+      setState("error");
+      return;
+    }
 
     setState("uploading");
     setErrorMsg("");
@@ -186,6 +191,7 @@ export default function PhotoUpload() {
           : "";
 
   const selectedScenario = scenarios.find((item) => item.scenario_id === selectedScenarioId);
+  const manualRequiresPhoto = mode === "manual" && !file;
 
   return (
     <PageShell maxWidth="3xl">
@@ -213,6 +219,9 @@ export default function PhotoUpload() {
               fileName={file?.name}
               className="bg-slate-50 hover:bg-slate-50/80"
             />
+            <p className="text-xs font-medium text-slate-500">
+              Please upload a charger, EVDB, or isolator photo.
+            </p>
             <p className="text-xs font-medium text-slate-500">
               Large photos are optimized before upload to keep labels readable while avoiding deployment upload limits.
             </p>
@@ -262,6 +271,10 @@ export default function PhotoUpload() {
                 <CaptureTipCard icon={<Power className="w-5 h-5" />} text="EVDB: MCB/RCCB labels clearly" />
                 <CaptureTipCard icon={<Zap className="w-5 h-5" />} text="Isolator: ON/OFF switch clearly" />
               </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
+              Take photos from a safe distance. Do not open electrical panels unless you are authorized to do so.
             </div>
           </TabsContent>
 
@@ -318,7 +331,7 @@ export default function PhotoUpload() {
           <Button
             size="lg"
             onClick={handleContinue}
-            disabled={isBusy || (mode === "demo" && !selectedScenarioId)}
+            disabled={isBusy || manualRequiresPhoto || (mode === "demo" && !selectedScenarioId)}
             className="w-full h-14 text-lg font-bold bg-green-700 hover:bg-green-800 text-white rounded-xl shadow-sm"
           >
             {isBusy ? "Processing..." : "Continue"}
@@ -326,7 +339,7 @@ export default function PhotoUpload() {
         </div>
         
         <div className="mt-6 flex items-center justify-center gap-2 text-sm text-slate-500 font-medium">
-          <CheckCircle2 className="w-4 h-4 text-green-600" /> Safe routing guaranteed
+          <CheckCircle2 className="w-4 h-4 text-green-600" /> Theme 2 evidence routing
         </div>
       </Card>
     </PageShell>

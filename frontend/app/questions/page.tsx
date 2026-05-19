@@ -27,6 +27,16 @@ function splitPrompt(prompt: string) {
   return { title: prompt, helper: "Please describe what you can observe to help us make a more accurate assessment." };
 }
 
+function isUploadStyleFollowUp(questionId: string) {
+  return [
+    "evdb_label_closeup",
+    "charger_identity_closeup",
+    "photo_request",
+    "clear_theme2_photo",
+    "charger_app_screenshot",
+  ].includes(questionId);
+}
+
 export default function AdaptiveQuestions() {
   const router = useRouter();
   const [questions, setQuestions] = useState<FollowUpQuestion[]>([]);
@@ -177,6 +187,12 @@ export default function AdaptiveQuestions() {
             onFileSelect={(file) => setFile(currentQuestion.question_id, file)}
             fileName={currentFile?.name}
           />
+
+          {isUploadStyleFollowUp(currentQuestion.question_id) && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium leading-6 text-amber-900">
+              Take follow-up photos from a safe distance. Do not open electrical panels unless you are authorized to do so.
+            </div>
+          )}
 
           {errorMsg && (
             <div className="mt-6 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-medium">

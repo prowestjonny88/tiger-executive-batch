@@ -12,6 +12,9 @@ def _read(path: Path) -> str:
 def test_result_field_builder_uses_component_specific_evidence_cards():
     source = _read(FRONTEND_ROOT / "lib" / "theme2-result-fields.ts")
 
+    assert "buildCoreOrganizerOutputFields" in source
+    assert "buildComponentEvidenceFields" in source
+    assert "isEvdbSpecCompleteAndCorrect" in source
     assert 'output.input_component === "charger"' in source
     assert 'output.input_component === "evdb"' in source
     assert 'output.input_component === "isolator"' in source
@@ -20,15 +23,24 @@ def test_result_field_builder_uses_component_specific_evidence_cards():
     assert '"MCB Evidence"' in source
     assert '"RCCB Evidence"' in source
     assert '"EVDB Spec Status"' in source
+    assert '"Correct specs readable"' in source
+    assert '"Verification incomplete"' in source
     assert '"Switch State"' in source
 
 
-def test_result_page_delegates_organizer_fields_to_builder():
+def test_result_page_uses_safe_hierarchy_and_collapsed_internal_trace():
     source = _read(FRONTEND_ROOT / "app" / "result" / "page.tsx")
 
-    assert "buildOrganizerOutputFields" in source
-    assert "organizerFields.map" in source
+    assert "ResultVerdictCard" in source
+    assert "buildCoreOrganizerOutputFields" in source
+    assert "buildComponentEvidenceFields" in source
+    assert "Required Output" in source
+    assert "Component Evidence" in source
+    assert "Show decision trace" in source
+    assert source.index("Show decision trace") < source.rindex("<DecisionChain")
+    assert "Advanced Debug Info" in source
     assert "triage.perception.extraction.bounding_boxes ?? []" in source
+    assert "ConfidencePill" not in source
     assert '"Charger Serial Number"' not in source
     assert '"Brand / Model"' not in source
 
@@ -40,6 +52,15 @@ def test_evidence_panel_accepts_theme2_object_annotations():
     assert "annotations?: Annotation[]" in source
     assert "annotations={annotations}" in source
     assert "Highlighted object evidence" in source
+    assert "No visual boxes returned. The image was still used for VLM assessment." in source
+
+
+def test_proof_required_card_uses_verification_language_and_evdb_filter():
+    source = _read(FRONTEND_ROOT / "components" / "triage" / "proof-required-card.tsx")
+
+    assert "Verification Required" in source
+    assert "suppressGenericEvdbProof" in source
+    assert "evdb_label_closeup" in source
 
 
 def test_result_page_supports_optional_ev_app_screenshot_upload():
@@ -64,6 +85,7 @@ def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():
         FRONTEND_ROOT / "app" / "history" / "page.tsx",
         FRONTEND_ROOT / "components" / "triage" / "evidence-panel.tsx",
         FRONTEND_ROOT / "components" / "triage" / "follow-up-control.tsx",
+        FRONTEND_ROOT / "components" / "triage" / "result-verdict-card.tsx",
         FRONTEND_ROOT / "components" / "triage" / "confidence-pill.tsx",
         FRONTEND_ROOT / "lib" / "theme2-result-fields.ts",
     ]
