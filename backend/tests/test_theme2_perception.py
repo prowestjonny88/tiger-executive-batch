@@ -307,6 +307,83 @@ def test_secondary_evdb_trip_check_preserves_phase_when_no_trip_cue():
     assert mock_client.models.generate_content.call_count == 2
 
 
+def test_red_trip_window_heuristic_overrides_phase_after_secondary_miss():
+    from PIL import Image, ImageDraw
+
+    TEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    image_path = TEST_UPLOAD_ROOT / "theme2-red-trip-window.jpg"
+    image = Image.new("RGB", (240, 180), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((45, 35, 170, 125), outline="black", width=2)
+    draw.rectangle((96, 54, 132, 61), fill=(190, 42, 40))
+    image.save(image_path)
+
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Single-phase EVDB labels are readable.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["MCB C40 2P", "ON"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.95,
+            "input_component": "evdb",
+            "observation_result": "evdb_single_phase",
+            "evdb_phase_type": "single_phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 2P",
+            "rccb_rating": "40A Type A 2P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "2P",
+            "rccb_poles": "2P",
+            "rccb_type": "Type A",
+            "evdb_spec_status": "correct",
+            "raw_visible_text": ["MCB C40 2P", "ON"],
+            "bounding_boxes": [{"id": "mcb", "label": "MCB", "x": 18, "y": 18, "width": 55, "height": 52}],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "evdb_visible": True,
+            "mcb_or_rccb_tripped": False,
+            "trip_observation": "unknown",
+            "trip_evidence": [],
+            "confidence_score": 0.9,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["ON"],
+            "bounding_boxes": [],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    incident = IncidentInput(
+        site_id="site-mall-01",
+        photo_evidence=StoredPhotoEvidence(
+            filename=image_path.name,
+            media_type="image/jpeg",
+            storage_path=str(image_path),
+            byte_size=image_path.stat().st_size,
+        ),
+        photo_hint="Photo uploaded for EV charger troubleshooting.",
+    )
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(incident)
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.observation_result == "mcb_tripped"
+    assert result.extraction.bounding_boxes[0].id == "evdb-red-trip-window"
+    assert "EVDB_RED_WINDOW_HEURISTIC: detected" in (result.raw_provider_output or "")
+
+
 def test_gemini_perception_merges_ev_app_screenshot_text():
     primary_response = MagicMock()
     primary_response.text = json.dumps(

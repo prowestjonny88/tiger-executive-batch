@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from io import BytesIO
 from typing import Any
 
 from app.core.models import IncidentInput, StoredPhotoEvidence, Theme2BoundingBox, Theme2PerceptionAssessment, Theme2VisualExtraction
@@ -250,10 +251,19 @@ _GENERIC_UPLOAD_HINTS = {
 
 
 def _normalize_list(values: object) -> list[str]:
+    placeholders = {"unknown", "unreadable", "none", "null", "n/a", "na", "not_applicable"}
     if isinstance(values, list):
-        return [str(value).strip() for value in values if str(value).strip()]
+        return [
+            str(value).strip()
+            for value in values
+            if str(value).strip() and str(value).strip().lower() not in placeholders
+        ]
     if isinstance(values, str):
-        return [part.strip() for part in re.split(r"[;\n,]+", values) if part.strip()]
+        return [
+            part.strip()
+            for part in re.split(r"[;\n,]+", values)
+            if part.strip() and part.strip().lower() not in placeholders
+        ]
     return []
 
 
@@ -511,6 +521,108 @@ def _provider_has_isolator_on_signal(text: str, isolator_state: str) -> bool:
     if not _provider_mentions_isolator(text):
         return False
     return _text_has_any_phrase(text, _ISOLATOR_ON_TOKENS) or _contains_token(text, "on")
+
+
+def _red_trip_window_box_from_image(
+    evidence: StoredPhotoEvidence,
+    search_boxes: list[Theme2BoundingBox],
+) -> Theme2BoundingBox | None:
+    if not search_boxes:
+        return None
+
+    try:
+        from PIL import Image  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+
+    try:
+        image = Image.open(BytesIO(read_photo_bytes(evidence))).convert("RGB")
+    except Exception:
+        return None
+
+    image_width, image_height = image.size
+    candidate_boxes = [
+        box
+        for box in search_boxes
+        if any(token in f"{box.id} {box.label}".lower() for token in ["mcb", "rccb", "breaker", "evdb"])
+    ]
+    if not candidate_boxes:
+        candidate_boxes = search_boxes
+
+    best: tuple[int, int, int, int, int] | None = None
+    for box in candidate_boxes:
+        left = int(image_width * box.x / 100.0)
+        top = int(image_height * box.y / 100.0)
+        right = int(image_width * (box.x + box.width) / 100.0)
+        bottom = int(image_height * (box.y + box.height) / 100.0)
+        if right <= left or bottom <= top:
+            continue
+        crop = image.crop((left, top, right, bottom))
+        crop_width, crop_height = crop.size
+        pixels = crop.load()
+        visited: set[tuple[int, int]] = set()
+        red_pixels: set[tuple[int, int]] = set()
+
+        for y in range(crop_height):
+            for x in range(crop_width):
+                r, g, b = pixels[x, y]
+                if r >= 120 and r - g >= 35 and r - b >= 35 and g <= 170 and b <= 170:
+                    red_pixels.add((x, y))
+
+        for start in red_pixels:
+            if start in visited:
+                continue
+            stack = [start]
+            visited.add(start)
+            xs: list[int] = []
+            ys: list[int] = []
+            while stack:
+                x, y = stack.pop()
+                xs.append(x)
+                ys.append(y)
+                for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                    if (nx, ny) in red_pixels and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        stack.append((nx, ny))
+            if not xs:
+                continue
+
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            component_width = max_x - min_x + 1
+            component_height = max_y - min_y + 1
+            area = len(xs)
+            aspect_ratio = component_width / max(component_height, 1)
+
+            if area < 18:
+                continue
+            if component_width < max(8, int(crop_width * 0.025)):
+                continue
+            if component_height < 2 or component_height > crop_height * 0.45:
+                continue
+            if aspect_ratio < 1.8:
+                continue
+            if min_y > crop_height * 0.68:
+                continue
+
+            score = area * component_width
+            absolute = (left + min_x, top + min_y, left + max_x + 1, top + max_y + 1, score)
+            if best is None or score > best[4]:
+                best = absolute
+
+    if best is None:
+        return None
+
+    left, top, right, bottom, _ = best
+    return Theme2BoundingBox(
+        id="evdb-red-trip-window",
+        label="EVDB red trip/status window",
+        x=max(0.0, min(100.0, left / image_width * 100.0)),
+        y=max(0.0, min(100.0, top / image_height * 100.0)),
+        width=max(1.0, min(100.0, (right - left) / image_width * 100.0)),
+        height=max(1.0, min(100.0, (bottom - top) / image_height * 100.0)),
+        source="heuristic",
+    )
 
 
 def _fallback_bounding_boxes(input_component: str, observation: str, *, has_photo: bool) -> list[Theme2BoundingBox]:
@@ -1176,6 +1288,38 @@ def _merge_evdb_trip_secondary_check(
                 "confidence_score": min(max(perception.confidence_score, secondary_confidence), 1.0),
                 "requires_follow_up": bool(extraction.uncertainty_notes),
                 "raw_provider_output": f"{perception.raw_provider_output or ''}\nEVDB_TRIP_SECONDARY:\n{raw}".strip(),
+                "extraction": extraction,
+            }
+        )
+
+    red_trip_window = _red_trip_window_box_from_image(incident.photo_evidence, perception.extraction.bounding_boxes) if incident.photo_evidence else None
+    if evdb_visible and red_trip_window is not None:
+        extraction = perception.extraction.model_copy(
+            update={
+                "input_component": "evdb",
+                "observation_result": "mcb_tripped",
+                "bounding_boxes": [red_trip_window, *perception.extraction.bounding_boxes][:3],
+                "raw_visible_text": _dedupe(
+                    [*perception.extraction.raw_visible_text, *raw_visible_text, "red trip/status window"],
+                    limit=10,
+                ),
+                "confidence_score": min(max(perception.extraction.confidence_score, 0.78), 1.0),
+                "uncertainty_notes": _dedupe(
+                    [
+                        *perception.extraction.uncertainty_notes,
+                        "Detected a red EVDB trip/status window; treating as MCB/RCCB tripped.",
+                    ],
+                    limit=5,
+                ),
+            }
+        )
+        return perception.model_copy(
+            update={
+                "visible_abnormalities": _dedupe([*perception.visible_abnormalities, "mcb_tripped"], limit=5),
+                "ocr_findings": _dedupe([*perception.ocr_findings, *raw_visible_text, "red trip/status window"], limit=10),
+                "confidence_score": min(max(perception.confidence_score, 0.78), 1.0),
+                "requires_follow_up": bool(extraction.uncertainty_notes),
+                "raw_provider_output": f"{perception.raw_provider_output or ''}\nEVDB_TRIP_SECONDARY:\n{raw}\nEVDB_RED_WINDOW_HEURISTIC: detected".strip(),
                 "extraction": extraction,
             }
         )
