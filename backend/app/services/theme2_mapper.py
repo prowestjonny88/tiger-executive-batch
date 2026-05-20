@@ -167,6 +167,10 @@ def _maybe_refine_observation(theme2: Theme2VisualExtraction) -> ObservationResu
     observation = theme2.observation_result
     if theme2.input_component == "evdb":
         spec_status, _ = _evdb_spec_review(theme2)
+        if observation == "mcb_tripped":
+            if spec_status == "missing":
+                return "missing_mcb_rccb"
+            return "mcb_tripped"
         if spec_status == "missing":
             return "missing_mcb_rccb"
         if spec_status == "wrong":

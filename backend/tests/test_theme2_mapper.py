@@ -439,16 +439,16 @@ def test_pure_mcb_tripped_routes_to_customer_reset_check():
         ),
     ],
 )
-def test_mcb_tripped_with_wrong_specs_refines_to_after_sales(theme2: Theme2VisualExtraction):
+def test_mcb_tripped_with_wrong_specs_preserves_tripped_observation(theme2: Theme2VisualExtraction):
     output, _ = build_competition_output(
         IncidentInput(site_id="site-mall-01", photo_hint="mcb tripped with EVDB labels visible"),
         _perception(theme2),
     )
 
-    assert output.observation_result == "wrong_component_specs"
+    assert output.observation_result == "mcb_tripped"
     assert output.fault_type_v2 == "protection_issue"
-    assert output.recipient_type == "after_sales_team"
-    assert output.assigned_team_id == "AS_TEAM_01"
+    assert output.recipient_type == "customer"
+    assert output.assigned_team_id is None
 
 
 def test_mcb_tripped_with_missing_protection_refines_to_after_sales():
