@@ -156,6 +156,30 @@ _ISOLATOR_CHECK_SCHEMA = {
     ],
 }
 
+_EVDB_TRIP_CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "evdb_visible": {"type": "boolean"},
+        "mcb_or_rccb_tripped": {"type": "boolean"},
+        "trip_observation": {"type": "string"},
+        "trip_evidence": {"type": "array", "items": {"type": "string"}},
+        "confidence_score": {"type": "number"},
+        "uncertainty_notes": {"type": "array", "items": {"type": "string"}},
+        "raw_visible_text": {"type": "array", "items": {"type": "string"}},
+        "bounding_boxes": _GEMINI_RESPONSE_SCHEMA["properties"]["bounding_boxes"],
+    },
+    "required": [
+        "evdb_visible",
+        "mcb_or_rccb_tripped",
+        "trip_observation",
+        "trip_evidence",
+        "confidence_score",
+        "uncertainty_notes",
+        "raw_visible_text",
+        "bounding_boxes",
+    ],
+}
+
 
 class GeminiPerceptionError(RuntimeError):
     def __init__(self, message: str, *, error_type: str, raw_provider_output: str | None = None) -> None:
@@ -1009,6 +1033,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         raw_provider_output=raw,
         extraction=_theme2_from_data(data, confidence_score),
     )
+    assessment = _merge_evdb_trip_secondary_check(incident, assessment)
     return _merge_isolator_secondary_check(incident, assessment)
 
 
@@ -1070,6 +1095,96 @@ def _call_gemini_isolator_check(incident: IncidentInput) -> tuple[dict[str, obje
         f"symptom_text: {incident.symptom_text or ''}\n"
     )
     return _generate_gemini_json(incident.photo_evidence, prompt, genai_types, _ISOLATOR_CHECK_SCHEMA)
+
+
+def _should_run_evdb_trip_secondary_check(perception: Theme2PerceptionAssessment) -> bool:
+    extraction = perception.extraction
+    return extraction.input_component == "evdb" and extraction.observation_result in {"evdb_single_phase", "evdb_three_phase"}
+
+
+def _call_gemini_evdb_trip_check(incident: IncidentInput) -> tuple[dict[str, object], str] | None:
+    if incident.photo_evidence is None:
+        return None
+
+    try:
+        from google.genai import types as genai_types  # type: ignore[import-untyped]
+    except ImportError:
+        raise RuntimeError("gemini_sdk_unavailable")
+
+    prompt = (
+        "You are doing a targeted ChargerDoc Theme 2 EVDB breaker-trip check. Return JSON only.\n"
+        "Inspect only the EV distribution board MCB/RCCB protective devices. This is not a phase/spec check.\n"
+        "Use exactly these keys: evdb_visible, mcb_or_rccb_tripped, trip_observation, trip_evidence, confidence_score, "
+        "uncertainty_notes, raw_visible_text, bounding_boxes.\n"
+        "trip_observation must be mcb_tripped or unknown.\n"
+        "Return mcb_or_rccb_tripped=true and trip_observation=mcb_tripped if any protective device shows a trip cue: "
+        "handle visibly down/OFF/mid-trip compared with adjacent devices, red/orange trip/status window that indicates a trip, "
+        "or readable text/marker showing TRIP/OFF. Phase labels such as 2P/4P and 40A are not the observation. "
+        "If all visible handles clearly show ON and there is no reliable trip cue, return false/unknown. "
+        "If the plastic cover, glare, blur, or angle makes trip state uncertain, return false/unknown and add an uncertainty note. "
+        "For bounding_boxes, return at most 2 boxes around the MCB/RCCB device or trip/status window using 0-100 image percentages.\n"
+        f"photo_hint: {incident.photo_hint or ''}\n"
+        f"symptom_text: {incident.symptom_text or ''}\n"
+    )
+    return _generate_gemini_json(incident.photo_evidence, prompt, genai_types, _EVDB_TRIP_CHECK_SCHEMA)
+
+
+def _merge_evdb_trip_secondary_check(
+    incident: IncidentInput,
+    perception: Theme2PerceptionAssessment,
+) -> Theme2PerceptionAssessment:
+    if not _should_run_evdb_trip_secondary_check(perception):
+        return perception
+    try:
+        parsed = _call_gemini_evdb_trip_check(incident)
+    except Exception:
+        return perception
+    if parsed is None:
+        return perception
+
+    data, raw = parsed
+    trip_observation = _normalize_observation_result(data.get("trip_observation"))
+    trip_evidence = _normalize_list(data.get("trip_evidence"))
+    raw_visible_text = (
+        _normalize_list(data.get("raw_visible_text"))
+        or _normalize_list(data.get("ocr_findings"))
+        or trip_evidence
+    )
+    tripped = bool(data.get("mcb_or_rccb_tripped"))
+    evdb_visible = bool(data.get("evdb_visible"))
+
+    if evdb_visible and tripped and trip_observation == "mcb_tripped":
+        secondary_confidence = _normalize_confidence(data.get("confidence_score"), perception.confidence_score)
+        secondary_boxes = _normalize_bounding_boxes(data.get("bounding_boxes"), source="vlm")
+        extraction = perception.extraction.model_copy(
+            update={
+                "input_component": "evdb",
+                "observation_result": "mcb_tripped",
+                "bounding_boxes": secondary_boxes or perception.extraction.bounding_boxes,
+                "raw_visible_text": _dedupe([*perception.extraction.raw_visible_text, *raw_visible_text, *trip_evidence], limit=10),
+                "confidence_score": secondary_confidence,
+                "uncertainty_notes": _dedupe(
+                    [*perception.extraction.uncertainty_notes, *_normalize_list(data.get("uncertainty_notes"))],
+                    limit=5,
+                ),
+            }
+        )
+        return perception.model_copy(
+            update={
+                "visible_abnormalities": _dedupe([*perception.visible_abnormalities, "mcb_tripped"], limit=5),
+                "ocr_findings": _dedupe([*perception.ocr_findings, *raw_visible_text, *trip_evidence], limit=10),
+                "confidence_score": min(max(perception.confidence_score, secondary_confidence), 1.0),
+                "requires_follow_up": bool(extraction.uncertainty_notes),
+                "raw_provider_output": f"{perception.raw_provider_output or ''}\nEVDB_TRIP_SECONDARY:\n{raw}".strip(),
+                "extraction": extraction,
+            }
+        )
+
+    return perception.model_copy(
+        update={
+            "raw_provider_output": f"{perception.raw_provider_output or ''}\nEVDB_TRIP_SECONDARY:\n{raw}".strip(),
+        }
+    )
 
 
 def _merge_isolator_secondary_check(

@@ -192,6 +192,121 @@ def test_gemini_evdb_tripped_signal_overrides_phase_observation():
     assert result.extraction.observation_result == "mcb_tripped"
 
 
+def test_secondary_evdb_trip_check_overrides_phase_result():
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Single-phase EVDB labels are readable.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["MCB C40 2P", "RCCB Type A 2P"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.95,
+            "input_component": "evdb",
+            "observation_result": "evdb_single_phase",
+            "evdb_phase_type": "single_phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 2P",
+            "rccb_rating": "40A Type A 2P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "2P",
+            "rccb_poles": "2P",
+            "rccb_type": "Type A",
+            "evdb_spec_status": "correct",
+            "raw_visible_text": ["MCB C40 2P", "RCCB Type A 2P"],
+            "bounding_boxes": [],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "evdb_visible": True,
+            "mcb_or_rccb_tripped": True,
+            "trip_observation": "mcb_tripped",
+            "trip_evidence": ["red trip/status window visible on MCB"],
+            "confidence_score": 0.86,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["red trip/status window"],
+            "bounding_boxes": [
+                {"id": "mcb-trip-window", "label": "MCB trip/status window", "x": 44, "y": 33, "width": 8, "height": 5}
+            ],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-secondary-evdb-trip.jpg"))
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.observation_result == "mcb_tripped"
+    assert result.extraction.bounding_boxes[0].id == "mcb-trip-window"
+    assert "EVDB_TRIP_SECONDARY" in (result.raw_provider_output or "")
+    assert mock_client.models.generate_content.call_count == 2
+
+
+def test_secondary_evdb_trip_check_preserves_phase_when_no_trip_cue():
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Single-phase EVDB labels are readable.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["MCB C40 2P", "RCCB Type A 2P"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.95,
+            "input_component": "evdb",
+            "observation_result": "evdb_single_phase",
+            "evdb_phase_type": "single_phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 2P",
+            "rccb_rating": "40A Type A 2P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "2P",
+            "rccb_poles": "2P",
+            "rccb_type": "Type A",
+            "evdb_spec_status": "correct",
+            "raw_visible_text": ["MCB C40 2P", "RCCB Type A 2P"],
+            "bounding_boxes": [],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "evdb_visible": True,
+            "mcb_or_rccb_tripped": False,
+            "trip_observation": "unknown",
+            "trip_evidence": ["visible handles show ON"],
+            "confidence_score": 0.84,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["ON"],
+            "bounding_boxes": [],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-secondary-evdb-no-trip.jpg"))
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.observation_result == "evdb_single_phase"
+    assert "EVDB_TRIP_SECONDARY" in (result.raw_provider_output or "")
+    assert mock_client.models.generate_content.call_count == 2
+
+
 def test_gemini_perception_merges_ev_app_screenshot_text():
     primary_response = MagicMock()
     primary_response.text = json.dumps(
