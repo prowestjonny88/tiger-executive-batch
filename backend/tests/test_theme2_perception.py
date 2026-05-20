@@ -235,6 +235,43 @@ def test_bad_gemini_theme2_enums_normalize_to_unknown():
     assert result.extraction.isolator_state == "unknown"
 
 
+def test_gemini_isolator_off_signal_overrides_dominant_charger():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "A charger is below two isolator switches; one isolator switch is marked OFF.",
+            "components_visible": ["charger", "isolator"],
+            "visible_abnormalities": ["isolator OFF"],
+            "ocr_findings": ["OFF", "ON"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.87,
+            "input_component": "charger",
+            "observation_result": "unknown",
+            "charger_serial_number": None,
+            "charger_brand_model": "PROTON e.MAS",
+            "indicator_status": "unknown",
+            "isolator_state": "off",
+            "raw_visible_text": ["OFF", "ON"],
+            "bounding_boxes": [
+                {"id": "isolator-switch", "label": "Isolator switch OFF", "x": 30, "y": 10, "width": 28, "height": 26}
+            ],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-isolator-off-dominant-charger.jpg"))
+
+    assert result.extraction.input_component == "isolator"
+    assert result.extraction.observation_result == "isolator_off_open_circuit"
+    assert result.extraction.isolator_state == "off"
+
+
 def test_bad_gemini_bounding_boxes_are_clamped_and_limited():
     mock_response = MagicMock()
     mock_response.text = json.dumps(
@@ -427,6 +464,41 @@ def test_heuristic_perception_produces_theme2_extraction_without_gemini():
     assert result.extraction.observation_result == "isolator_off_open_circuit"
     assert result.extraction.isolator_state == "off"
     assert result.extraction.bounding_boxes == []
+
+
+def test_heuristic_text_maps_tripped_isolator_to_open_circuit():
+    result = assess_theme2_perception(
+        IncidentInput(
+            site_id="site-mall-01",
+            photo_hint="tripped isolator",
+            symptom_text="The isolator looks tripped and the charger has no power.",
+        )
+    )
+
+    assert result.mode == "text_only"
+    assert result.extraction.input_component == "isolator"
+    assert result.extraction.observation_result == "isolator_off_open_circuit"
+    assert result.extraction.isolator_state == "off"
+
+
+def test_generic_upload_hint_does_not_force_charger_in_heuristic_fallback():
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=None):
+        result = assess_theme2_perception(
+            IncidentInput(
+                site_id="site-mall-01",
+                photo_evidence=StoredPhotoEvidence(
+                    filename="random.jpg",
+                    media_type="image/jpeg",
+                    storage_path=str(TEST_UPLOAD_ROOT / "random.jpg"),
+                    byte_size=10,
+                ),
+                photo_hint="Photo uploaded for EV charger troubleshooting.",
+            )
+        )
+
+    assert result.mode == "heuristic"
+    assert result.extraction.input_component == "unknown"
+    assert result.extraction.observation_result == "unknown"
 
 
 def test_heuristic_photo_fallback_adds_component_bounding_box_without_gemini():

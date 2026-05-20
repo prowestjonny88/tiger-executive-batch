@@ -154,7 +154,38 @@ _ABNORMALITY_TOKENS = {
     "tripped_breaker": ["mcb tripped", "breaker tripped", "breaker down", "mcb down", "tripped breaker"],
     "missing_protection": ["missing mcb", "missing rccb", "no mcb", "no rccb"],
     "wrong_specs": ["wrong component", "wrong spec", "incorrect spec", "type ac"],
-    "isolator_off": ["isolator off", "open circuit", "switch off"],
+    "isolator_off": [
+        "isolator off",
+        "open circuit",
+        "switch off",
+        "main switch off",
+        "isolator tripped",
+        "tripped isolator",
+    ],
+}
+
+_ISOLATOR_OFF_TOKENS = [
+    "isolator off",
+    "open circuit",
+    "switch off",
+    "main switch off",
+    "isolator tripped",
+    "tripped isolator",
+    "isolator down",
+    "off at isolator",
+]
+
+_ISOLATOR_ON_TOKENS = [
+    "isolator on",
+    "switch on",
+    "main switch on",
+    "isolator closed",
+    "closed circuit",
+]
+
+_GENERIC_UPLOAD_HINTS = {
+    "photo uploaded for ev charger troubleshooting",
+    "uploaded photo requires deterministic theme 2 assessment",
 }
 
 
@@ -202,6 +233,23 @@ def _normalize_input_component(value: object) -> str:
 
 def _normalize_observation_result(value: object) -> str:
     text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "red_light": "charger_red_light",
+        "solid_red": "charger_red_light",
+        "solid_red_light": "charger_red_light",
+        "blinking_red": "charger_blinking_red_light",
+        "flashing_red": "charger_blinking_red_light",
+        "no_light": "charger_no_light",
+        "charger_off": "charger_no_light",
+        "isolator_off": "isolator_off_open_circuit",
+        "switch_off": "isolator_off_open_circuit",
+        "open_circuit": "isolator_off_open_circuit",
+        "isolator_tripped": "isolator_off_open_circuit",
+        "tripped_isolator": "isolator_off_open_circuit",
+        "isolator_closed": "isolator_on",
+        "switch_on": "isolator_on",
+    }
+    text = aliases.get(text, text)
     valid = {
         "charger_red_light",
         "charger_blinking_red_light",
@@ -338,6 +386,55 @@ def _normalize_bounding_boxes(values: object, *, source: str) -> list[Theme2Boun
             )
         )
     return boxes
+
+
+def _text_has_any_phrase(text: str, phrases: list[str]) -> bool:
+    return any(_contains_token(text, phrase) for phrase in phrases)
+
+
+def _provider_text_for_component_override(theme_data: dict[str, object], raw_visible_text: list[str]) -> str:
+    values: list[str] = []
+    for key in (
+        "scene_summary",
+        "components_visible",
+        "visible_abnormalities",
+        "ocr_findings",
+        "hazard_signals",
+        "uncertainty_notes",
+        "raw_visible_text",
+    ):
+        values.extend(_normalize_list(theme_data.get(key)))
+        value = theme_data.get(key)
+        if isinstance(value, str):
+            values.append(value)
+    values.extend(raw_visible_text)
+    raw_boxes = theme_data.get("bounding_boxes")
+    if isinstance(raw_boxes, list):
+        for raw_box in raw_boxes:
+            if isinstance(raw_box, dict):
+                values.append(str(raw_box.get("id") or ""))
+                values.append(str(raw_box.get("label") or ""))
+    return " ".join(value for value in values if value).lower()
+
+
+def _provider_mentions_isolator(text: str) -> bool:
+    return any(_contains_token(text, token) for token in ["isolator", "main switch", "switch disconnector"])
+
+
+def _provider_has_isolator_off_signal(text: str, isolator_state: str) -> bool:
+    if isolator_state == "off":
+        return True
+    if not _provider_mentions_isolator(text):
+        return False
+    return _text_has_any_phrase(text, _ISOLATOR_OFF_TOKENS) or _contains_token(text, "off")
+
+
+def _provider_has_isolator_on_signal(text: str, isolator_state: str) -> bool:
+    if isolator_state == "on":
+        return True
+    if not _provider_mentions_isolator(text):
+        return False
+    return _text_has_any_phrase(text, _ISOLATOR_ON_TOKENS) or _contains_token(text, "on")
 
 
 def _fallback_bounding_boxes(input_component: str, observation: str, *, has_photo: bool) -> list[Theme2BoundingBox]:
@@ -490,9 +587,21 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
     )
     mcb_rating = _clean_optional_text(theme_data.get("mcb_rating"))
     rccb_rating = _clean_optional_text(theme_data.get("rccb_rating"))
+    input_component = _normalize_input_component(theme_data.get("input_component"))
+    observation_result = _normalize_observation_result(theme_data.get("observation_result"))
+    isolator_state = _normalize_isolator_state(theme_data.get("isolator_state"))
+    provider_text = _provider_text_for_component_override(theme_data, raw_visible_text)
+    if _provider_has_isolator_off_signal(provider_text, isolator_state):
+        input_component = "isolator"
+        observation_result = "isolator_off_open_circuit"
+        isolator_state = "off"
+    elif observation_result == "unknown" and _provider_has_isolator_on_signal(provider_text, isolator_state):
+        input_component = "isolator"
+        observation_result = "isolator_on"
+        isolator_state = "on"
     return Theme2VisualExtraction(
-        input_component=_normalize_input_component(theme_data.get("input_component")),  # type: ignore[arg-type]
-        observation_result=_normalize_observation_result(theme_data.get("observation_result")),  # type: ignore[arg-type]
+        input_component=input_component,  # type: ignore[arg-type]
+        observation_result=observation_result,  # type: ignore[arg-type]
         charger_serial_number=_clean_optional_text(theme_data.get("charger_serial_number")),
         charger_brand_model=_clean_optional_text(theme_data.get("charger_brand_model")),
         indicator_status=_normalize_indicator_status(theme_data.get("indicator_status")),  # type: ignore[arg-type]
@@ -512,7 +621,7 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         rccb_symbol_description=_clean_optional_text(theme_data.get("rccb_symbol_description")),
         charger_brand_source=_normalize_brand_source(theme_data.get("charger_brand_source")),  # type: ignore[arg-type]
         evdb_spec_status=_normalize_evdb_spec_status(theme_data.get("evdb_spec_status")),  # type: ignore[arg-type]
-        isolator_state=_normalize_isolator_state(theme_data.get("isolator_state")),  # type: ignore[arg-type]
+        isolator_state=isolator_state,  # type: ignore[arg-type]
         raw_visible_text=raw_visible_text,
         bounding_boxes=_normalize_bounding_boxes(theme_data.get("bounding_boxes"), source="vlm"),
         confidence_score=_normalize_confidence(theme_data.get("theme2_confidence_score", theme_data.get("confidence_score")), default_confidence),
@@ -550,6 +659,9 @@ def _fallback_ocr_findings(incident: IncidentInput) -> list[str]:
 
 def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float) -> Theme2VisualExtraction:
     text = _combined_incident_text(incident).lower()
+    meaningful_text = text
+    for generic_hint in _GENERIC_UPLOAD_HINTS:
+        meaningful_text = meaningful_text.replace(generic_hint, "")
     input_component = "unknown"
     observation = "unknown"
     indicator_status = "unknown"
@@ -559,43 +671,59 @@ def _fallback_theme2_extraction(incident: IncidentInput, confidence_score: float
     rccb_visible: bool | None = None
     rccb_type = "unknown"
 
-    if "isolator" in text:
+    if "isolator" in meaningful_text or "main switch" in meaningful_text:
         input_component = "isolator"
-        if any(token in text for token in ["isolator off", "open circuit", "switch off"]):
+        if any(token in meaningful_text for token in _ISOLATOR_OFF_TOKENS):
             observation = "isolator_off_open_circuit"
             isolator_state = "off"
-        elif any(token in text for token in ["isolator on", "switch on"]):
+        elif any(token in meaningful_text for token in _ISOLATOR_ON_TOKENS):
             observation = "isolator_on"
             isolator_state = "on"
-    elif any(token in text for token in ["evdb", "distribution board", "mcb", "rccb", "breaker"]):
+    elif any(token in meaningful_text for token in ["evdb", "distribution board", "mcb", "rccb", "breaker"]):
         input_component = "evdb"
-        if any(token in text for token in ["missing mcb", "missing rccb", "no mcb", "no rccb"]):
+        if any(token in meaningful_text for token in ["missing mcb", "missing rccb", "no mcb", "no rccb"]):
             observation = "missing_mcb_rccb"
-        elif any(token in text for token in ["wrong component", "wrong spec", "incorrect spec", "type ac"]):
+        elif any(token in meaningful_text for token in ["wrong component", "wrong spec", "incorrect spec", "type ac"]):
             observation = "wrong_component_specs"
-        elif any(token in text for token in ["mcb tripped", "breaker tripped", "breaker down", "mcb down", "tripped breaker"]):
+        elif any(token in meaningful_text for token in ["mcb tripped", "breaker tripped", "breaker down", "mcb down", "tripped breaker"]):
             observation = "mcb_tripped"
-        elif any(token in text for token in ["three phase", "3 phase", "4p"]):
+        elif any(token in meaningful_text for token in ["three phase", "3 phase", "4p"]):
             observation = "evdb_three_phase"
             evdb_phase_type = "three_phase"
-        elif any(token in text for token in ["single phase", "1 phase", "2p"]):
+        elif any(token in meaningful_text for token in ["single phase", "1 phase", "2p"]):
             observation = "evdb_single_phase"
             evdb_phase_type = "single_phase"
-        mcb_visible = False if "missing mcb" in text or "no mcb" in text else None
-        rccb_visible = False if "missing rccb" in text or "no rccb" in text else None
-        rccb_type = "type_ac" if "type ac" in text else "type_a" if "type a" in text else "unknown"
-    elif any(token in text for token in ["charger", "red light", "no light", "serial", "brand", "model"]):
+        mcb_visible = False if "missing mcb" in meaningful_text or "no mcb" in meaningful_text else None
+        rccb_visible = False if "missing rccb" in meaningful_text or "no rccb" in meaningful_text else None
+        rccb_type = "type_ac" if "type ac" in meaningful_text else "type_a" if "type a" in meaningful_text else "unknown"
+    elif any(
+        token in meaningful_text
+        for token in [
+            "charger red",
+            "charger blinking",
+            "charger no light",
+            "charger display off",
+            "charger serial",
+            "charger brand",
+            "charger model",
+            "red light",
+            "no light",
+            "serial",
+            "brand",
+            "model",
+        ]
+    ):
         input_component = "charger"
-        if any(token in text for token in ["blinking red", "flashing red", "red flashes", "red blinking"]):
+        if any(token in meaningful_text for token in ["blinking red", "flashing red", "red flashes", "red blinking"]):
             observation = "charger_blinking_red_light"
             indicator_status = "blinking_red_light"
-        elif "no light" in text or "no lights" in text or "display off" in text:
+        elif "no light" in meaningful_text or "no lights" in meaningful_text or "display off" in meaningful_text:
             observation = "charger_no_light"
             indicator_status = "no_light"
-        elif "red light" in text or "red indicator" in text:
+        elif "red light" in meaningful_text or "red indicator" in meaningful_text:
             observation = "charger_red_light"
             indicator_status = "red_light"
-        elif any(token in text for token in ["serial", "brand", "model"]):
+        elif any(token in meaningful_text for token in ["serial", "brand", "model"]):
             observation = "charger_serial_brand_visible"
 
     serial_number = _extract_serial_number(text)
@@ -744,6 +872,11 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "For charger identity, extract serial number only from readable serial/SN/ID text and brand/model only from "
         "readable text or logo text; do not infer brand from shape, color, or styling. "
         "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
+        "Choose the actionable Theme 2 evidence, not merely the largest object. If a charger and isolator are both visible "
+        "and the isolator switch/label is readable as OFF, the correct output is input_component=isolator, "
+        "observation_result=isolator_off_open_circuit, isolator_state=off. Treat user wording such as 'tripped isolator' "
+        "as isolator OFF/open circuit for this guide. Do not classify an OFF isolator photo as charger_no_light or "
+        "charger_serial_brand_visible just because a charger is also visible.\n"
         "For bounding_boxes, return at most 3 boxes using percentages relative to the full image: "
         "x, y, width, height are 0-100 values. Bound only visible Theme 2 evidence objects such as the charger unit, "
         "charger serial/brand label, EVDB enclosure or MCB/RCCB cluster, or isolator switch. "
