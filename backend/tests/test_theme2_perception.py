@@ -152,6 +152,46 @@ def test_gemini_perception_parses_normalized_evdb_spec_fields():
     assert result.extraction.evdb_spec_status == "wrong"
 
 
+def test_gemini_evdb_tripped_signal_overrides_phase_observation():
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Single-phase EVDB with one MCB handle down.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": ["MCB tripped"],
+            "ocr_findings": ["MCB C40 2P", "RCCB Type A 2P"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.9,
+            "input_component": "evdb",
+            "observation_result": "evdb_single_phase",
+            "evdb_phase_type": "single_phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 2P",
+            "rccb_rating": "40A Type A 2P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "2P",
+            "rccb_poles": "2P",
+            "rccb_type": "Type A",
+            "evdb_spec_status": "correct",
+            "raw_visible_text": ["MCB tripped", "C40 2P"],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-evdb-tripped-phase.jpg"))
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.observation_result == "mcb_tripped"
+
+
 def test_gemini_perception_merges_ev_app_screenshot_text():
     primary_response = MagicMock()
     primary_response.text = json.dumps(
@@ -270,6 +310,57 @@ def test_gemini_isolator_off_signal_overrides_dominant_charger():
     assert result.extraction.input_component == "isolator"
     assert result.extraction.observation_result == "isolator_off_open_circuit"
     assert result.extraction.isolator_state == "off"
+
+
+def test_secondary_isolator_check_catches_off_switch_after_charger_result():
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Large charger unit is visible.",
+            "components_visible": ["charger"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["PROTON e.MAS"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.91,
+            "input_component": "charger",
+            "observation_result": "charger_serial_brand_visible",
+            "charger_serial_number": None,
+            "charger_brand_model": "PROTON e.MAS",
+            "indicator_status": "unknown",
+            "raw_visible_text": ["PROTON e.MAS"],
+            "bounding_boxes": [],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "isolator_visible": True,
+            "isolator_state": "off",
+            "isolator_observation": "isolator_off_open_circuit",
+            "confidence_score": 0.88,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["OFF"],
+            "bounding_boxes": [
+                {"id": "isolator-switch", "label": "Isolator OFF switch", "x": 28, "y": 10, "width": 24, "height": 20}
+            ],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-secondary-isolator.jpg"))
+
+    assert result.extraction.input_component == "isolator"
+    assert result.extraction.observation_result == "isolator_off_open_circuit"
+    assert result.extraction.isolator_state == "off"
+    assert result.extraction.bounding_boxes[0].id == "isolator-switch"
+    assert "ISOLATOR_SECONDARY" in (result.raw_provider_output or "")
+    assert mock_client.models.generate_content.call_count == 2
 
 
 def test_bad_gemini_bounding_boxes_are_clamped_and_limited():

@@ -134,6 +134,28 @@ _APP_SCREENSHOT_SCHEMA = {
     ],
 }
 
+_ISOLATOR_CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "isolator_visible": {"type": "boolean"},
+        "isolator_state": {"type": "string"},
+        "isolator_observation": {"type": "string"},
+        "confidence_score": {"type": "number"},
+        "uncertainty_notes": {"type": "array", "items": {"type": "string"}},
+        "raw_visible_text": {"type": "array", "items": {"type": "string"}},
+        "bounding_boxes": _GEMINI_RESPONSE_SCHEMA["properties"]["bounding_boxes"],
+    },
+    "required": [
+        "isolator_visible",
+        "isolator_state",
+        "isolator_observation",
+        "confidence_score",
+        "uncertainty_notes",
+        "raw_visible_text",
+        "bounding_boxes",
+    ],
+}
+
 
 class GeminiPerceptionError(RuntimeError):
     def __init__(self, message: str, *, error_type: str, raw_provider_output: str | None = None) -> None:
@@ -163,6 +185,20 @@ _ABNORMALITY_TOKENS = {
         "tripped isolator",
     ],
 }
+
+_EVDB_TRIPPED_TOKENS = [
+    "mcb tripped",
+    "rccb tripped",
+    "breaker tripped",
+    "rcd tripped",
+    "breaker down",
+    "mcb down",
+    "rccb down",
+    "breaker off",
+    "mcb off",
+    "rccb off",
+    "tripped breaker",
+]
 
 _ISOLATOR_OFF_TOKENS = [
     "isolator off",
@@ -241,6 +277,12 @@ def _normalize_observation_result(value: object) -> str:
         "flashing_red": "charger_blinking_red_light",
         "no_light": "charger_no_light",
         "charger_off": "charger_no_light",
+        "breaker_tripped": "mcb_tripped",
+        "mcb_down": "mcb_tripped",
+        "mcb_off": "mcb_tripped",
+        "rccb_tripped": "mcb_tripped",
+        "rccb_down": "mcb_tripped",
+        "rccb_off": "mcb_tripped",
         "isolator_off": "isolator_off_open_circuit",
         "switch_off": "isolator_off_open_circuit",
         "open_circuit": "isolator_off_open_circuit",
@@ -421,6 +463,16 @@ def _provider_mentions_isolator(text: str) -> bool:
     return any(_contains_token(text, token) for token in ["isolator", "main switch", "switch disconnector"])
 
 
+def _provider_mentions_evdb(text: str) -> bool:
+    return any(_contains_token(text, token) for token in ["evdb", "distribution board", "mcb", "rccb", "breaker", "rcd"])
+
+
+def _provider_has_evdb_tripped_signal(text: str, input_component: str) -> bool:
+    if input_component != "evdb" and not _provider_mentions_evdb(text):
+        return False
+    return _text_has_any_phrase(text, _EVDB_TRIPPED_TOKENS)
+
+
 def _provider_has_isolator_off_signal(text: str, isolator_state: str) -> bool:
     if isolator_state == "off":
         return True
@@ -591,6 +643,9 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
     observation_result = _normalize_observation_result(theme_data.get("observation_result"))
     isolator_state = _normalize_isolator_state(theme_data.get("isolator_state"))
     provider_text = _provider_text_for_component_override(theme_data, raw_visible_text)
+    if _provider_has_evdb_tripped_signal(provider_text, input_component):
+        input_component = "evdb"
+        observation_result = "mcb_tripped"
     if _provider_has_isolator_off_signal(provider_text, isolator_state):
         input_component = "isolator"
         observation_result = "isolator_off_open_circuit"
@@ -866,6 +921,11 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "three phase expects MCB 40A 4P and RCCB 40A Type A 4P. "
         "RCCB Type AC is wrong for this guide. A sine-wave-only RCCB symbol means Type AC; "
         "a sine wave plus pulsating DC symbol or readable Type A text means Type A. "
+        "EVDB observation priority: missing MCB/RCCB first, then visibly tripped/down/OFF MCB/RCCB breaker, "
+        "then wrong component/specs, then single-phase/three-phase reference evidence. If any EVDB breaker handle "
+        "is visibly down/OFF/tripped while other breakers are up/ON, return observation_result=mcb_tripped; do not "
+        "return evdb_single_phase or evdb_three_phase just because 2P/4P labels are visible. Phase observations are "
+        "for reference/spec verification when no tripped/missing/wrong breaker fault is visible. "
         "Do not mix MCB and RCCB labels. If a label is blurry, occluded, or unreadable, set numeric/pole/type fields "
         "to null or unknown and add an uncertainty note. "
         "Set evdb_spec_status to correct, wrong, missing, incomplete, or unknown based only on readable EVDB evidence. "
@@ -873,7 +933,8 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "readable text or logo text; do not infer brand from shape, color, or styling. "
         "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
         "Choose the actionable Theme 2 evidence, not merely the largest object. If a charger and isolator are both visible "
-        "and the isolator switch/label is readable as OFF, the correct output is input_component=isolator, "
+        "inspect the isolator switch before finalizing a charger result. If the isolator switch/label is readable as OFF, "
+        "the correct output is input_component=isolator, "
         "observation_result=isolator_off_open_circuit, isolator_state=off. Treat user wording such as 'tripped isolator' "
         "as isolator OFF/open circuit for this guide. Do not classify an OFF isolator photo as charger_no_light or "
         "charger_serial_brand_visible just because a charger is also visible.\n"
@@ -932,7 +993,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
 
     uncertainty_notes = _normalize_list(data.get("uncertainty_notes"))
     confidence_score = _normalize_confidence(data.get("confidence_score"), 0.72)
-    return Theme2PerceptionAssessment(
+    assessment = Theme2PerceptionAssessment(
         mode="vlm",
         evidence_type=evidence_type,  # type: ignore[arg-type]
         scene_summary=str(data.get("scene_summary") or incident.photo_hint or incident.symptom_text or "Visual evidence inspected."),
@@ -948,6 +1009,7 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         raw_provider_output=raw,
         extraction=_theme2_from_data(data, confidence_score),
     )
+    return _merge_isolator_secondary_check(incident, assessment)
 
 
 def _call_gemini_app_screenshot(incident: IncidentInput) -> tuple[dict[str, object], str] | None:
@@ -972,6 +1034,117 @@ def _call_gemini_app_screenshot(incident: IncidentInput) -> tuple[dict[str, obje
         f"error_code: {incident.error_code or ''}\n"
     )
     return _generate_gemini_json(incident.app_screenshot_evidence, prompt, genai_types, _APP_SCREENSHOT_SCHEMA)
+
+
+def _should_run_isolator_secondary_check(perception: Theme2PerceptionAssessment) -> bool:
+    extraction = perception.extraction
+    return extraction.input_component in {"charger", "unknown"} and extraction.observation_result in {
+        "unknown",
+        "charger_no_light",
+        "charger_serial_brand_visible",
+    }
+
+
+def _call_gemini_isolator_check(incident: IncidentInput) -> tuple[dict[str, object], str] | None:
+    if incident.photo_evidence is None:
+        return None
+
+    try:
+        from google.genai import types as genai_types  # type: ignore[import-untyped]
+    except ImportError:
+        raise RuntimeError("gemini_sdk_unavailable")
+
+    prompt = (
+        "You are doing a targeted ChargerDoc Theme 2 isolator check. Return JSON only.\n"
+        "Inspect the image only for EV charger isolator switches, even if a charger unit is larger in the frame.\n"
+        "Use exactly these keys: isolator_visible, isolator_state, isolator_observation, confidence_score, "
+        "uncertainty_notes, raw_visible_text, bounding_boxes.\n"
+        "isolator_state must be on, off, or unknown. isolator_observation must be isolator_on, "
+        "isolator_off_open_circuit, or unknown.\n"
+        "If any isolator switch label or handle position clearly indicates OFF/open circuit, return "
+        "isolator_visible=true, isolator_state=off, isolator_observation=isolator_off_open_circuit. "
+        "If the isolator is visible but state is hidden, blurry, or ambiguous, return unknown rather than guessing. "
+        "Do not classify charger labels or EVDB breakers as isolators.\n"
+        "For bounding_boxes, return at most 2 boxes around visible isolator switches using 0-100 image percentages.\n"
+        f"photo_hint: {incident.photo_hint or ''}\n"
+        f"symptom_text: {incident.symptom_text or ''}\n"
+    )
+    return _generate_gemini_json(incident.photo_evidence, prompt, genai_types, _ISOLATOR_CHECK_SCHEMA)
+
+
+def _merge_isolator_secondary_check(
+    incident: IncidentInput,
+    perception: Theme2PerceptionAssessment,
+) -> Theme2PerceptionAssessment:
+    if not _should_run_isolator_secondary_check(perception):
+        return perception
+    try:
+        parsed = _call_gemini_isolator_check(incident)
+    except Exception:
+        return perception
+    if parsed is None:
+        return perception
+
+    data, raw = parsed
+    raw_visible_text = (
+        _normalize_list(data.get("raw_visible_text"))
+        or _normalize_list(data.get("ocr_findings"))
+        or _normalize_list(data.get("visible_text"))
+    )
+    state = _normalize_isolator_state(data.get("isolator_state"))
+    observation = _normalize_observation_result(data.get("isolator_observation"))
+    provider_text = _provider_text_for_component_override(data, raw_visible_text)
+    isolator_visible = bool(data.get("isolator_visible"))
+
+    if isolator_visible and _provider_has_isolator_off_signal(provider_text, state):
+        secondary_confidence = _normalize_confidence(data.get("confidence_score"), perception.confidence_score)
+        secondary_boxes = _normalize_bounding_boxes(data.get("bounding_boxes"), source="vlm")
+        extraction = perception.extraction.model_copy(
+            update={
+                "input_component": "isolator",
+                "observation_result": "isolator_off_open_circuit",
+                "isolator_state": "off",
+                "bounding_boxes": secondary_boxes or perception.extraction.bounding_boxes,
+                "raw_visible_text": _dedupe([*perception.extraction.raw_visible_text, *raw_visible_text], limit=8),
+                "confidence_score": secondary_confidence,
+                "uncertainty_notes": _dedupe(
+                    [*perception.extraction.uncertainty_notes, *_normalize_list(data.get("uncertainty_notes"))],
+                    limit=5,
+                ),
+            }
+        )
+        return perception.model_copy(
+            update={
+                "components_visible": _dedupe([*perception.components_visible, "isolator"], limit=5),
+                "visible_abnormalities": _dedupe([*perception.visible_abnormalities, "isolator_off_open_circuit"], limit=5),
+                "ocr_findings": _dedupe([*perception.ocr_findings, *raw_visible_text], limit=8),
+                "confidence_score": min(max(perception.confidence_score, secondary_confidence), 1.0),
+                "requires_follow_up": bool(extraction.uncertainty_notes),
+                "raw_provider_output": f"{perception.raw_provider_output or ''}\nISOLATOR_SECONDARY:\n{raw}".strip(),
+                "extraction": extraction,
+            }
+        )
+
+    if isolator_visible and perception.extraction.observation_result == "unknown" and observation == "isolator_on":
+        extraction = perception.extraction.model_copy(
+            update={
+                "input_component": "isolator",
+                "observation_result": "isolator_on",
+                "isolator_state": "on",
+                "bounding_boxes": _normalize_bounding_boxes(data.get("bounding_boxes"), source="vlm")
+                or perception.extraction.bounding_boxes,
+                "raw_visible_text": _dedupe([*perception.extraction.raw_visible_text, *raw_visible_text], limit=8),
+            }
+        )
+        return perception.model_copy(
+            update={
+                "components_visible": _dedupe([*perception.components_visible, "isolator"], limit=5),
+                "raw_provider_output": f"{perception.raw_provider_output or ''}\nISOLATOR_SECONDARY:\n{raw}".strip(),
+                "extraction": extraction,
+            }
+        )
+
+    return perception
 
 
 def _merge_app_screenshot_perception(
