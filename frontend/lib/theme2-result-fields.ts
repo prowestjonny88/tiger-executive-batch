@@ -32,6 +32,16 @@ function formatRccbType(value: string | null | undefined) {
   return "Type unknown";
 }
 
+function formatEvdbPhaseType(extraction: Theme2VisualExtraction) {
+  if (extraction.evdb_phase_type === "single_phase" || extraction.observation_result === "evdb_single_phase") {
+    return "Single phase";
+  }
+  if (extraction.evdb_phase_type === "three_phase" || extraction.observation_result === "evdb_three_phase") {
+    return "Three phase";
+  }
+  return "Not confirmed";
+}
+
 function ratingIncludesAmp(rating: string | null | undefined, amp: number | null | undefined) {
   if (!rating || typeof amp !== "number") return false;
   return new RegExp(`\\b${amp}\\s*A\\b`, "i").test(rating);
@@ -147,6 +157,7 @@ function componentEvidenceFields(output: CompetitionOutput, extraction: Theme2Vi
 
   if (output.input_component === "evdb") {
     return [
+      { label: "Phase Type", value: formatEvdbPhaseType(extraction) },
       { label: "MCB Evidence", value: mcbEvidence(extraction) },
       { label: "RCCB Evidence", value: rccbEvidence(extraction) },
       { label: "EVDB Spec Status", value: formatSpecStatusWithExtraction(extraction.evdb_spec_status, extraction) },
