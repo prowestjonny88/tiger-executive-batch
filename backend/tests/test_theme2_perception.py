@@ -49,6 +49,27 @@ def test_mixed_charger_no_light_allows_isolator_off_to_win():
     assert result.observation_result == "isolator_off_open_circuit"
 
 
+def test_mixed_powered_charger_does_not_force_isolator_open_circuit():
+    result = _theme2_from_data(
+        {
+            "scene_summary": "EV charger shows a blue status light and a nearby isolator switch label appears OFF.",
+            "components_visible": ["charger", "isolator"],
+            "visible_abnormalities": ["isolator OFF"],
+            "input_component": "isolator",
+            "observation_result": "isolator_off_open_circuit",
+            "indicator_status": "unknown",
+            "isolator_state": "off",
+            "raw_visible_text": ["charger blue indicator", "isolator OFF"],
+        },
+        0.9,
+    )
+
+    assert result.input_component == "charger"
+    assert result.observation_result == "unknown"
+    assert result.isolator_state == "unknown"
+    assert any("powered" in note.lower() and "isolator" in note.lower() for note in result.uncertainty_notes)
+
+
 def _photo_incident(response_filename: str = "theme2.jpg") -> IncidentInput:
     TEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     image_path = TEST_UPLOAD_ROOT / response_filename
@@ -588,6 +609,57 @@ def test_secondary_isolator_check_catches_off_switch_after_charger_result():
     assert result.extraction.observation_result == "isolator_off_open_circuit"
     assert result.extraction.isolator_state == "off"
     assert result.extraction.bounding_boxes[0].id == "isolator-switch"
+    assert "ISOLATOR_SECONDARY" in (result.raw_provider_output or "")
+    assert mock_client.models.generate_content.call_count == 2
+
+
+def test_secondary_isolator_check_does_not_override_powered_charger():
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Large charger unit is visible with a blue status light.",
+            "components_visible": ["charger", "isolator"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["PROTON e.MAS", "blue charger indicator"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.91,
+            "input_component": "charger",
+            "observation_result": "charger_serial_brand_visible",
+            "charger_serial_number": None,
+            "charger_brand_model": "PROTON e.MAS",
+            "indicator_status": "unknown",
+            "raw_visible_text": ["PROTON e.MAS", "blue status light"],
+            "bounding_boxes": [],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "isolator_visible": True,
+            "isolator_state": "off",
+            "isolator_observation": "isolator_off_open_circuit",
+            "confidence_score": 0.88,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["OFF"],
+            "bounding_boxes": [
+                {"id": "isolator-switch", "label": "Isolator OFF switch", "x": 28, "y": 10, "width": 24, "height": 20}
+            ],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(_photo_incident("theme2-secondary-powered-charger.jpg"))
+
+    assert result.extraction.input_component == "charger"
+    assert result.extraction.observation_result == "charger_serial_brand_visible"
+    assert result.requires_follow_up is True
+    assert any("powered" in note.lower() and "isolator" in note.lower() for note in result.extraction.uncertainty_notes)
     assert "ISOLATOR_SECONDARY" in (result.raw_provider_output or "")
     assert mock_client.models.generate_content.call_count == 2
 

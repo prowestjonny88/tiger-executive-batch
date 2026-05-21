@@ -557,6 +557,53 @@ def _provider_charger_indicator_fault(text: str, indicator_status: str, observat
     return None
 
 
+def _provider_has_powered_charger_signal(text: str) -> bool:
+    if not any(_contains_token(text, token) for token in ["charger", "charging unit", "ev charger", "wallbox"]):
+        return False
+    return _text_has_any_phrase(
+        text,
+        [
+            "blue light",
+            "blue indicator",
+            "blue status",
+            "green light",
+            "green indicator",
+            "green status",
+            "indicator is blue",
+            "indicator is green",
+            "status light is blue",
+            "status light is green",
+            "charger powered",
+            "charger is powered",
+            "powered on",
+            "power indicator on",
+            "ready status",
+            "standby status",
+            "normal status",
+            "normal indicator",
+        ],
+    )
+
+
+def _perception_provider_text(perception: Theme2PerceptionAssessment) -> str:
+    extraction = perception.extraction
+    values: list[str] = [
+        perception.scene_summary,
+        " ".join(perception.components_visible),
+        " ".join(perception.visible_abnormalities),
+        " ".join(perception.ocr_findings),
+        " ".join(perception.hazard_signals),
+        " ".join(perception.uncertainty_notes),
+        extraction.input_component,
+        extraction.observation_result,
+        extraction.indicator_status,
+        extraction.charger_brand_model or "",
+        " ".join(extraction.raw_visible_text),
+    ]
+    values.extend(f"{box.id} {box.label}" for box in extraction.bounding_boxes)
+    return " ".join(value for value in values if value).lower()
+
+
 def _red_trip_window_box_from_image(
     evidence: StoredPhotoEvidence,
     search_boxes: list[Theme2BoundingBox],
@@ -815,12 +862,24 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
     isolator_state = _normalize_isolator_state(theme_data.get("isolator_state"))
     provider_text = _provider_text_for_component_override(theme_data, raw_visible_text)
     charger_indicator_fault = _provider_charger_indicator_fault(provider_text, indicator_status, observation_result)
+    uncertainty_notes = _normalize_list(theme_data.get("theme2_uncertainty_notes")) or _normalize_list(theme_data.get("uncertainty_notes"))
     if _provider_has_evdb_tripped_signal(provider_text, input_component):
         input_component = "evdb"
         observation_result = "mcb_tripped"
     if charger_indicator_fault is not None:
         input_component = "charger"
         observation_result = charger_indicator_fault
+    elif _provider_has_powered_charger_signal(provider_text) and _provider_has_isolator_off_signal(provider_text, isolator_state):
+        input_component = "charger"
+        observation_result = "unknown"
+        isolator_state = "unknown"
+        uncertainty_notes = _dedupe(
+            [
+                *uncertainty_notes,
+                "Charger appears powered while isolator appears OFF; request clearer switch-state proof instead of forcing power-cut.",
+            ],
+            limit=5,
+        )
     elif _provider_has_isolator_off_signal(provider_text, isolator_state):
         input_component = "isolator"
         observation_result = "isolator_off_open_circuit"
@@ -855,7 +914,7 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         raw_visible_text=raw_visible_text,
         bounding_boxes=_normalize_bounding_boxes(theme_data.get("bounding_boxes"), source="vlm"),
         confidence_score=_normalize_confidence(theme_data.get("theme2_confidence_score", theme_data.get("confidence_score")), default_confidence),
-        uncertainty_notes=_normalize_list(theme_data.get("theme2_uncertainty_notes")) or _normalize_list(theme_data.get("uncertainty_notes")),
+        uncertainty_notes=uncertainty_notes,
     )
 
 
@@ -1109,11 +1168,13 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
         "Choose the actionable Theme 2 evidence, not merely the largest object. If a charger and isolator are both visible, "
         "a clearly visible charger red light or blinking red light is the primary actionable charger observation and must "
-        "not be overridden by the isolator. If the charger has no light/no power and the isolator switch/label is readable "
-        "as OFF, the correct output is input_component=isolator, observation_result=isolator_off_open_circuit, "
-        "isolator_state=off. Treat user wording such as 'tripped isolator' as isolator OFF/open circuit for this guide. "
-        "Do not classify an OFF isolator photo as charger_no_light or charger_serial_brand_visible just because a charger "
-        "is also visible.\n"
+        "not be overridden by the isolator. If the charger appears powered/normal with a blue or green status light, do not "
+        "force isolator_off_open_circuit just because an isolator-like switch or OFF label is visible; return unknown and "
+        "ask for clearer switch-state proof if the true fault is unclear. If the charger has no light/no power and the "
+        "isolator switch/label is readable as OFF, the correct output is input_component=isolator, "
+        "observation_result=isolator_off_open_circuit, isolator_state=off. Treat user wording such as 'tripped isolator' "
+        "as isolator OFF/open circuit for this guide. Do not classify an OFF isolator photo as charger_no_light or "
+        "charger_serial_brand_visible just because a charger is also visible.\n"
         "For bounding_boxes, return at most 3 boxes using percentages relative to the full image: "
         "x, y, width, height are 0-100 values. Bound only visible Theme 2 evidence objects such as the charger unit, "
         "charger serial/brand label, EVDB enclosure or MCB/RCCB cluster, or isolator switch. "
@@ -1396,6 +1457,21 @@ def _merge_isolator_secondary_check(
     isolator_visible = bool(data.get("isolator_visible"))
 
     if isolator_visible and _provider_has_isolator_off_signal(provider_text, state):
+        if _provider_has_powered_charger_signal(_perception_provider_text(perception)):
+            notes = _dedupe(
+                [
+                    *perception.extraction.uncertainty_notes,
+                    "Charger appears powered while isolator appears OFF; request clearer switch-state proof instead of forcing power-cut.",
+                ],
+                limit=5,
+            )
+            return perception.model_copy(
+                update={
+                    "requires_follow_up": True,
+                    "raw_provider_output": f"{perception.raw_provider_output or ''}\nISOLATOR_SECONDARY:\n{raw}".strip(),
+                    "extraction": perception.extraction.model_copy(update={"uncertainty_notes": notes}),
+                }
+            )
         secondary_confidence = _normalize_confidence(data.get("confidence_score"), perception.confidence_score)
         secondary_boxes = _normalize_bounding_boxes(data.get("bounding_boxes"), source="vlm")
         extraction = perception.extraction.model_copy(
