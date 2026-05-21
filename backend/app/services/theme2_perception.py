@@ -523,6 +523,40 @@ def _provider_has_isolator_on_signal(text: str, isolator_state: str) -> bool:
     return _text_has_any_phrase(text, _ISOLATOR_ON_TOKENS) or _contains_token(text, "on")
 
 
+def _provider_charger_indicator_fault(text: str, indicator_status: str, observation_result: str) -> str | None:
+    if observation_result in {"charger_red_light", "charger_blinking_red_light"}:
+        return observation_result
+    if indicator_status == "red_light":
+        return "charger_red_light"
+    if indicator_status == "blinking_red_light":
+        return "charger_blinking_red_light"
+    if not any(_contains_token(text, token) for token in ["charger", "charging unit", "ev charger"]):
+        return None
+    if _text_has_any_phrase(
+        text,
+        [
+            "blinking red light",
+            "red light blinking",
+            "flashing red light",
+            "red indicator blinking",
+            "blinking red indicator",
+        ],
+    ):
+        return "charger_blinking_red_light"
+    if _text_has_any_phrase(
+        text,
+        [
+            "charger red light",
+            "red light indicator",
+            "red indicator",
+            "solid red light",
+            "solid red indicator",
+        ],
+    ):
+        return "charger_red_light"
+    return None
+
+
 def _red_trip_window_box_from_image(
     evidence: StoredPhotoEvidence,
     search_boxes: list[Theme2BoundingBox],
@@ -777,12 +811,17 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
     rccb_rating = _clean_optional_text(theme_data.get("rccb_rating"))
     input_component = _normalize_input_component(theme_data.get("input_component"))
     observation_result = _normalize_observation_result(theme_data.get("observation_result"))
+    indicator_status = _normalize_indicator_status(theme_data.get("indicator_status"))
     isolator_state = _normalize_isolator_state(theme_data.get("isolator_state"))
     provider_text = _provider_text_for_component_override(theme_data, raw_visible_text)
+    charger_indicator_fault = _provider_charger_indicator_fault(provider_text, indicator_status, observation_result)
     if _provider_has_evdb_tripped_signal(provider_text, input_component):
         input_component = "evdb"
         observation_result = "mcb_tripped"
-    if _provider_has_isolator_off_signal(provider_text, isolator_state):
+    if charger_indicator_fault is not None:
+        input_component = "charger"
+        observation_result = charger_indicator_fault
+    elif _provider_has_isolator_off_signal(provider_text, isolator_state):
         input_component = "isolator"
         observation_result = "isolator_off_open_circuit"
         isolator_state = "off"
@@ -795,7 +834,7 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
         observation_result=observation_result,  # type: ignore[arg-type]
         charger_serial_number=_clean_optional_text(theme_data.get("charger_serial_number")),
         charger_brand_model=_clean_optional_text(theme_data.get("charger_brand_model")),
-        indicator_status=_normalize_indicator_status(theme_data.get("indicator_status")),  # type: ignore[arg-type]
+        indicator_status=indicator_status,  # type: ignore[arg-type]
         evdb_phase_type=_normalize_phase_type(theme_data.get("evdb_phase_type")),  # type: ignore[arg-type]
         mcb_visible=_normalize_optional_bool(theme_data.get("mcb_visible")),
         rccb_visible=_normalize_optional_bool(theme_data.get("rccb_visible")),
@@ -1068,12 +1107,13 @@ def _call_gemini_perception(incident: IncidentInput) -> Theme2PerceptionAssessme
         "For charger identity, extract serial number only from readable serial/SN/ID text and brand/model only from "
         "readable text or logo text; do not infer brand from shape, color, or styling. "
         "Do not guess serial number, brand/model, breaker rating, pole count, or RCCB type. Use null or unknown when unreadable.\n"
-        "Choose the actionable Theme 2 evidence, not merely the largest object. If a charger and isolator are both visible "
-        "inspect the isolator switch before finalizing a charger result. If the isolator switch/label is readable as OFF, "
-        "the correct output is input_component=isolator, "
-        "observation_result=isolator_off_open_circuit, isolator_state=off. Treat user wording such as 'tripped isolator' "
-        "as isolator OFF/open circuit for this guide. Do not classify an OFF isolator photo as charger_no_light or "
-        "charger_serial_brand_visible just because a charger is also visible.\n"
+        "Choose the actionable Theme 2 evidence, not merely the largest object. If a charger and isolator are both visible, "
+        "a clearly visible charger red light or blinking red light is the primary actionable charger observation and must "
+        "not be overridden by the isolator. If the charger has no light/no power and the isolator switch/label is readable "
+        "as OFF, the correct output is input_component=isolator, observation_result=isolator_off_open_circuit, "
+        "isolator_state=off. Treat user wording such as 'tripped isolator' as isolator OFF/open circuit for this guide. "
+        "Do not classify an OFF isolator photo as charger_no_light or charger_serial_brand_visible just because a charger "
+        "is also visible.\n"
         "For bounding_boxes, return at most 3 boxes using percentages relative to the full image: "
         "x, y, width, height are 0-100 values. Bound only visible Theme 2 evidence objects such as the charger unit, "
         "charger serial/brand label, EVDB enclosure or MCB/RCCB cluster, or isolator switch. "

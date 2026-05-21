@@ -6,10 +6,47 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 from app.core.models import IncidentInput, StoredPhotoEvidence
-from app.services.theme2_perception import assess_theme2_perception
+from app.services.theme2_perception import _theme2_from_data, assess_theme2_perception
 
 
 TEST_UPLOAD_ROOT = Path(__file__).parent / "test-uploads"
+
+
+def test_mixed_charger_red_light_wins_over_visible_isolator_off():
+    result = _theme2_from_data(
+        {
+            "scene_summary": "EV charger with solid red light and nearby isolator switch marked OFF.",
+            "components_visible": ["charger", "isolator"],
+            "visible_abnormalities": ["isolator_off_open_circuit"],
+            "input_component": "isolator",
+            "observation_result": "isolator_off_open_circuit",
+            "indicator_status": "red_light",
+            "isolator_state": "off",
+            "raw_visible_text": ["PROTON e.MAS charger red indicator", "isolator OFF"],
+        },
+        0.9,
+    )
+
+    assert result.input_component == "charger"
+    assert result.observation_result == "charger_red_light"
+
+
+def test_mixed_charger_no_light_allows_isolator_off_to_win():
+    result = _theme2_from_data(
+        {
+            "scene_summary": "EV charger has no light and the nearby isolator switch is marked OFF.",
+            "components_visible": ["charger", "isolator"],
+            "input_component": "charger",
+            "observation_result": "charger_no_light",
+            "indicator_status": "no_light",
+            "isolator_state": "off",
+            "raw_visible_text": ["charger no light", "isolator OFF"],
+        },
+        0.9,
+    )
+
+    assert result.input_component == "isolator"
+    assert result.observation_result == "isolator_off_open_circuit"
 
 
 def _photo_incident(response_filename: str = "theme2.jpg") -> IncidentInput:
