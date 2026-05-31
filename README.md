@@ -155,10 +155,16 @@ Use `weak-label-sanity` only for pipeline regression checks. Use Gemini-enabled 
 
 Frontend deploys on Vercel from `frontend/`.
 
-Backend deploys on Cloud Run from the repo root:
+Backend deploys on Cloud Run from the repo root.
+
+Current infrastructure intentionally keeps the original Cloud Run service and bucket names for safety. Product/UI/docs copy should say `ChargerDoc`, but deployment commands should continue using:
+
+- Cloud Run service: `rexharge-backend`
+- Project: `rexharge-experiment`
+- Upload bucket: `rexharge-uploads-rexharge-experiment`
 
 ```cmd
-gcloud run deploy chargerdoc-backend ^
+gcloud run deploy rexharge-backend ^
   --source . ^
   --region us-central1 ^
   --allow-unauthenticated ^
@@ -176,14 +182,14 @@ DATABASE_URL=postgresql://...
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3-flash-preview
 STORAGE_BACKEND=gcs
-GCS_BUCKET=chargerdoc-uploads-<PROJECT_ID>
+GCS_BUCKET=rexharge-uploads-rexharge-experiment
 GCS_UPLOAD_PREFIX=incidents
 ```
 
 Get the Cloud Run URL:
 
 ```cmd
-gcloud run services describe chargerdoc-backend --region us-central1 --format="value(status.url)"
+gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
 ```
 
 Set that URL in Vercel:

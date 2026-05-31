@@ -273,28 +273,46 @@ def test_evdb_normalized_wrong_specs_route_to_after_sales(theme2: Theme2VisualEx
     assert output.recipient_type == "after_sales_team"
 
 
-def test_evdb_normalized_correct_specs_do_not_route_to_after_sales():
-    output, _ = build_competition_output(
-        IncidentInput(site_id="site-mall-01", photo_hint="EVDB single phase labels readable"),
-        _perception(
-            Theme2VisualExtraction(
-                input_component="evdb",
-                observation_result="evdb_single_phase",
-                evdb_phase_type="single_phase",
-                mcb_visible=True,
-                rccb_visible=True,
-                mcb_current_amp=40,
-                rccb_current_amp=40,
-                mcb_poles="2p",
-                rccb_poles="2p",
-                rccb_type="type_a",
-                evdb_spec_status="correct",
-                confidence_score=0.9,
-            )
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_single_phase",
+            evdb_phase_type="single_phase",
+            mcb_visible=True,
+            rccb_visible=True,
+            mcb_current_amp=40,
+            rccb_current_amp=40,
+            mcb_poles="2p",
+            rccb_poles="2p",
+            rccb_type="type_a",
+            evdb_spec_status="correct",
+            confidence_score=0.9,
         ),
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_three_phase",
+            evdb_phase_type="three_phase",
+            mcb_visible=True,
+            rccb_visible=True,
+            mcb_current_amp=40,
+            rccb_current_amp=40,
+            mcb_poles="4p",
+            rccb_poles="4p",
+            rccb_type="type_a",
+            evdb_spec_status="correct",
+            confidence_score=0.9,
+        ),
+    ],
+)
+def test_evdb_normalized_correct_specs_do_not_route_to_after_sales(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB labels readable"),
+        _perception(theme2),
     )
 
-    assert output.observation_result == "evdb_single_phase"
+    assert output.observation_result == theme2.observation_result
     assert output.fault_type_v2 == "unknown"
     assert output.recipient_type == "customer"
 
@@ -316,6 +334,41 @@ def test_evdb_unreadable_specs_keep_phase_and_request_proof():
     )
 
     assert output.observation_result == "evdb_single_phase"
+    assert output.fault_type_v2 == "unknown"
+    assert output.recipient_type == "customer"
+    assert output.required_proof_next == "Clear close-up photo showing MCB/RCCB labels, pole count, and RCCB type."
+
+
+@pytest.mark.parametrize(
+    "theme2",
+    [
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_single_phase",
+            evdb_phase_type="single_phase",
+            mcb_visible=True,
+            rccb_visible=True,
+            evdb_spec_status="wrong",
+            confidence_score=0.86,
+        ),
+        Theme2VisualExtraction(
+            input_component="evdb",
+            observation_result="evdb_three_phase",
+            evdb_phase_type="three_phase",
+            mcb_visible=True,
+            rccb_visible=True,
+            evdb_spec_status="wrong",
+            confidence_score=0.86,
+        ),
+    ],
+)
+def test_evdb_wrong_status_without_readable_mismatch_requests_proof(theme2: Theme2VisualExtraction):
+    output, _ = build_competition_output(
+        IncidentInput(site_id="site-mall-01", photo_hint="EVDB labels unclear"),
+        _perception(theme2),
+    )
+
+    assert output.observation_result == theme2.observation_result
     assert output.fault_type_v2 == "unknown"
     assert output.recipient_type == "customer"
     assert output.required_proof_next == "Clear close-up photo showing MCB/RCCB labels, pole count, and RCCB type."

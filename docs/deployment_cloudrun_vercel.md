@@ -10,6 +10,16 @@ This guide deploys the current ChargerDoc Theme 2 app:
 
 Raw Dataset 2 images are not deployed. Uploaded user evidence is stored in GCS.
 
+## Naming Policy
+
+`ChargerDoc` is the product name used in UI and docs. The deployed Google Cloud resources keep their existing legacy names to avoid creating a second backend or bucket by accident:
+
+- Cloud Run service: `rexharge-backend`
+- Google Cloud project: `rexharge-experiment`
+- Upload bucket: `rexharge-uploads-rexharge-experiment`
+
+Do not deploy to `chargerdoc-backend` unless you are intentionally migrating infrastructure.
+
 ## Architecture
 
 ```text
@@ -42,7 +52,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3-flash-preview
 STORAGE_BACKEND=gcs
-GCS_BUCKET=chargerdoc-uploads-<PROJECT_ID>
+GCS_BUCKET=rexharge-uploads-rexharge-experiment
 GCS_UPLOAD_PREFIX=incidents
 ```
 
@@ -83,8 +93,8 @@ gcloud services enable storage.googleapis.com
 Create the upload bucket:
 
 ```cmd
-set PROJECT_ID=chargerdoc-experiment
-set BUCKET=chargerdoc-uploads-%PROJECT_ID%
+set PROJECT_ID=rexharge-experiment
+set BUCKET=rexharge-uploads-%PROJECT_ID%
 
 gcloud storage buckets create gs://%BUCKET% ^
   --location=US-CENTRAL1 ^
@@ -110,7 +120,7 @@ gcloud storage buckets add-iam-policy-binding gs://%BUCKET% ^
 Run from the repo root:
 
 ```cmd
-gcloud run deploy chargerdoc-backend ^
+gcloud run deploy rexharge-backend ^
   --source . ^
   --region us-central1 ^
   --allow-unauthenticated ^
@@ -126,7 +136,7 @@ If the service already has environment variables configured, this redeploy keeps
 Get the service URL:
 
 ```cmd
-gcloud run services describe chargerdoc-backend --region us-central1 --format="value(status.url)"
+gcloud run services describe rexharge-backend --region us-central1 --format="value(status.url)"
 ```
 
 Health check:
@@ -149,7 +159,7 @@ Expected fields:
 Read backend logs:
 
 ```cmd
-gcloud run services logs read chargerdoc-backend --region us-central1 --limit 100
+gcloud run services logs read rexharge-backend --region us-central1 --limit 100
 ```
 
 ## Vercel Frontend

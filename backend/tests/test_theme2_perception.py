@@ -400,8 +400,85 @@ def test_red_trip_window_heuristic_overrides_phase_after_secondary_miss():
             "rccb_poles": "2P",
             "rccb_type": "Type A",
             "evdb_spec_status": "correct",
-            "raw_visible_text": ["MCB C40 2P", "ON"],
+            "raw_visible_text": ["MCB C40 2P", "O-OFF marker visible near red status window"],
             "bounding_boxes": [{"id": "mcb", "label": "MCB", "x": 18, "y": 18, "width": 55, "height": 52}],
+        }
+    )
+    secondary_response = MagicMock()
+    secondary_response.text = json.dumps(
+        {
+            "evdb_visible": True,
+            "mcb_or_rccb_tripped": False,
+            "trip_observation": "unknown",
+            "trip_evidence": [],
+            "confidence_score": 0.9,
+            "uncertainty_notes": [],
+            "raw_visible_text": ["O-OFF marker visible near red status window"],
+            "bounding_boxes": [],
+        }
+    )
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [primary_response, secondary_response]
+
+    incident = IncidentInput(
+        site_id="site-mall-01",
+        photo_evidence=StoredPhotoEvidence(
+            filename=image_path.name,
+            media_type="image/jpeg",
+            storage_path=str(image_path),
+            byte_size=image_path.stat().st_size,
+        ),
+        photo_hint="Photo uploaded for EV charger troubleshooting.",
+    )
+
+    with patch("app.services.theme2_perception.get_gemini_client", return_value=mock_client), patch.dict(
+        sys.modules, _fake_genai_modules()
+    ):
+        result = assess_theme2_perception(incident)
+
+    assert result.extraction.input_component == "evdb"
+    assert result.extraction.observation_result == "mcb_tripped"
+    assert result.extraction.bounding_boxes[0].id == "evdb-red-trip-window"
+    assert "EVDB_RED_WINDOW_HEURISTIC: detected" in (result.raw_provider_output or "")
+
+
+def test_red_label_pixels_do_not_override_phase_without_trip_text():
+    from PIL import Image, ImageDraw
+
+    TEST_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    image_path = TEST_UPLOAD_ROOT / "theme2-red-label-not-trip.jpg"
+    image = Image.new("RGB", (240, 180), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((45, 35, 170, 125), outline="black", width=2)
+    draw.rectangle((80, 52, 140, 60), fill=(190, 42, 40))
+    image.save(image_path)
+
+    primary_response = MagicMock()
+    primary_response.text = json.dumps(
+        {
+            "evidence_type": "hardware_photo",
+            "scene_summary": "Three-phase EVDB labels are readable and handles show ON.",
+            "components_visible": ["evdb", "mcb", "rccb"],
+            "visible_abnormalities": [],
+            "ocr_findings": ["MCB C40 4P", "RCCB Type A 4P", "ON"],
+            "hazard_signals": [],
+            "uncertainty_notes": [],
+            "confidence_score": 0.95,
+            "input_component": "evdb",
+            "observation_result": "evdb_three_phase",
+            "evdb_phase_type": "three_phase",
+            "mcb_visible": True,
+            "rccb_visible": True,
+            "mcb_rating": "C40 4P",
+            "rccb_rating": "40A Type A 4P",
+            "mcb_current_amp": 40,
+            "rccb_current_amp": 40,
+            "mcb_poles": "4P",
+            "rccb_poles": "4P",
+            "rccb_type": "Type A",
+            "evdb_spec_status": "correct",
+            "raw_visible_text": ["MCB C40 4P", "RCCB Type A 4P", "ON"],
+            "bounding_boxes": [{"id": "evdb", "label": "EVDB", "x": 18, "y": 18, "width": 55, "height": 52}],
         }
     )
     secondary_response = MagicMock()
@@ -437,9 +514,8 @@ def test_red_trip_window_heuristic_overrides_phase_after_secondary_miss():
         result = assess_theme2_perception(incident)
 
     assert result.extraction.input_component == "evdb"
-    assert result.extraction.observation_result == "mcb_tripped"
-    assert result.extraction.bounding_boxes[0].id == "evdb-red-trip-window"
-    assert "EVDB_RED_WINDOW_HEURISTIC: detected" in (result.raw_provider_output or "")
+    assert result.extraction.observation_result == "evdb_three_phase"
+    assert "EVDB_RED_WINDOW_HEURISTIC: detected" not in (result.raw_provider_output or "")
 
 
 def test_gemini_perception_merges_ev_app_screenshot_text():

@@ -114,14 +114,13 @@ def _phase_for_evdb(theme2: Theme2VisualExtraction) -> str:
 
 
 def _evdb_spec_review(theme2: Theme2VisualExtraction) -> tuple[str, list[str]]:
+    # EVDB review is evidence-first: missing protection wins, then concrete readable
+    # mismatches, then incomplete proof. Do not route to after-sales on a bare VLM
+    # "wrong" flag unless the extracted fields show Type AC, wrong amps, or wrong poles.
     if theme2.input_component != "evdb":
         return "unknown", []
     if theme2.mcb_visible is False or theme2.rccb_visible is False or theme2.evdb_spec_status == "missing":
         return "missing", ["MCB or RCCB is not visible/present."]
-    if theme2.evdb_spec_status == "wrong":
-        return "wrong", ["EVDB spec status was read as wrong."]
-    if theme2.rccb_type == "type_ac":
-        return "wrong", ["RCCB was read as Type AC; Theme 2 requires Type A."]
 
     phase = _phase_for_evdb(theme2)
     if phase == "unknown":
@@ -139,12 +138,17 @@ def _evdb_spec_review(theme2: Theme2VisualExtraction) -> tuple[str, list[str]]:
         reasons.append(f"MCB current was read as {mcb_amp}A; expected 40A.")
     if rccb_amp is not None and rccb_amp != expected_amp:
         reasons.append(f"RCCB current was read as {rccb_amp}A; expected 40A.")
+    if theme2.rccb_type == "type_ac":
+        reasons.append("RCCB was read as Type AC; Theme 2 requires Type A.")
     if mcb_poles != "unknown" and mcb_poles != expected_pole:
         reasons.append(f"MCB pole count was read as {mcb_poles}; expected {expected_pole}.")
     if rccb_poles != "unknown" and rccb_poles != expected_pole:
         reasons.append(f"RCCB pole count was read as {rccb_poles}; expected {expected_pole}.")
     if reasons:
         return "wrong", reasons
+
+    if theme2.evdb_spec_status == "wrong":
+        return "incomplete", ["EVDB was flagged as wrong, but readable mismatch fields were incomplete."]
 
     missing_fields: list[str] = []
     if mcb_amp is None:

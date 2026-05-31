@@ -99,6 +99,16 @@ py scripts\check_round2_eval_coverage.py
 
 The coverage checker reports missing recommended coverage, including EVDB single phase, EVDB three phase, missing/wrong specs, isolator ON/OFF, blinking-red follow-up cases, and exact charger OCR ground truth.
 
+Current committed baseline status:
+
+- 21 total eval cases.
+- Charger image/text-follow-up coverage is usable for regression checks.
+- EVDB coverage is still thin: three-phase and one MCB-tripped case exist, but reviewed single-phase, missing MCB/RCCB, and wrong-spec image cases are still missing.
+- Isolator image cases are still missing from the clean eval pack.
+- Exact serial/brand OCR ground-truth cases are still missing because those values require human transcription.
+
+These gaps are intentionally left as warnings instead of fabricated labels. Promote cases only after `manual_review_cases.json` has reviewer-filled final labels.
+
 Use strict mode only when the eval pack is expected to satisfy those recommendations:
 
 ```powershell

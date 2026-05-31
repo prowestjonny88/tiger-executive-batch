@@ -604,6 +604,51 @@ def _perception_provider_text(perception: Theme2PerceptionAssessment) -> str:
     return " ".join(value for value in values if value).lower()
 
 
+def _apply_theme2_observation_priority(
+    *,
+    input_component: str,
+    observation_result: str,
+    indicator_status: str,
+    isolator_state: str,
+    provider_text: str,
+    uncertainty_notes: list[str],
+) -> tuple[str, str, str, list[str]]:
+    """Keep cross-component Theme 2 observations stable when several objects are visible.
+
+    Priority is intentionally explicit: EVDB tripped cues beat EVDB phase/spec reference,
+    charger red/blinking faults beat incidental isolator visibility, charger no-light plus
+    isolator OFF remains a power-cut case, and powered charger evidence makes apparent
+    isolator OFF ambiguous rather than a forced power-cut result.
+    """
+    charger_indicator_fault = _provider_charger_indicator_fault(provider_text, indicator_status, observation_result)
+    if _provider_has_evdb_tripped_signal(provider_text, input_component):
+        input_component = "evdb"
+        observation_result = "mcb_tripped"
+    if charger_indicator_fault is not None:
+        input_component = "charger"
+        observation_result = charger_indicator_fault
+    elif _provider_has_powered_charger_signal(provider_text) and _provider_has_isolator_off_signal(provider_text, isolator_state):
+        input_component = "charger"
+        observation_result = "unknown"
+        isolator_state = "unknown"
+        uncertainty_notes = _dedupe(
+            [
+                *uncertainty_notes,
+                "Charger appears powered while isolator appears OFF; request clearer switch-state proof instead of forcing power-cut.",
+            ],
+            limit=5,
+        )
+    elif _provider_has_isolator_off_signal(provider_text, isolator_state):
+        input_component = "isolator"
+        observation_result = "isolator_off_open_circuit"
+        isolator_state = "off"
+    elif observation_result == "unknown" and _provider_has_isolator_on_signal(provider_text, isolator_state):
+        input_component = "isolator"
+        observation_result = "isolator_on"
+        isolator_state = "on"
+    return input_component, observation_result, isolator_state, uncertainty_notes
+
+
 def _red_trip_window_box_from_image(
     evidence: StoredPhotoEvidence,
     search_boxes: list[Theme2BoundingBox],
@@ -704,6 +749,24 @@ def _red_trip_window_box_from_image(
         height=max(1.0, min(100.0, (bottom - top) / image_height * 100.0)),
         source="heuristic",
     )
+
+
+def _text_supports_evdb_trip_window(*values: list[str]) -> bool:
+    text = " ".join(item for value in values for item in value).lower()
+    if not text:
+        return False
+    trip_terms = [
+        "trip",
+        "tripped",
+        "off",
+        "down",
+        "o-off",
+        "o off",
+        "red trip",
+        "red status",
+        "fault window",
+    ]
+    return any(term in text for term in trip_terms)
 
 
 def _fallback_bounding_boxes(input_component: str, observation: str, *, has_photo: bool) -> list[Theme2BoundingBox]:
@@ -861,33 +924,15 @@ def _theme2_from_data(data: dict[str, object], default_confidence: float) -> The
     indicator_status = _normalize_indicator_status(theme_data.get("indicator_status"))
     isolator_state = _normalize_isolator_state(theme_data.get("isolator_state"))
     provider_text = _provider_text_for_component_override(theme_data, raw_visible_text)
-    charger_indicator_fault = _provider_charger_indicator_fault(provider_text, indicator_status, observation_result)
     uncertainty_notes = _normalize_list(theme_data.get("theme2_uncertainty_notes")) or _normalize_list(theme_data.get("uncertainty_notes"))
-    if _provider_has_evdb_tripped_signal(provider_text, input_component):
-        input_component = "evdb"
-        observation_result = "mcb_tripped"
-    if charger_indicator_fault is not None:
-        input_component = "charger"
-        observation_result = charger_indicator_fault
-    elif _provider_has_powered_charger_signal(provider_text) and _provider_has_isolator_off_signal(provider_text, isolator_state):
-        input_component = "charger"
-        observation_result = "unknown"
-        isolator_state = "unknown"
-        uncertainty_notes = _dedupe(
-            [
-                *uncertainty_notes,
-                "Charger appears powered while isolator appears OFF; request clearer switch-state proof instead of forcing power-cut.",
-            ],
-            limit=5,
-        )
-    elif _provider_has_isolator_off_signal(provider_text, isolator_state):
-        input_component = "isolator"
-        observation_result = "isolator_off_open_circuit"
-        isolator_state = "off"
-    elif observation_result == "unknown" and _provider_has_isolator_on_signal(provider_text, isolator_state):
-        input_component = "isolator"
-        observation_result = "isolator_on"
-        isolator_state = "on"
+    input_component, observation_result, isolator_state, uncertainty_notes = _apply_theme2_observation_priority(
+        input_component=input_component,
+        observation_result=observation_result,
+        indicator_status=indicator_status,
+        isolator_state=isolator_state,
+        provider_text=provider_text,
+        uncertainty_notes=uncertainty_notes,
+    )
     return Theme2VisualExtraction(
         input_component=input_component,  # type: ignore[arg-type]
         observation_result=observation_result,  # type: ignore[arg-type]
@@ -1394,7 +1439,8 @@ def _merge_evdb_trip_secondary_check(
         )
 
     red_trip_window = _red_trip_window_box_from_image(incident.photo_evidence, perception.extraction.bounding_boxes) if incident.photo_evidence else None
-    if evdb_visible and red_trip_window is not None:
+    trip_text_supported = _text_supports_evdb_trip_window(raw_visible_text, trip_evidence, perception.visible_abnormalities)
+    if evdb_visible and red_trip_window is not None and trip_text_supported:
         extraction = perception.extraction.model_copy(
             update={
                 "input_component": "evdb",
