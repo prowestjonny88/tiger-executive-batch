@@ -1,6 +1,6 @@
 # ChargerDoc Theme 2 Triage
 
-ChargerDoc Theme 2 Triage is an EV charger troubleshooting prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, and routes the result either to the customer or to `AS_TEAM_01`.
+ChargerDoc Theme 2 Triage is an EV charger troubleshooting and support-ticket prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, routes the result either to the customer or to `AS_TEAM_01`, and can generate trackable customer support tickets for after-sales handling.
 
 The current product is Theme 2 only. Round 1 known-case retrieval, pgvector, KB gates, `issue_family`, and `resolver_tier` are archived under `_archive/round1/` and are not part of the live runtime.
 
@@ -13,7 +13,7 @@ Browser
   -> FastAPI backend on Cloud Run or local Uvicorn
   -> Gemini VLM for image/app-screenshot perception
   -> deterministic Theme 2 rule mapper
-  -> Neon/local Postgres for incidents and triage_audits
+  -> Neon/local Postgres for incidents, triage_audits, tickets, events, and feedback
   -> Google Cloud Storage or local disk for uploaded evidence
 ```
 
@@ -29,6 +29,18 @@ upload/demo input
 -> audit/history
 ```
 
+Ticketing path:
+
+```text
+/login role selection
+-> /customer/new-ticket customer and charger context
+-> existing Theme 2 upload/triage
+-> support ticket RXT-YYYYMMDD-XXXX
+-> /customer/tickets/[ticketId] tracker
+-> /staff/dashboard queue
+-> status updates, assisted scheduling, WhatsApp-style simulation, feedback
+```
+
 ## Current Features
 
 - Charger, EVDB, and isolator evidence classification.
@@ -37,6 +49,11 @@ upload/demo input
 - Conservative fallback behavior when Gemini is unavailable.
 - Organizer outputs: `input_component`, `observation_result`, `fault_type_v2`, `recipient_type`, optional `assigned_team_id`, action message, confidence, proof prompts, and evidence notes.
 - Component-specific result display: charger identity, EVDB MCB/RCCB evidence, or isolator switch state.
+- Role-based demo portal at `/login`.
+- Customer ticket submission, tracker, appointment display, WhatsApp-style simulated updates, and feedback after resolution.
+- Staff ticket queue, filtering, ticket detail, status controls, internal activity timeline, scheduling, and WhatsApp preview.
+- Support ticket persistence with `tickets`, `ticket_events`, and `ticket_feedback` tables.
+- Bounding boxes are rendered against the actual object-contained image rectangle for better alignment across aspect ratios.
 - Dataset manifest, evaluation, pseudo-label, quarantine, video-frame, and unseen-image utility scripts.
 
 ## Repository Layout
@@ -111,10 +128,22 @@ npm.cmd install
 Open:
 
 - `http://localhost:3000/`
+- `http://localhost:3000/login`
 - `http://localhost:3000/upload`
 - `http://localhost:3000/history`
 
 ## Web Interface Test Flow
+
+Ticket flow:
+
+1. Open `/login`.
+2. Continue as Customer.
+3. Create a ticket from `/customer/new-ticket`.
+4. Confirm `/customer/tickets/[ticketId]` shows status, next action, evidence, timeline, and WhatsApp-style update.
+5. Open `/staff/dashboard`, filter the queue, and open the ticket.
+6. Update status or schedule a visit and confirm the customer tracker reflects it.
+
+Classic triage flow:
 
 1. Open `/upload`.
 2. Upload a charger, EVDB, or isolator image.

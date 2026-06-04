@@ -31,6 +31,22 @@ FaultTypeV2 = Literal[
     "unknown",
 ]
 RecipientType = Literal["customer", "after_sales_team", "none", "unknown"]
+TicketPriority = Literal["Critical", "High", "Medium", "Low"]
+TicketStatus = Literal[
+    "submitted",
+    "triaged",
+    "waiting_customer",
+    "assigned",
+    "scheduled",
+    "reschedule_requested",
+    "in_progress",
+    "resolved",
+    "closed",
+    "cancelled",
+    "reopened",
+]
+ScheduleStatus = Literal["not_required", "pending", "scheduled", "reschedule_requested", "completed"]
+ActorRole = Literal["customer", "staff", "system"]
 
 
 class PhotoEvidence(BaseModel):
@@ -193,3 +209,94 @@ class DemoScenario(BaseModel):
     expected_observation_result: ObservationResultV2
     expected_fault_type_v2: FaultTypeV2
     expected_recipient_type: RecipientType
+
+
+class CustomerProfile(BaseModel):
+    full_name: str
+    phone_number: str
+    whatsapp_number: str
+    email: str
+    preferred_contact_method: Literal["whatsapp", "phone", "email"] = "whatsapp"
+
+
+class ChargerContext(BaseModel):
+    installation_address: str
+    customer_type: Literal["home", "condo", "commercial", "public_site", "unknown"] = "unknown"
+    installed_by: Literal["rexharge", "third_party", "property_management", "unknown"] = "unknown"
+    installer_name: Optional[str] = None
+    charger_serial_number: Optional[str] = None
+    charger_brand_model: Optional[str] = None
+    symptom_text: Optional[str] = None
+    error_code: Optional[str] = None
+
+
+class TicketFromTriageRequest(BaseModel):
+    incident_id: Optional[int] = None
+    triage_result: Dict[str, Any]
+    customer_profile: CustomerProfile
+    charger_context: ChargerContext
+    customer_comments: Optional[str] = None
+
+
+class TicketStatusUpdateRequest(BaseModel):
+    status: TicketStatus
+    actor_role: ActorRole = "staff"
+    actor_name: Optional[str] = "Demo Staff"
+    note: Optional[str] = None
+
+
+class TicketEventCreateRequest(BaseModel):
+    event_type: str
+    actor_role: ActorRole = "staff"
+    actor_name: Optional[str] = "Demo Staff"
+    message: str
+    payload_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class TicketScheduleRequest(BaseModel):
+    scheduled_at: str
+    scheduled_window: str
+    assigned_technician: str
+    actor_name: Optional[str] = "Demo Staff"
+
+
+class TicketFeedbackRequest(BaseModel):
+    issue_resolved: Literal["yes", "partially", "no"]
+    support_rating: int = Field(ge=1, le=5)
+    ai_guidance_helpful: Literal["yes", "somewhat", "no"]
+    technician_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    comment: Optional[str] = None
+
+
+class TicketRecord(BaseModel):
+    id: int
+    ticket_id: str
+    incident_id: Optional[int] = None
+    customer_profile: Dict[str, Any]
+    charger_context: Dict[str, Any]
+    input_component: InputComponent
+    observation_result: ObservationResultV2
+    fault_type_v2: FaultTypeV2
+    recipient_type: RecipientType
+    assigned_team_id: Optional[str] = None
+    priority: TicketPriority
+    status: TicketStatus
+    ai_summary: str
+    customer_comments: Optional[str] = None
+    required_proof_next: Optional[str] = None
+    evidence_photos: List[Dict[str, Any]] = Field(default_factory=list)
+    triage_result: Dict[str, Any] = Field(default_factory=dict)
+    scheduled_at: Optional[str] = None
+    scheduled_window: Optional[str] = None
+    assigned_technician: Optional[str] = None
+    technician_notes: Optional[str] = None
+    schedule_status: ScheduleStatus = "not_required"
+    customer_confirmed_schedule: bool = False
+    created_at: Any
+    updated_at: Any
+    events: List[Dict[str, Any]] = Field(default_factory=list)
+    feedback: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class TicketListResponse(BaseModel):
+    tickets: List[TicketRecord]

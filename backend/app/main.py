@@ -10,13 +10,33 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
-from app.core.models import IncidentInput, UploadedPhotoPayload
+from app.core.models import (
+    IncidentInput,
+    TicketEventCreateRequest,
+    TicketFeedbackRequest,
+    TicketFromTriageRequest,
+    TicketScheduleRequest,
+    TicketStatusUpdateRequest,
+    UploadedPhotoPayload,
+)
 from app.db.persistence import init_db, save_audit, save_incident, update_incident
 from app.services.history import get_incident_history_by_id, list_incident_history
 from app.services.intake import assess_image_quality, build_follow_up_questions, store_uploaded_photo
 from app.services.storage import get_upload_root, read_evidence_object
 from app.services.theme2_rules import load_theme2_rules
 from app.services.theme2_triage import run_theme2_triage_with_debug
+from app.services.tickets import (
+    DEMO_TECHNICIANS,
+    add_ticket_event,
+    create_ticket_from_triage,
+    generate_whatsapp_preview,
+    get_ticket_by_ticket_id,
+    list_tickets,
+    schedule_ticket_visit,
+    submit_ticket_feedback,
+    suggested_slots,
+    update_ticket_status,
+)
 
 app = FastAPI(title="ChargerDoc Theme 2 API", version="0.2.0")
 app.mount("/uploads", StaticFiles(directory=get_upload_root(), check_dir=False), name="uploads")
@@ -121,6 +141,108 @@ def get_incident(incident_id: int):
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@app.post("/api/v1/tickets/from-triage")
+def create_ticket(payload: TicketFromTriageRequest):
+    ticket = create_ticket_from_triage(payload)
+    return {
+        "ticket_id": ticket["ticket_id"],
+        "status": ticket["status"],
+        "priority": ticket["priority"],
+        "ticket": ticket,
+    }
+
+
+@app.get("/api/v1/tickets")
+def tickets(
+    priority: str | None = None,
+    status: str | None = None,
+    fault_type: str | None = None,
+    component: str | None = None,
+    recipient_type: str | None = None,
+    installation_source: str | None = None,
+    assigned_technician: str | None = None,
+    customer_type: str | None = None,
+    date_submitted: str | None = None,
+):
+    return {
+        "tickets": list_tickets(
+            {
+                "priority": priority,
+                "status": status,
+                "fault_type": fault_type,
+                "component": component,
+                "recipient_type": recipient_type,
+                "installation_source": installation_source,
+                "assigned_technician": assigned_technician,
+                "customer_type": customer_type,
+                "date_submitted": date_submitted,
+            }
+        )
+    }
+
+
+@app.get("/api/v1/tickets/{ticket_id}")
+def get_ticket(ticket_id: str):
+    ticket = get_ticket_by_ticket_id(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+
+@app.patch("/api/v1/tickets/{ticket_id}/status")
+def patch_ticket_status(ticket_id: str, payload: TicketStatusUpdateRequest):
+    ticket = update_ticket_status(ticket_id, payload)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+
+@app.post("/api/v1/tickets/{ticket_id}/events")
+def create_ticket_event(ticket_id: str, payload: TicketEventCreateRequest):
+    if not get_ticket_by_ticket_id(ticket_id):
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return add_ticket_event(
+        ticket_id,
+        payload.event_type,
+        payload.actor_role,
+        payload.message,
+        payload.actor_name,
+        payload.payload_json,
+    )
+
+
+@app.post("/api/v1/tickets/{ticket_id}/schedule")
+def schedule_ticket(ticket_id: str, payload: TicketScheduleRequest):
+    ticket = schedule_ticket_visit(ticket_id, payload)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+
+@app.post("/api/v1/tickets/{ticket_id}/feedback")
+def create_ticket_feedback(ticket_id: str, payload: TicketFeedbackRequest):
+    ticket = submit_ticket_feedback(ticket_id, payload)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
+
+
+@app.get("/api/v1/tickets/{ticket_id}/whatsapp-preview")
+def ticket_whatsapp_preview(ticket_id: str):
+    ticket = get_ticket_by_ticket_id(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return generate_whatsapp_preview(ticket)
+
+
+@app.get("/api/v1/tickets/{ticket_id}/schedule-suggestions")
+def ticket_schedule_suggestions(ticket_id: str):
+    ticket = get_ticket_by_ticket_id(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"technicians": DEMO_TECHNICIANS, "slots": suggested_slots(ticket["priority"])}
 
 
 @app.post("/api/v1/uploads")

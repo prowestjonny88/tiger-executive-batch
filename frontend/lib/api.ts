@@ -209,6 +209,113 @@ export type IncidentHistoryDetailItem = IncidentHistoryItem & {
   triage_payload?: ApiTriageResponse;
 };
 
+export type CustomerProfile = {
+  full_name: string;
+  phone_number: string;
+  whatsapp_number: string;
+  email: string;
+  preferred_contact_method: "whatsapp" | "phone" | "email";
+};
+
+export type ChargerContext = {
+  installation_address: string;
+  customer_type: "home" | "condo" | "commercial" | "public_site" | "unknown";
+  installed_by: "rexharge" | "third_party" | "property_management" | "unknown";
+  installer_name?: string | null;
+  charger_serial_number?: string | null;
+  charger_brand_model?: string | null;
+  symptom_text?: string | null;
+  error_code?: string | null;
+};
+
+export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
+export type TicketStatus =
+  | "submitted"
+  | "triaged"
+  | "waiting_customer"
+  | "assigned"
+  | "scheduled"
+  | "reschedule_requested"
+  | "in_progress"
+  | "resolved"
+  | "closed"
+  | "cancelled"
+  | "reopened";
+
+export type TicketEvent = {
+  id: number;
+  ticket_id: string;
+  event_type: string;
+  actor_role: "customer" | "staff" | "system";
+  actor_name?: string | null;
+  message: string;
+  payload_json?: Record<string, unknown>;
+  created_at: string;
+};
+
+export type TicketFeedback = {
+  id: number;
+  ticket_id: string;
+  issue_resolved: "yes" | "partially" | "no";
+  support_rating: number;
+  ai_guidance_helpful: "yes" | "somewhat" | "no";
+  technician_rating?: number | null;
+  comment?: string | null;
+  created_at: string;
+};
+
+export type TicketRecord = {
+  id: number;
+  ticket_id: string;
+  incident_id?: number | null;
+  customer_profile: CustomerProfile;
+  charger_context: ChargerContext;
+  input_component: InputComponent;
+  observation_result: ObservationResultV2;
+  fault_type_v2: FaultTypeV2;
+  recipient_type: RecipientType;
+  assigned_team_id?: string | null;
+  priority: TicketPriority;
+  status: TicketStatus;
+  ai_summary: string;
+  customer_comments?: string | null;
+  required_proof_next?: string | null;
+  evidence_photos: UploadedPhotoEvidence[];
+  triage_result?: ApiTriageResponse;
+  scheduled_at?: string | null;
+  scheduled_window?: string | null;
+  assigned_technician?: string | null;
+  technician_notes?: string | null;
+  schedule_status: "not_required" | "pending" | "scheduled" | "reschedule_requested" | "completed";
+  customer_confirmed_schedule: boolean;
+  created_at: string;
+  updated_at: string;
+  events: TicketEvent[];
+  feedback: TicketFeedback[];
+};
+
+export type TicketListResponse = {
+  tickets: TicketRecord[];
+};
+
+export type CreateTicketResponse = {
+  ticket_id: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  ticket: TicketRecord;
+};
+
+export type WhatsAppPreview = {
+  label: string;
+  message: string;
+  wa_url?: string | null;
+};
+
+export type ScheduleSuggestions = {
+  technicians: Array<{ id: string; name: string; skills: string[]; area: string }>;
+  slots: Array<{ scheduled_at: string; scheduled_window: string }>;
+};
+
 const backendAssetBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "";
 
 export function resolveEvidenceUrl(evidenceOrPath?: UploadedPhotoEvidence | string | null) {
@@ -249,6 +356,16 @@ async function postJson<T>(url: string, payload: object): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function patchJson<T>(url: string, payload: object): Promise<T> {
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return (await response.json()) as T;
+}
+
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
@@ -269,6 +386,75 @@ export async function fetchIncidents() {
 
 export async function fetchIncidentById(id: number) {
   return getJson<IncidentHistoryDetailItem>(`/api/incidents/${id}`);
+}
+
+export async function fetchTickets(filters: Record<string, string> = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return getJson<TicketListResponse>(`/api/tickets${query ? `?${query}` : ""}`);
+}
+
+export async function fetchTicket(ticketId: string) {
+  return getJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}`);
+}
+
+export async function createTicketFromTriage(payload: {
+  incident_id?: number;
+  triage_result: ApiTriageResponse;
+  customer_profile: CustomerProfile;
+  charger_context: ChargerContext;
+  customer_comments?: string;
+}) {
+  return postJson<CreateTicketResponse>("/api/tickets/from-triage", payload);
+}
+
+export async function updateTicketStatus(ticketId: string, payload: {
+  status: TicketStatus;
+  actor_role?: "customer" | "staff" | "system";
+  actor_name?: string;
+  note?: string;
+}) {
+  return patchJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/status`, payload);
+}
+
+export async function addTicketEvent(ticketId: string, payload: {
+  event_type: string;
+  actor_role?: "customer" | "staff" | "system";
+  actor_name?: string;
+  message: string;
+  payload_json?: Record<string, unknown>;
+}) {
+  return postJson<TicketEvent>(`/api/tickets/${encodeURIComponent(ticketId)}/events`, payload);
+}
+
+export async function scheduleTicket(ticketId: string, payload: {
+  scheduled_at: string;
+  scheduled_window: string;
+  assigned_technician: string;
+  actor_name?: string;
+}) {
+  return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/schedule`, payload);
+}
+
+export async function submitTicketFeedback(ticketId: string, payload: {
+  issue_resolved: "yes" | "partially" | "no";
+  support_rating: number;
+  ai_guidance_helpful: "yes" | "somewhat" | "no";
+  technician_rating?: number;
+  comment?: string;
+}) {
+  return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/feedback`, payload);
+}
+
+export async function fetchWhatsAppPreview(ticketId: string) {
+  return getJson<WhatsAppPreview>(`/api/tickets/${encodeURIComponent(ticketId)}/whatsapp-preview`);
+}
+
+export async function fetchScheduleSuggestions(ticketId: string) {
+  return getJson<ScheduleSuggestions>(`/api/tickets/${encodeURIComponent(ticketId)}/schedule-suggestions`);
 }
 
 export async function fetchPreview(payload: {

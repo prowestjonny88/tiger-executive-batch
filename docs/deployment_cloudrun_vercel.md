@@ -1,12 +1,13 @@
 # Cloud Run And Vercel Deployment Guide
 
-This guide deploys the current ChargerDoc Theme 2 app:
+This guide deploys the current ChargerDoc Theme 2 support app:
 
 - Frontend: Vercel
 - Backend: Google Cloud Run
 - Database: Neon Postgres
 - Upload storage: Google Cloud Storage
 - Vision model: Gemini
+- Support workflow: customer/staff ticketing layered on Theme 2 triage
 
 Raw Dataset 2 images are not deployed. Uploaded user evidence is stored in GCS.
 
@@ -28,7 +29,7 @@ Browser
   -> Next.js API proxy routes
   -> Cloud Run FastAPI backend
   -> Gemini API
-  -> Neon Postgres for incidents/audits
+  -> Neon Postgres for incidents, audits, support tickets, ticket events, and feedback
   -> Google Cloud Storage for uploaded photos and app screenshots
 ```
 
@@ -179,12 +180,13 @@ If only backend code changes and the Cloud Run URL stays the same, redeploy Clou
 
 ## Final Smoke Test
 
-1. Open the Vercel `/upload` page.
-2. Upload a charger red-light image.
-3. Confirm the result routes to after-sales team `AS_TEAM_01`.
-4. Add an EV app screenshot if prompted and confirm triage reruns.
-5. Upload an isolator OFF image and confirm customer power-cut guidance.
-6. Open `/history` and confirm Theme 2 columns render.
+1. Open the Vercel `/login` page.
+2. Continue as Customer and create a ticket from `/customer/new-ticket`.
+3. Confirm the customer tracker shows a `RXT-YYYYMMDD-XXXX` ticket ID, status, next action, evidence, timeline, and WhatsApp-style simulated update.
+4. Open `/staff/dashboard`, filter/open the ticket, update status, and schedule a demo visit.
+5. Confirm the customer tracker reflects the staff update.
+6. Open the classic `/upload` page and confirm the original Theme 2 result flow still works.
+7. Open `/history` and confirm Theme 2 columns render.
 
 ## Common Failures
 

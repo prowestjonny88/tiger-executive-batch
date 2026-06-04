@@ -66,6 +66,66 @@ def init_db() -> None:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tickets (
+                    id BIGSERIAL PRIMARY KEY,
+                    ticket_id TEXT UNIQUE NOT NULL,
+                    incident_id BIGINT REFERENCES incidents(id) ON DELETE SET NULL,
+                    customer_profile_json JSONB NOT NULL,
+                    charger_context_json JSONB NOT NULL,
+                    input_component TEXT NOT NULL,
+                    observation_result TEXT NOT NULL,
+                    fault_type_v2 TEXT NOT NULL,
+                    recipient_type TEXT NOT NULL,
+                    assigned_team_id TEXT,
+                    priority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    ai_summary TEXT NOT NULL,
+                    customer_comments TEXT,
+                    required_proof_next TEXT,
+                    evidence_photos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    triage_result_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    scheduled_at TIMESTAMPTZ,
+                    scheduled_window TEXT,
+                    assigned_technician TEXT,
+                    technician_notes TEXT,
+                    schedule_status TEXT NOT NULL DEFAULT 'not_required',
+                    customer_confirmed_schedule BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cur.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS triage_result_json JSONB NOT NULL DEFAULT '{}'::jsonb")
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    ticket_id TEXT NOT NULL REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+                    event_type TEXT NOT NULL,
+                    actor_role TEXT NOT NULL,
+                    actor_name TEXT,
+                    message TEXT NOT NULL,
+                    payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_feedback (
+                    id BIGSERIAL PRIMARY KEY,
+                    ticket_id TEXT NOT NULL REFERENCES tickets(ticket_id) ON DELETE CASCADE,
+                    issue_resolved TEXT NOT NULL,
+                    support_rating INTEGER NOT NULL,
+                    ai_guidance_helpful TEXT NOT NULL,
+                    technician_rating INTEGER,
+                    comment TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+                """
+            )
 
 
 def save_incident(incident: dict[str, Any]) -> int:
@@ -266,3 +326,313 @@ def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
     if row.get("latest_triage_payload_json"):
         result["triage_payload"] = row["latest_triage_payload_json"]
     return result
+
+
+def _extract_ticket_row(row: dict[str, Any]) -> dict[str, Any]:
+    ticket = dict(row)
+    ticket["customer_profile"] = ticket.pop("customer_profile_json", {}) or {}
+    ticket["charger_context"] = ticket.pop("charger_context_json", {}) or {}
+    ticket["evidence_photos"] = ticket.pop("evidence_photos_json", []) or []
+    ticket["triage_result"] = ticket.pop("triage_result_json", {}) or {}
+    return ticket
+
+
+def _ticket_events(ticket_id: str) -> list[dict[str, Any]]:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT id, ticket_id, event_type, actor_role, actor_name, message, payload_json, created_at
+                FROM ticket_events
+                WHERE ticket_id = %s
+                ORDER BY id ASC
+                """,
+                (ticket_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def _ticket_feedback(ticket_id: str) -> list[dict[str, Any]]:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT id, ticket_id, issue_resolved, support_rating, ai_guidance_helpful,
+                       technician_rating, comment, created_at
+                FROM ticket_feedback
+                WHERE ticket_id = %s
+                ORDER BY id ASC
+                """,
+                (ticket_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+
+def _attach_ticket_children(ticket: dict[str, Any]) -> dict[str, Any]:
+    ticket["events"] = _ticket_events(ticket["ticket_id"])
+    ticket["feedback"] = _ticket_feedback(ticket["ticket_id"])
+    return ticket
+
+
+def _next_ticket_id(cur: Any) -> str:
+    from app.services.tickets import generate_ticket_id
+
+    prefix = generate_ticket_id(sequence=0)[:13]
+    cur.execute("SELECT COUNT(*) AS count FROM tickets WHERE ticket_id LIKE %s", (f"{prefix}-%",))
+    row = cur.fetchone()
+    sequence = int(row["count"]) + 1
+    return generate_ticket_id(sequence=sequence)
+
+
+def create_ticket_record(values: dict[str, Any]) -> dict[str, Any]:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            ticket_id = _next_ticket_id(cur)
+            cur.execute(
+                """
+                INSERT INTO tickets (
+                    ticket_id,
+                    incident_id,
+                    customer_profile_json,
+                    charger_context_json,
+                    input_component,
+                    observation_result,
+                    fault_type_v2,
+                    recipient_type,
+                    assigned_team_id,
+                    priority,
+                    status,
+                    ai_summary,
+                    customer_comments,
+                    required_proof_next,
+                    evidence_photos_json,
+                    triage_result_json,
+                    schedule_status
+                )
+                VALUES (
+                    %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s
+                )
+                RETURNING *
+                """,
+                (
+                    ticket_id,
+                    values.get("incident_id"),
+                    json.dumps(values.get("customer_profile", {})),
+                    json.dumps(values.get("charger_context", {})),
+                    values.get("input_component"),
+                    values.get("observation_result"),
+                    values.get("fault_type_v2"),
+                    values.get("recipient_type"),
+                    values.get("assigned_team_id"),
+                    values.get("priority"),
+                    values.get("status"),
+                    values.get("ai_summary"),
+                    values.get("customer_comments"),
+                    values.get("required_proof_next"),
+                    json.dumps(values.get("evidence_photos", [])),
+                    json.dumps(values.get("triage_result", {})),
+                    values.get("schedule_status", "not_required"),
+                ),
+            )
+            ticket = _extract_ticket_row(cur.fetchone())
+            event_payloads = [
+                ("ticket_created", "system", "Support ticket created.", {}),
+                (
+                    "triage_completed",
+                    "system",
+                    f"AI triage completed: {ticket['observation_result']} -> {ticket['fault_type_v2']}.",
+                    {
+                        "observation_result": ticket["observation_result"],
+                        "fault_type_v2": ticket["fault_type_v2"],
+                        "recipient_type": ticket["recipient_type"],
+                    },
+                ),
+            ]
+            if ticket.get("required_proof_next"):
+                event_payloads.append(
+                    (
+                        "proof_requested",
+                        "system",
+                        str(ticket["required_proof_next"]),
+                        {"required_proof_next": ticket["required_proof_next"]},
+                    )
+                )
+            for event_type, actor_role, message, payload in event_payloads:
+                cur.execute(
+                    """
+                    INSERT INTO ticket_events (ticket_id, event_type, actor_role, message, payload_json)
+                    VALUES (%s, %s, %s, %s, %s::jsonb)
+                    """,
+                    (ticket_id, event_type, actor_role, message, json.dumps(payload)),
+                )
+    return _attach_ticket_children(ticket)
+
+
+def list_ticket_records(filters: dict[str, str | None] | None = None) -> list[dict[str, Any]]:
+    filters = filters or {}
+    clauses: list[str] = []
+    params: list[Any] = []
+    filter_map = {
+        "priority": "priority",
+        "status": "status",
+        "fault_type": "fault_type_v2",
+        "component": "input_component",
+        "recipient_type": "recipient_type",
+        "assigned_technician": "assigned_technician",
+        "installation_source": "charger_context_json ->> 'installed_by'",
+        "customer_type": "charger_context_json ->> 'customer_type'",
+    }
+    for key, column in filter_map.items():
+        value = filters.get(key)
+        if value:
+            clauses.append(f"{column} = %s")
+            params.append(value)
+    date_submitted = filters.get("date_submitted")
+    if date_submitted:
+        clauses.append("created_at::date = %s::date")
+        params.append(date_submitted)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                f"""
+                SELECT *
+                FROM tickets
+                {where_sql}
+                ORDER BY
+                    CASE priority
+                        WHEN 'Critical' THEN 1
+                        WHEN 'High' THEN 2
+                        WHEN 'Medium' THEN 3
+                        ELSE 4
+                    END,
+                    created_at DESC
+                LIMIT 100
+                """,
+                tuple(params),
+            )
+            rows = cur.fetchall()
+    return [_attach_ticket_children(_extract_ticket_row(row)) for row in rows]
+
+
+def get_ticket_record(ticket_id: str) -> dict[str, Any] | None:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM tickets WHERE ticket_id = %s", (ticket_id,))
+            row = cur.fetchone()
+    if not row:
+        return None
+    return _attach_ticket_children(_extract_ticket_row(row))
+
+
+def add_ticket_event_record(
+    ticket_id: str,
+    event_type: str,
+    actor_role: str,
+    actor_name: str | None,
+    message: str,
+    payload_json: dict[str, Any],
+) -> dict[str, Any]:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                INSERT INTO ticket_events (ticket_id, event_type, actor_role, actor_name, message, payload_json)
+                VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                RETURNING *
+                """,
+                (ticket_id, event_type, actor_role, actor_name, message, json.dumps(payload_json)),
+            )
+            row = cur.fetchone()
+    return dict(row)
+
+
+def update_ticket_status_record(ticket_id: str, status: str) -> dict[str, Any] | None:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE tickets
+                SET status = %s, updated_at = NOW()
+                WHERE ticket_id = %s
+                RETURNING *
+                """,
+                (status, ticket_id),
+            )
+            row = cur.fetchone()
+    return _extract_ticket_row(row) if row else None
+
+
+def update_ticket_priority_record(ticket_id: str, priority: str) -> dict[str, Any] | None:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE tickets
+                SET priority = %s, updated_at = NOW()
+                WHERE ticket_id = %s
+                RETURNING *
+                """,
+                (priority, ticket_id),
+            )
+            row = cur.fetchone()
+    return _extract_ticket_row(row) if row else None
+
+
+def schedule_ticket_record(
+    ticket_id: str,
+    scheduled_at: str,
+    scheduled_window: str,
+    assigned_technician: str,
+) -> dict[str, Any] | None:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE tickets
+                SET scheduled_at = %s::timestamptz,
+                    scheduled_window = %s,
+                    assigned_technician = %s,
+                    schedule_status = 'scheduled',
+                    status = 'scheduled',
+                    updated_at = NOW()
+                WHERE ticket_id = %s
+                RETURNING *
+                """,
+                (scheduled_at, scheduled_window, assigned_technician, ticket_id),
+            )
+            row = cur.fetchone()
+    return _extract_ticket_row(row) if row else None
+
+
+def save_ticket_feedback_record(ticket_id: str, feedback: dict[str, Any]) -> dict[str, Any] | None:
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (ticket_id,))
+            if not cur.fetchone():
+                return None
+            cur.execute(
+                """
+                INSERT INTO ticket_feedback (
+                    ticket_id,
+                    issue_resolved,
+                    support_rating,
+                    ai_guidance_helpful,
+                    technician_rating,
+                    comment
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING *
+                """,
+                (
+                    ticket_id,
+                    feedback.get("issue_resolved"),
+                    feedback.get("support_rating"),
+                    feedback.get("ai_guidance_helpful"),
+                    feedback.get("technician_rating"),
+                    feedback.get("comment"),
+                ),
+            )
+            row = cur.fetchone()
+    return dict(row) if row else None

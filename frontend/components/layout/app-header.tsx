@@ -20,12 +20,16 @@ export function AppHeader() {
     if (path === "/support") {
       return ["/upload", "/questions", "/result", "/guidance", "/escalation", "/confirmation"].includes(pathname);
     }
+    if (path === "/portal") {
+      return pathname.startsWith("/login") || pathname.startsWith("/customer") || pathname.startsWith("/staff");
+    }
     return pathname.startsWith(path);
   };
 
   const navLinks = [
     { name: "Home", href: "/", activeKey: "/" },
     { name: "New Report", href: "/upload", activeKey: "/support" },
+    { name: "Portal", href: "/login", activeKey: "/portal" },
     { name: "History", href: "/history", activeKey: "/history" },
     { name: "Safety", href: "/safety", activeKey: "/safety" },
   ];
@@ -66,10 +70,10 @@ export function AppHeader() {
 
         <div className="hidden md:block">
           <Link
-            href="/upload"
+            href="/login"
             className="bg-green-700 hover:bg-green-800 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm flex items-center gap-2"
           >
-            Check Photo
+            Start Report
           </Link>
         </div>
 
@@ -102,11 +106,11 @@ export function AppHeader() {
                 ))}
                 <div className="pt-6 border-t border-slate-100">
                   <Link
-                    href="/upload"
+                    href="/login"
                     onClick={() => setOpen(false)}
                     className="flex justify-center bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-sm w-full"
                   >
-                    Check Photo
+                    Start Report
                   </Link>
                 </div>
               </nav>

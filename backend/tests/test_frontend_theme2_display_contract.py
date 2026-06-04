@@ -75,6 +75,17 @@ def test_evidence_panel_accepts_theme2_object_annotations():
     assert "No visual boxes returned. The image was still used for VLM assessment." in source
 
 
+def test_annotated_image_uses_rendered_image_rectangle_for_boxes():
+    source = _read(FRONTEND_ROOT / "components" / "ui" / "annotated-image.tsx")
+
+    assert "ResizeObserver" in source
+    assert "naturalWidth" in source
+    assert "naturalHeight" in source
+    assert "renderedImageRect" in source
+    assert "(ann.x / 100) * renderedImageRect.width" in source
+    assert "(ann.y / 100) * renderedImageRect.height" in source
+
+
 def test_proof_required_card_uses_verification_language_and_evdb_filter():
     source = _read(FRONTEND_ROOT / "components" / "triage" / "proof-required-card.tsx")
 
@@ -92,6 +103,38 @@ def test_result_page_supports_optional_ev_app_screenshot_upload():
     assert "Add App Screenshot" in source
     assert "uploadIncidentPhoto" in source
     assert "fetchTriage" in source
+
+
+def test_ticket_routes_and_role_flows_exist():
+    expected_paths = [
+        FRONTEND_ROOT / "app" / "login" / "page.tsx",
+        FRONTEND_ROOT / "app" / "customer" / "dashboard" / "page.tsx",
+        FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx",
+        FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx",
+        FRONTEND_ROOT / "app" / "staff" / "dashboard" / "page.tsx",
+        FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx",
+        FRONTEND_ROOT / "app" / "api" / "tickets" / "route.ts",
+        FRONTEND_ROOT / "app" / "api" / "tickets" / "from-triage" / "route.ts",
+    ]
+
+    for path in expected_paths:
+        assert path.exists()
+
+    api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
+    assert "createTicketFromTriage" in api_source
+    assert "fetchTickets" in api_source
+    assert "updateTicketStatus" in api_source
+    assert "scheduleTicket" in api_source
+    assert "submitTicketFeedback" in api_source
+
+
+def test_customer_ticket_page_hides_debug_and_staff_only_fields():
+    source = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
+
+    assert "debug" not in source
+    assert "raw_provider_output" not in source
+    assert "Advanced Debug" not in source
+    assert "internal note" not in source.lower()
 
 
 def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():
