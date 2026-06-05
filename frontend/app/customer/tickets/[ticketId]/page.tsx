@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CalendarClock, MessageCircle, UploadCloud } from "lucide-react";
 
 import {
-  addTicketEvent,
+  addTicketEvidence,
   fetchTicket,
   fetchWhatsAppPreview,
   formatFaultTypeV2,
@@ -18,7 +18,9 @@ import {
   type TicketRecord,
   type WhatsAppPreview,
 } from "../../../../lib/api";
+import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { formatTicketStatus, nextActionForTicket, priorityClass, statusClass } from "../../../../lib/ticket-ui";
+import { buildWhatsAppThread } from "../../../../lib/whatsapp-thread";
 import { PageShell } from "../../../../components/layout/page-shell";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { UploadDropzone } from "../../../../components/triage/upload-dropzone";
@@ -28,6 +30,7 @@ import { Label } from "../../../../components/ui/label";
 import { Textarea } from "../../../../components/ui/textarea";
 
 export default function CustomerTicketDetailPage() {
+  useDemoRoleGuard("customer");
   const params = useParams<{ ticketId: string }>();
   const ticketId = params.ticketId;
   const [ticket, setTicket] = useState<TicketRecord | null>(null);
@@ -51,6 +54,7 @@ export default function CustomerTicketDetailPage() {
   };
 
   useEffect(refresh, [ticketId]);
+  const whatsAppThread = useMemo(() => (ticket ? buildWhatsAppThread(ticket) : []), [ticket]);
 
   if (!ticket) {
     return (
@@ -63,6 +67,7 @@ export default function CustomerTicketDetailPage() {
   }
 
   const evidenceUrl = resolveEvidenceUrl(ticket.evidence_photos[0]);
+  const annotations = ticket.triage_result?.perception?.extraction?.bounding_boxes ?? [];
   const customerEvents = ticket.events.filter((event) => event.event_type !== "staff_note_added");
 
   const submitFeedback = async () => {
@@ -85,13 +90,14 @@ export default function CustomerTicketDetailPage() {
     setProofStatus("uploading");
     try {
       const uploaded = await uploadIncidentPhoto(proofFile);
-      await addTicketEvent(ticket.ticket_id, {
-        event_type: "proof_uploaded",
+      const updated = await addTicketEvidence(ticket.ticket_id, {
+        evidence: uploaded,
+        evidence_type: "closeup",
         actor_role: "customer",
         actor_name: ticket.customer_profile.full_name,
         message: `Customer uploaded additional proof: ${uploaded.filename}.`,
-        payload_json: { evidence: uploaded },
       });
+      setTicket(updated);
       setProofFile(null);
       setProofStatus("done");
       refresh();
@@ -163,7 +169,7 @@ export default function CustomerTicketDetailPage() {
             </Card>
           )}
 
-          {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={[]} />}
+          {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={annotations} />}
 
           <Card id="ticket-timeline" className="app-card p-6">
             <h2 className="mb-4 text-xl font-extrabold text-slate-950">Ticket timeline</h2>
@@ -205,7 +211,27 @@ export default function CustomerTicketDetailPage() {
                 <MessageCircle className="h-5 w-5 text-green-700" />
                 <h2 className="text-xl font-extrabold text-slate-950">WhatsApp-style update</h2>
               </div>
-              <p className="mb-3 rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
+              <div className="mb-3 space-y-3">
+                {whatsAppThread.length > 0 ? (
+                  whatsAppThread.map((bubble) => (
+                    <div
+                      key={bubble.id}
+                      className={`rounded-xl p-3 text-sm font-semibold leading-6 ${
+                        bubble.align === "right"
+                          ? "ml-auto bg-green-700 text-white"
+                          : "mr-auto bg-green-50 text-green-950"
+                      }`}
+                    >
+                      <p>{bubble.message}</p>
+                      <p className={`mt-1 text-[11px] ${bubble.align === "right" ? "text-green-100" : "text-green-700"}`}>
+                        {new Date(bubble.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
+                )}
+              </div>
               <p className="text-xs font-bold text-slate-500">{whatsApp.label}</p>
               {whatsApp.wa_url && (
                 <Button asChild variant="outline" className="mt-4 w-full rounded-xl">

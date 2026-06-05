@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.core.models import ChargerContext, CustomerProfile, TicketFromTriageRequest, TicketStatusUpdateRequest
+from app.core.models import ChargerContext, CustomerProfile, TicketEvidenceRequest, TicketFromTriageRequest, TicketStatusUpdateRequest
 from app.services import tickets
 
 
@@ -139,6 +139,41 @@ def test_status_update_writes_timeline_event(monkeypatch):
     assert events[0]["payload_json"]["status"] == "scheduled"
 
 
+def test_attach_ticket_evidence_appends_proof_and_returns_ticket(monkeypatch):
+    captured = {}
+
+    def fake_append_ticket_evidence_record(**kwargs):
+        captured.update(kwargs)
+        return {
+            "ticket_id": kwargs["ticket_id"],
+            "status": "assigned",
+            "evidence_photos": [{"kind": kwargs["evidence_type"], **kwargs["evidence"]}],
+            "events": [{"event_type": "proof_uploaded"}],
+        }
+
+    monkeypatch.setattr("app.db.persistence.append_ticket_evidence_record", fake_append_ticket_evidence_record)
+
+    result = tickets.attach_ticket_evidence(
+        "RXT-20260604-0001",
+        TicketEvidenceRequest(
+            evidence={
+                "filename": "closeup.jpg",
+                "media_type": "image/jpeg",
+                "storage_path": "/uploads/closeup.jpg",
+                "byte_size": 123,
+            },
+            evidence_type="closeup",
+            actor_role="customer",
+            actor_name="Ng Hong Jon",
+        ),
+    )
+
+    assert result is not None
+    assert result["status"] == "assigned"
+    assert captured["evidence_type"] == "closeup"
+    assert captured["message"] == "Customer uploaded additional proof: closeup.jpg."
+
+
 def test_ticket_schema_and_routes_are_additive_source_contract():
     repo_root = Path(__file__).resolve().parents[2]
     persistence_source = (repo_root / "backend" / "app" / "db" / "persistence.py").read_text(encoding="utf-8")
@@ -147,8 +182,15 @@ def test_ticket_schema_and_routes_are_additive_source_contract():
     assert "CREATE TABLE IF NOT EXISTS tickets" in persistence_source
     assert "CREATE TABLE IF NOT EXISTS ticket_events" in persistence_source
     assert "CREATE TABLE IF NOT EXISTS ticket_feedback" in persistence_source
+    assert "app_screenshot_evidence_json" in persistence_source
+    assert "append_ticket_evidence_record" in persistence_source
+    assert "proof_uploaded" in persistence_source
+    assert "customer_profile_json ->> 'email'" in persistence_source
+    assert "customer_profile_json ->> 'phone_number'" in persistence_source
+    assert "customer_profile_json ->> 'whatsapp_number'" in persistence_source
     assert "/api/v1/triage" in main_source
     assert "/api/v1/tickets/from-triage" in main_source
+    assert "/api/v1/tickets/{ticket_id}/evidence" in main_source
     assert "/api/v1/tickets/{ticket_id}/status" in main_source
     assert "/api/v1/tickets/{ticket_id}/schedule" in main_source
     assert "/api/v1/tickets/{ticket_id}/feedback" in main_source

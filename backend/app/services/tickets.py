@@ -8,6 +8,7 @@ from app.core.models import (
     ChargerContext,
     CustomerProfile,
     TicketFeedbackRequest,
+    TicketEvidenceRequest,
     TicketFromTriageRequest,
     TicketPriority,
     TicketScheduleRequest,
@@ -171,6 +172,21 @@ def get_ticket_by_ticket_id(ticket_id: str) -> dict[str, Any] | None:
     from app.db.persistence import get_ticket_record
 
     return get_ticket_record(ticket_id)
+
+
+def attach_ticket_evidence(ticket_id: str, request: TicketEvidenceRequest) -> dict[str, Any] | None:
+    from app.db.persistence import append_ticket_evidence_record
+
+    filename = request.evidence.get("filename") or "uploaded evidence"
+    message = request.message or f"Customer uploaded additional proof: {filename}."
+    return append_ticket_evidence_record(
+        ticket_id=ticket_id,
+        evidence=request.evidence,
+        evidence_type=request.evidence_type,
+        actor_role=request.actor_role,
+        actor_name=request.actor_name,
+        message=message,
+    )
 
 
 def add_ticket_event(

@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import (
     IncidentInput,
+    TicketEvidenceRequest,
     TicketEventCreateRequest,
     TicketFeedbackRequest,
     TicketFromTriageRequest,
@@ -28,6 +29,7 @@ from app.services.theme2_triage import run_theme2_triage_with_debug
 from app.services.tickets import (
     DEMO_TECHNICIANS,
     add_ticket_event,
+    attach_ticket_evidence,
     create_ticket_from_triage,
     generate_whatsapp_preview,
     get_ticket_by_ticket_id,
@@ -164,6 +166,9 @@ def tickets(
     installation_source: str | None = None,
     assigned_technician: str | None = None,
     customer_type: str | None = None,
+    customer_email: str | None = None,
+    customer_phone: str | None = None,
+    whatsapp_number: str | None = None,
     date_submitted: str | None = None,
 ):
     return {
@@ -177,6 +182,9 @@ def tickets(
                 "installation_source": installation_source,
                 "assigned_technician": assigned_technician,
                 "customer_type": customer_type,
+                "customer_email": customer_email,
+                "customer_phone": customer_phone,
+                "whatsapp_number": whatsapp_number,
                 "date_submitted": date_submitted,
             }
         )
@@ -211,6 +219,14 @@ def create_ticket_event(ticket_id: str, payload: TicketEventCreateRequest):
         payload.actor_name,
         payload.payload_json,
     )
+
+
+@app.post("/api/v1/tickets/{ticket_id}/evidence")
+def create_ticket_evidence(ticket_id: str, payload: TicketEvidenceRequest):
+    ticket = attach_ticket_evidence(ticket_id, payload)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return ticket
 
 
 @app.post("/api/v1/tickets/{ticket_id}/schedule")

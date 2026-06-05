@@ -115,6 +115,7 @@ def test_ticket_routes_and_role_flows_exist():
         FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx",
         FRONTEND_ROOT / "app" / "api" / "tickets" / "route.ts",
         FRONTEND_ROOT / "app" / "api" / "tickets" / "from-triage" / "route.ts",
+        FRONTEND_ROOT / "app" / "api" / "tickets" / "[ticketId]" / "evidence" / "route.ts",
     ]
 
     for path in expected_paths:
@@ -126,6 +127,7 @@ def test_ticket_routes_and_role_flows_exist():
     assert "updateTicketStatus" in api_source
     assert "scheduleTicket" in api_source
     assert "submitTicketFeedback" in api_source
+    assert "addTicketEvidence" in api_source
 
 
 def test_customer_ticket_page_hides_debug_and_staff_only_fields():
@@ -135,6 +137,33 @@ def test_customer_ticket_page_hides_debug_and_staff_only_fields():
     assert "raw_provider_output" not in source
     assert "Advanced Debug" not in source
     assert "internal note" not in source.lower()
+
+
+def test_ticket_post_audit_frontend_contracts():
+    customer_dashboard = _read(FRONTEND_ROOT / "app" / "customer" / "dashboard" / "page.tsx")
+    new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
+    customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
+    staff_dashboard = _read(FRONTEND_ROOT / "app" / "staff" / "dashboard" / "page.tsx")
+    staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
+    role_helper = _read(FRONTEND_ROOT / "lib" / "demo-role.ts")
+    whatsapp_helper = _read(FRONTEND_ROOT / "lib" / "whatsapp-thread.ts")
+
+    assert "chargerdoc_customer_profile" in role_helper
+    assert 'useDemoRoleGuard("customer")' in customer_dashboard
+    assert 'useDemoRoleGuard("customer")' in new_ticket
+    assert 'useDemoRoleGuard("customer")' in customer_detail
+    assert 'useDemoRoleGuard("staff")' in staff_dashboard
+    assert 'useDemoRoleGuard("staff")' in staff_detail
+    assert "fetchTickets({ customer_email: profile.email })" in customer_dashboard
+    assert "saveDemoCustomerProfile(customer)" in new_ticket
+    assert "addTicketEvidence" in customer_detail
+    assert "ticket.triage_result?.perception?.extraction?.bounding_boxes ?? []" in customer_detail
+    assert "buildWhatsAppThread" in whatsapp_helper
+    assert "staff_note_added" in whatsapp_helper
+    assert "showScheduling" in staff_detail
+    assert "Open Scheduling" in staff_detail
+    assert "proof_uploaded" in staff_detail
+    assert "const visibleTickets" in staff_dashboard
 
 
 def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():

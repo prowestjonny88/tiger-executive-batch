@@ -1,6 +1,7 @@
 import { compressImageForUpload } from "./image-compress";
 
 export type UploadedPhotoEvidence = {
+  kind?: string;
   filename: string;
   media_type: string;
   storage_path: string;
@@ -253,6 +254,14 @@ export type TicketEvent = {
   created_at: string;
 };
 
+export type TicketEvidencePayload = {
+  evidence: UploadedPhotoEvidence;
+  evidence_type?: "hardware_photo" | "screenshot" | "app_screenshot" | "closeup" | "other";
+  actor_role?: "customer" | "staff" | "system";
+  actor_name?: string;
+  message?: string;
+};
+
 export type TicketFeedback = {
   id: number;
   ticket_id: string;
@@ -430,6 +439,10 @@ export async function addTicketEvent(ticketId: string, payload: {
   return postJson<TicketEvent>(`/api/tickets/${encodeURIComponent(ticketId)}/events`, payload);
 }
 
+export async function addTicketEvidence(ticketId: string, payload: TicketEvidencePayload) {
+  return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/evidence`, payload);
+}
+
 export async function scheduleTicket(ticketId: string, payload: {
   scheduled_at: string;
   scheduled_window: string;
@@ -574,5 +587,23 @@ export function formatRecipientType(value?: string | null) {
       return "No Routing Required";
     default:
       return "Unknown";
+  }
+}
+
+export function formatInstallationSource(value?: string | null) {
+  switch (value) {
+    case "rexharge":
+      return "ChargerDoc";
+    case "third_party":
+      return "Third party";
+    case "property_management":
+      return "Property management";
+    case "unknown":
+    case "":
+    case undefined:
+    case null:
+      return "Unknown";
+    default:
+      return titleize(value);
   }
 }

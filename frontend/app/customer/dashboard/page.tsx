@@ -9,18 +9,29 @@ import {
   formatFaultTypeV2,
   formatObservationResult,
   type TicketRecord,
+  type CustomerProfile,
 } from "../../../lib/api";
+import { loadDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { formatTicketStatus, nextActionForTicket, statusClass } from "../../../lib/ticket-ui";
 import { PageShell } from "../../../components/layout/page-shell";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
 
 export default function CustomerDashboardPage() {
+  useDemoRoleGuard("customer");
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
   const [error, setError] = useState("");
+  const [hasProfile, setHasProfile] = useState(true);
 
   useEffect(() => {
-    fetchTickets()
+    const profile = loadDemoCustomerProfile<CustomerProfile>();
+    if (!profile?.email) {
+      setHasProfile(false);
+      setTickets([]);
+      return;
+    }
+    setHasProfile(true);
+    fetchTickets({ customer_email: profile.email })
       .then((data) => setTickets(data.tickets))
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
   }, []);
@@ -46,7 +57,15 @@ export default function CustomerDashboardPage() {
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       <div className="grid gap-4">
-        {tickets.length === 0 ? (
+        {!hasProfile ? (
+          <Card className="app-card p-8 text-center">
+            <Ticket className="mx-auto mb-4 h-10 w-10 text-slate-400" />
+            <h2 className="text-xl font-extrabold text-slate-950">No customer profile found</h2>
+            <p className="mt-2 text-sm font-medium text-slate-500">
+              Start a new support ticket so this demo dashboard can show only your tickets.
+            </p>
+          </Card>
+        ) : tickets.length === 0 ? (
           <Card className="app-card p-8 text-center">
             <Ticket className="mx-auto mb-4 h-10 w-10 text-slate-400" />
             <h2 className="text-xl font-extrabold text-slate-950">No tickets yet</h2>

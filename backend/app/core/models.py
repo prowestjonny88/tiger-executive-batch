@@ -253,6 +253,14 @@ class TicketEventCreateRequest(BaseModel):
     payload_json: Dict[str, Any] = Field(default_factory=dict)
 
 
+class TicketEvidenceRequest(BaseModel):
+    evidence: Dict[str, Any]
+    evidence_type: Literal["hardware_photo", "screenshot", "app_screenshot", "closeup", "other"] = "hardware_photo"
+    actor_role: ActorRole = "customer"
+    actor_name: Optional[str] = None
+    message: Optional[str] = None
+
+
 class TicketScheduleRequest(BaseModel):
     scheduled_at: str
     scheduled_window: str

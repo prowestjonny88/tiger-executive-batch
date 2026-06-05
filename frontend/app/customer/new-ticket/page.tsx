@@ -7,6 +7,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import {
   createTicketFromTriage,
+  formatInstallationSource,
   fetchPreview,
   fetchSites,
   fetchTriage,
@@ -14,6 +15,7 @@ import {
   type CustomerProfile,
   uploadIncidentPhoto,
 } from "../../../lib/api";
+import { saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { PageShell } from "../../../components/layout/page-shell";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
@@ -45,6 +47,7 @@ const initialContext: ChargerContext = {
 };
 
 export default function NewTicketPage() {
+  useDemoRoleGuard("customer");
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [customer, setCustomer] = useState<CustomerProfile>(initialCustomer);
@@ -65,11 +68,15 @@ export default function NewTicketPage() {
   }, [file]);
 
   const customerValid = useMemo(
-    () => customer.full_name && customer.phone_number && customer.whatsapp_number && customer.email,
+    () =>
+      customer.full_name.trim().length >= 2 &&
+      customer.phone_number.replace(/\D/g, "").length >= 7 &&
+      customer.whatsapp_number.replace(/\D/g, "").length >= 7 &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email),
     [customer]
   );
   const contextValid = useMemo(
-    () => context.installation_address && context.customer_type && context.installed_by,
+    () => context.installation_address.trim().length >= 8 && context.customer_type && context.installed_by,
     [context]
   );
 
@@ -115,6 +122,7 @@ export default function NewTicketPage() {
         charger_context: context,
         customer_comments: context.symptom_text || undefined,
       });
+      saveDemoCustomerProfile(customer);
       router.push(`/customer/tickets/${created.ticket_id}`);
     } catch (err) {
       setState("error");
@@ -162,6 +170,11 @@ export default function NewTicketPage() {
               />
             </FormGrid>
             <StepActions canContinue={Boolean(customerValid)} onNext={() => setStep(2)} />
+            {!customerValid && (
+              <p className="text-xs font-semibold text-slate-500">
+                Enter a name, valid email, and reachable phone/WhatsApp numbers to continue.
+              </p>
+            )}
           </section>
         )}
 
@@ -212,6 +225,11 @@ export default function NewTicketPage() {
               </Alert>
             )}
             <StepActions canContinue={Boolean(contextValid)} onBack={() => setStep(1)} onNext={() => setStep(3)} />
+            {!contextValid && (
+              <p className="text-xs font-semibold text-slate-500">
+                Add the installation address and installation source before uploading evidence.
+              </p>
+            )}
           </section>
         )}
 
@@ -298,7 +316,7 @@ function SelectInput({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option.replace("_", " ")}
+            {formatInstallationSource(option)}
           </option>
         ))}
       </select>

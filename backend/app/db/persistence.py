@@ -46,6 +46,7 @@ def init_db() -> None:
                     site_id TEXT NOT NULL,
                     charger_id TEXT,
                     photo_evidence_json JSONB,
+                    app_screenshot_evidence_json JSONB,
                     photo_hint TEXT,
                     symptom_text TEXT,
                     error_code TEXT,
@@ -55,6 +56,7 @@ def init_db() -> None:
                 )
                 """
             )
+            cur.execute("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS app_screenshot_evidence_json JSONB")
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS triage_audits (
@@ -137,19 +139,23 @@ def save_incident(incident: dict[str, Any]) -> int:
                     site_id,
                     charger_id,
                     photo_evidence_json,
+                    app_screenshot_evidence_json,
                     photo_hint,
                     symptom_text,
                     error_code,
                     follow_up_answers_json,
                     demo_scenario_id
                 )
-                VALUES (%s, %s, %s::jsonb, %s, %s, %s, %s::jsonb, %s)
+                VALUES (%s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s::jsonb, %s)
                 RETURNING id
                 """,
                 (
                     incident.get("site_id"),
                     incident.get("charger_id"),
                     json.dumps(incident.get("photo_evidence")) if incident.get("photo_evidence") else None,
+                    json.dumps(incident.get("app_screenshot_evidence"))
+                    if incident.get("app_screenshot_evidence")
+                    else None,
                     incident.get("photo_hint"),
                     incident.get("symptom_text"),
                     incident.get("error_code"),
@@ -170,6 +176,7 @@ def update_incident(incident_id: int, incident: dict[str, Any]) -> bool:
                 SET site_id = %s,
                     charger_id = %s,
                     photo_evidence_json = %s::jsonb,
+                    app_screenshot_evidence_json = %s::jsonb,
                     photo_hint = %s,
                     symptom_text = %s,
                     error_code = %s,
@@ -181,6 +188,9 @@ def update_incident(incident_id: int, incident: dict[str, Any]) -> bool:
                     incident.get("site_id"),
                     incident.get("charger_id"),
                     json.dumps(incident.get("photo_evidence")) if incident.get("photo_evidence") else None,
+                    json.dumps(incident.get("app_screenshot_evidence"))
+                    if incident.get("app_screenshot_evidence")
+                    else None,
                     incident.get("photo_hint"),
                     incident.get("symptom_text"),
                     incident.get("error_code"),
@@ -211,9 +221,13 @@ def _extract_incident_history(row: dict[str, Any]) -> dict[str, Any]:
     summary = dict(row)
     latest_triage_payload = summary.pop("latest_triage_payload_json", None)
     photo_evidence_raw = summary.pop("photo_evidence_json", None)
+    app_screenshot_evidence_raw = summary.pop("app_screenshot_evidence_json", None)
     follow_up_answers_raw = summary.pop("follow_up_answers_json", None)
 
     summary["photo_evidence"] = photo_evidence_raw if isinstance(photo_evidence_raw, dict) else photo_evidence_raw
+    summary["app_screenshot_evidence"] = (
+        app_screenshot_evidence_raw if isinstance(app_screenshot_evidence_raw, dict) else app_screenshot_evidence_raw
+    )
     if "follow_up_answers_json" in row:
         summary["follow_up_answers"] = follow_up_answers_raw if isinstance(follow_up_answers_raw, dict) else follow_up_answers_raw
 
@@ -240,6 +254,7 @@ def list_recent_incidents(limit: int = 20) -> list[dict[str, Any]]:
                     incidents.site_id,
                     incidents.charger_id,
                     incidents.photo_evidence_json,
+                    incidents.app_screenshot_evidence_json,
                     incidents.photo_hint,
                     incidents.symptom_text,
                     incidents.error_code,
@@ -286,6 +301,7 @@ def get_incident_by_id(incident_id: int) -> dict[str, Any] | None:
                     incidents.site_id,
                     incidents.charger_id,
                     incidents.photo_evidence_json,
+                    incidents.app_screenshot_evidence_json,
                     incidents.photo_hint,
                     incidents.symptom_text,
                     incidents.error_code,
@@ -482,6 +498,9 @@ def list_ticket_records(filters: dict[str, str | None] | None = None) -> list[di
         "assigned_technician": "assigned_technician",
         "installation_source": "charger_context_json ->> 'installed_by'",
         "customer_type": "charger_context_json ->> 'customer_type'",
+        "customer_email": "customer_profile_json ->> 'email'",
+        "customer_phone": "customer_profile_json ->> 'phone_number'",
+        "whatsapp_number": "customer_profile_json ->> 'whatsapp_number'",
     }
     for key, column in filter_map.items():
         value = filters.get(key)
@@ -524,6 +543,64 @@ def get_ticket_record(ticket_id: str) -> dict[str, Any] | None:
     if not row:
         return None
     return _attach_ticket_children(_extract_ticket_row(row))
+
+
+def append_ticket_evidence_record(
+    ticket_id: str,
+    evidence: dict[str, Any],
+    evidence_type: str,
+    actor_role: str,
+    actor_name: str | None,
+    message: str,
+) -> dict[str, Any] | None:
+    evidence_payload = {"kind": evidence_type, **evidence}
+    status_changed = False
+    with _pg_connection() as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT status FROM tickets WHERE ticket_id = %s", (ticket_id,))
+            ticket_row = cur.fetchone()
+            if not ticket_row:
+                return None
+
+            cur.execute(
+                """
+                UPDATE tickets
+                SET evidence_photos_json = evidence_photos_json || %s::jsonb,
+                    status = CASE WHEN status = 'waiting_customer' THEN 'assigned' ELSE status END,
+                    updated_at = NOW()
+                WHERE ticket_id = %s
+                RETURNING *
+                """,
+                (json.dumps([evidence_payload]), ticket_id),
+            )
+            ticket = _extract_ticket_row(cur.fetchone())
+            status_changed = ticket_row["status"] == "waiting_customer"
+            cur.execute(
+                """
+                INSERT INTO ticket_events (ticket_id, event_type, actor_role, actor_name, message, payload_json)
+                VALUES (%s, 'proof_uploaded', %s, %s, %s, %s::jsonb)
+                """,
+                (
+                    ticket_id,
+                    actor_role,
+                    actor_name,
+                    message,
+                    json.dumps({"evidence_type": evidence_type, "evidence": evidence_payload}),
+                ),
+            )
+            if status_changed:
+                cur.execute(
+                    """
+                    INSERT INTO ticket_events (ticket_id, event_type, actor_role, actor_name, message, payload_json)
+                    VALUES (%s, 'status_changed', 'system', NULL, %s, %s::jsonb)
+                    """,
+                    (
+                        ticket_id,
+                        "Customer proof uploaded. Ticket is ready for staff review.",
+                        json.dumps({"status": "assigned", "reason": "proof_uploaded"}),
+                    ),
+                )
+    return _attach_ticket_children(ticket)
 
 
 def add_ticket_event_record(

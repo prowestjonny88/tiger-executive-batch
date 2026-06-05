@@ -12,6 +12,7 @@ import {
   fetchWhatsAppPreview,
   formatFaultTypeV2,
   formatInputComponent,
+  formatInstallationSource,
   formatObservationResult,
   resolveEvidenceUrl,
   scheduleTicket,
@@ -21,6 +22,7 @@ import {
   type TicketStatus,
   type WhatsAppPreview,
 } from "../../../../lib/api";
+import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { formatTicketStatus, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { PageShell } from "../../../../components/layout/page-shell";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
@@ -38,6 +40,7 @@ const statusActions: Array<{ label: string; status: TicketStatus }> = [
 ];
 
 export default function StaffTicketDetailPage() {
+  useDemoRoleGuard("staff");
   const params = useParams<{ ticketId: string }>();
   const ticketId = params.ticketId;
   const [ticket, setTicket] = useState<TicketRecord | null>(null);
@@ -46,6 +49,7 @@ export default function StaffTicketDetailPage() {
   const [note, setNote] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [selectedTechnician, setSelectedTechnician] = useState("");
+  const [showScheduling, setShowScheduling] = useState(false);
   const [error, setError] = useState("");
 
   const refresh = () => {
@@ -77,6 +81,13 @@ export default function StaffTicketDetailPage() {
 
   const annotations = ticket.triage_result?.perception?.extraction?.bounding_boxes ?? [];
   const evidenceUrl = resolveEvidenceUrl(ticket.evidence_photos[0]);
+  const additionalProof = ticket.evidence_photos.slice(1);
+  const proofEvents = ticket.events.filter((event) => event.event_type === "proof_uploaded");
+  const shouldShowScheduling =
+    showScheduling ||
+    ticket.recipient_type === "after_sales_team" ||
+    ["assigned", "scheduled", "reschedule_requested"].includes(ticket.status) ||
+    ["pending", "scheduled", "reschedule_requested"].includes(ticket.schedule_status);
 
   const setStatus = async (status: TicketStatus) => {
     const updated = await updateTicketStatus(ticket.ticket_id, {
@@ -164,13 +175,45 @@ export default function StaffTicketDetailPage() {
               <InfoBox label="Customer" value={ticket.customer_profile.full_name} />
               <InfoBox label="Contact" value={`${ticket.customer_profile.phone_number} / ${ticket.customer_profile.email}`} />
               <InfoBox label="Address" value={ticket.charger_context.installation_address} />
-              <InfoBox label="Installation source" value={ticket.charger_context.installed_by.replaceAll("_", " ")} />
+              <InfoBox label="Installation source" value={formatInstallationSource(ticket.charger_context.installed_by)} />
               <InfoBox label="Charger identity" value={ticket.charger_context.charger_brand_model || ticket.charger_context.charger_serial_number || "Not provided"} />
               <InfoBox label="Customer comments" value={ticket.customer_comments || ticket.charger_context.symptom_text || "None"} />
             </div>
           </Card>
 
           {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={annotations} />}
+
+          {(additionalProof.length > 0 || proofEvents.length > 0) && (
+            <Card className="app-card p-6">
+              <h2 className="mb-4 text-xl font-extrabold text-slate-950">Customer uploaded proof</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {additionalProof.map((item, index) => {
+                  const url = resolveEvidenceUrl(item);
+                  return (
+                    <a
+                      key={`${item.storage_path || item.filename}-${index}`}
+                      href={url || "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 hover:border-blue-300"
+                    >
+                      <p className="font-mono text-xs uppercase tracking-widest text-slate-500">{item.kind || "proof"}</p>
+                      <p className="mt-2 text-slate-950">{item.filename || "Uploaded proof"}</p>
+                    </a>
+                  );
+                })}
+              </div>
+              {proofEvents.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {proofEvents.map((event) => (
+                    <p key={event.id} className="rounded-xl bg-blue-50 p-3 text-sm font-semibold text-blue-950">
+                      {event.message}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
 
           <Card className="app-card p-6">
             <h2 className="mb-4 text-xl font-extrabold text-slate-950">Activity timeline</h2>
@@ -208,35 +251,50 @@ export default function StaffTicketDetailPage() {
             </div>
           </Card>
 
-          <Card className="app-card p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <CalendarClock className="h-5 w-5 text-blue-700" />
-              <h2 className="text-xl font-extrabold text-slate-950">Assisted scheduling</h2>
-            </div>
-            <div className="space-y-4">
-              <SelectField
-                label="Suggested slot"
-                value={selectedSlot}
-                onChange={setSelectedSlot}
-                options={(suggestions?.slots ?? []).map((slot) => ({
-                  value: slot.scheduled_at,
-                  label: `${new Date(slot.scheduled_at).toLocaleString()} / ${slot.scheduled_window}`,
-                }))}
-              />
-              <SelectField
-                label="Technician"
-                value={selectedTechnician}
-                onChange={setSelectedTechnician}
-                options={(suggestions?.technicians ?? []).map((tech) => ({
-                  value: tech.name,
-                  label: `${tech.name} / ${tech.skills.join(", ")} / ${tech.area}`,
-                }))}
-              />
-              <Button className="w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={scheduleVisit}>
-                Schedule Visit
+          {shouldShowScheduling ? (
+            <Card className="app-card p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <CalendarClock className="h-5 w-5 text-blue-700" />
+                <h2 className="text-xl font-extrabold text-slate-950">Assisted scheduling</h2>
+              </div>
+              <div className="space-y-4">
+                <SelectField
+                  label="Suggested slot"
+                  value={selectedSlot}
+                  onChange={setSelectedSlot}
+                  options={(suggestions?.slots ?? []).map((slot) => ({
+                    value: slot.scheduled_at,
+                    label: `${new Date(slot.scheduled_at).toLocaleString()} / ${slot.scheduled_window}`,
+                  }))}
+                />
+                <SelectField
+                  label="Technician"
+                  value={selectedTechnician}
+                  onChange={setSelectedTechnician}
+                  options={(suggestions?.technicians ?? []).map((tech) => ({
+                    value: tech.name,
+                    label: `${tech.name} / ${tech.skills.join(", ")} / ${tech.area}`,
+                  }))}
+                />
+                <Button className="w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={scheduleVisit}>
+                  Schedule Visit
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="app-card p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <CalendarClock className="h-5 w-5 text-slate-500" />
+                <h2 className="text-xl font-extrabold text-slate-950">Scheduling not required yet</h2>
+              </div>
+              <p className="text-sm font-semibold leading-6 text-slate-600">
+                Open scheduling manually only if staff decides a technician visit is needed.
+              </p>
+              <Button variant="outline" className="mt-4 w-full rounded-xl" onClick={() => setShowScheduling(true)}>
+                Open Scheduling
               </Button>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {whatsApp && (
             <Card className="app-card p-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Filter, Headphones } from "lucide-react";
 
@@ -8,9 +8,11 @@ import {
   fetchTickets,
   formatFaultTypeV2,
   formatInputComponent,
+  formatInstallationSource,
   formatObservationResult,
   type TicketRecord,
 } from "../../../lib/api";
+import { useDemoRoleGuard } from "../../../lib/demo-role";
 import { formatTicketStatus, priorityClass, statusClass } from "../../../lib/ticket-ui";
 import { PageShell } from "../../../components/layout/page-shell";
 import { Button } from "../../../components/ui/button";
@@ -28,8 +30,10 @@ const filterOptions = {
 };
 
 export default function StaffDashboardPage() {
+  useDemoRoleGuard("staff");
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
   const loadTickets = () => {
@@ -39,6 +43,28 @@ export default function StaffDashboardPage() {
   };
 
   useEffect(loadTickets, [filters]);
+  const visibleTickets = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return tickets;
+    return tickets.filter((ticket) => {
+      const searchable = [
+        ticket.ticket_id,
+        ticket.customer_profile.full_name,
+        ticket.customer_profile.phone_number,
+        ticket.customer_profile.whatsapp_number,
+        ticket.customer_profile.email,
+        ticket.charger_context.installation_address,
+        ticket.input_component,
+        ticket.observation_result,
+        ticket.fault_type_v2,
+        ticket.assigned_technician,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return searchable.includes(query);
+    });
+  }, [search, tickets]);
 
   return (
     <PageShell maxWidth="6xl">
@@ -59,6 +85,13 @@ export default function StaffDashboardPage() {
           <h2 className="text-sm font-extrabold uppercase tracking-widest text-slate-500">Filters</h2>
         </div>
         <div className="grid gap-3 md:grid-cols-4">
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search ticket, customer, phone, address..."
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 md:col-span-2"
+            aria-label="Search tickets"
+          />
           {Object.entries(filterOptions).map(([key, options]) => (
             <select
               key={key}
@@ -86,13 +119,13 @@ export default function StaffDashboardPage() {
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       <div className="space-y-4">
-        {tickets.length === 0 ? (
+        {visibleTickets.length === 0 ? (
           <Card className="app-card p-8 text-center">
             <Headphones className="mx-auto mb-4 h-10 w-10 text-slate-400" />
             <h2 className="text-xl font-extrabold text-slate-950">No tickets match these filters</h2>
           </Card>
         ) : (
-          tickets.map((ticket) => (
+          visibleTickets.map((ticket) => (
             <Link
               href={`/staff/tickets/${ticket.ticket_id}`}
               key={ticket.ticket_id}
@@ -111,7 +144,7 @@ export default function StaffDashboardPage() {
                 <div className="text-sm font-semibold leading-6 text-slate-600">
                   <p>{formatInputComponent(ticket.input_component)} / {formatObservationResult(ticket.observation_result)}</p>
                   <p>{formatFaultTypeV2(ticket.fault_type_v2)}</p>
-                  <p>Installation: {ticket.charger_context.installed_by.replaceAll("_", " ")}</p>
+                  <p>Installation: {formatInstallationSource(ticket.charger_context.installed_by)}</p>
                 </div>
                 <div className="text-sm font-semibold leading-6 text-slate-600">
                   <p>{ticket.assigned_team_id || ticket.recipient_type.replaceAll("_", " ")}</p>
