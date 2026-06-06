@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CalendarClock, Copy, MessageCircle, Send, Wrench } from "lucide-react";
@@ -11,8 +12,10 @@ import {
   fetchTicket,
   fetchWhatsAppPreview,
   formatFaultTypeV2,
+  formatHomeChargerLocation,
   formatInputComponent,
   formatInstallationSource,
+  formatLocationSource,
   formatObservationResult,
   resolveEvidenceUrl,
   scheduleTicket,
@@ -84,6 +87,16 @@ export default function StaffTicketDetailPage() {
   const additionalProof = ticket.evidence_photos.slice(1);
   const proofEvents = ticket.events.filter((event) => event.event_type === "proof_uploaded");
   const isTerminalStatus = ["resolved", "closed", "cancelled"].includes(ticket.status);
+  const mapHref =
+    ticket.charger_context.location_lat != null && ticket.charger_context.location_lng != null
+      ? `https://www.google.com/maps?q=${ticket.charger_context.location_lat},${ticket.charger_context.location_lng}`
+      : "";
+  const chargerIdentity =
+    ticket.charger_context.charger_brand_model || ticket.charger_context.charger_serial_number
+      ? `${ticket.charger_context.charger_brand_model || "Brand/model not provided"} / ${
+          ticket.charger_context.charger_serial_number || "Serial not provided"
+        }`
+      : "Not provided - request charger label close-up if needed.";
   const shouldShowScheduling =
     !isTerminalStatus &&
     (showScheduling ||
@@ -177,8 +190,31 @@ export default function StaffTicketDetailPage() {
               <InfoBox label="Customer" value={ticket.customer_profile.full_name} />
               <InfoBox label="Contact" value={`${ticket.customer_profile.phone_number} / ${ticket.customer_profile.email}`} />
               <InfoBox label="Address" value={ticket.charger_context.installation_address} />
+              <InfoBox label="Home charger location" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
+              <InfoBox label="Location notes" value={ticket.charger_context.charger_location_notes || "None"} />
+              <InfoBox label="Location source" value={formatLocationSource(ticket.charger_context.location_source)} />
+              <InfoBox
+                label="Map coordinate"
+                value={
+                  mapHref ? (
+                    <a href={mapHref} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-4">
+                      Open in Google Maps
+                    </a>
+                  ) : (
+                    "Not provided"
+                  )
+                }
+              />
+              <InfoBox
+                label="Location accuracy"
+                value={
+                  ticket.charger_context.location_accuracy_m != null
+                    ? `${Math.round(ticket.charger_context.location_accuracy_m)} m approximate`
+                    : "Not provided"
+                }
+              />
               <InfoBox label="Installation source" value={formatInstallationSource(ticket.charger_context.installed_by)} />
-              <InfoBox label="Charger identity" value={ticket.charger_context.charger_brand_model || ticket.charger_context.charger_serial_number || "Not provided"} />
+              <InfoBox label="Charger identity" value={chargerIdentity} />
               <InfoBox label="Customer comments" value={ticket.customer_comments || ticket.charger_context.symptom_text || "None"} />
             </div>
           </Card>
@@ -361,7 +397,7 @@ export default function StaffTicketDetailPage() {
   );
 }
 
-function InfoBox({ label, value }: { label: string; value: string }) {
+function InfoBox({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <p className="technical-label text-slate-500">{label}</p>

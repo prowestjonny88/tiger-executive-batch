@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LocateFixed } from "lucide-react";
 
 import {
   createTicketFromTriage,
@@ -11,10 +11,13 @@ import {
   fetchPreview,
   fetchSites,
   fetchTriage,
+  type ApiTriageResponse,
   type ChargerContext,
   type CustomerProfile,
+  type UploadedPhotoEvidence,
   uploadIncidentPhoto,
 } from "../../../lib/api";
+import { extractChargerIdentitySuggestion, formatIdentityConfidence, type ChargerIdentitySuggestion } from "../../../lib/charger-identity";
 import { saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { PageShell } from "../../../components/layout/page-shell";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
@@ -44,7 +47,19 @@ const initialContext: ChargerContext = {
   charger_brand_model: "",
   symptom_text: "",
   error_code: "",
+  home_charger_location: "unknown",
+  charger_location_notes: "",
+  location_source: "manual",
 };
+
+const homeChargerLocationOptions = [
+  { value: "car_porch", label: "Car porch" },
+  { value: "garage", label: "Garage" },
+  { value: "outdoor_wall", label: "Outdoor wall" },
+  { value: "indoor_wall", label: "Indoor wall" },
+  { value: "other", label: "Other" },
+  { value: "unknown", label: "Not sure" },
+];
 
 export default function NewTicketPage() {
   useDemoRoleGuard("customer");
@@ -54,8 +69,13 @@ export default function NewTicketPage() {
   const [context, setContext] = useState<ChargerContext>(initialContext);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [state, setState] = useState<"idle" | "running" | "error">("idle");
+  const [state, setState] = useState<"idle" | "checking" | "ready" | "creating" | "error">("idle");
   const [error, setError] = useState("");
+  const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "success" | "denied" | "error">("idle");
+  const [locationError, setLocationError] = useState("");
+  const [uploadedEvidence, setUploadedEvidence] = useState<UploadedPhotoEvidence | null>(null);
+  const [triageResult, setTriageResult] = useState<ApiTriageResponse | null>(null);
+  const [identitySuggestion, setIdentitySuggestion] = useState<ChargerIdentitySuggestion | null>(null);
 
   useEffect(() => {
     if (!file) {
@@ -80,10 +100,40 @@ export default function NewTicketPage() {
     [context]
   );
 
-  const runTriageAndCreateTicket = async () => {
-    if (!file || state === "running") return;
-    setState("running");
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("error");
+      setLocationError("Location is not supported by this browser. Please enter your address manually.");
+      return;
+    }
+
+    setLocationStatus("locating");
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setContext((current) => ({
+          ...current,
+          location_lat: position.coords.latitude,
+          location_lng: position.coords.longitude,
+          location_accuracy_m: position.coords.accuracy,
+          location_source: "browser_geolocation",
+        }));
+        setLocationStatus("success");
+      },
+      (geoError) => {
+        setLocationStatus(geoError.code === geoError.PERMISSION_DENIED ? "denied" : "error");
+        setLocationError("Could not access your location. Please enter your address manually.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  const runTriageOnly = async () => {
+    if (!file || state === "checking" || state === "creating") return;
+    setState("checking");
     setError("");
+    setTriageResult(null);
+    setIdentitySuggestion(null);
 
     try {
       let siteId = "site-mall-01";
@@ -115,9 +165,31 @@ export default function NewTicketPage() {
         error_code: context.error_code || "",
         follow_up_answers: {},
       });
+      const suggestion = extractChargerIdentitySuggestion(triage);
+      setUploadedEvidence(uploaded);
+      setTriageResult(triage);
+      setIdentitySuggestion(suggestion);
+      setContext((current) => ({
+        ...current,
+        charger_serial_number: current.charger_serial_number || suggestion.serial_number || "",
+        charger_brand_model: current.charger_brand_model || suggestion.brand_model || "",
+      }));
+      setState("ready");
+    } catch (err) {
+      setState("error");
+      setError(err instanceof Error ? err.message : "Photo check failed. Please try again.");
+    }
+  };
+
+  const createTicketAfterIdentityReview = async () => {
+    if (!triageResult || state === "creating") return;
+    setState("creating");
+    setError("");
+
+    try {
       const created = await createTicketFromTriage({
-        incident_id: triage.incident_id,
-        triage_result: triage,
+        incident_id: triageResult.incident_id,
+        triage_result: triageResult,
         customer_profile: customer,
         charger_context: context,
         customer_comments: context.symptom_text || undefined,
@@ -180,16 +252,42 @@ export default function NewTicketPage() {
 
         {step === 2 && (
           <section className="space-y-5">
-            <h2 className="text-xl font-extrabold text-slate-950">Charger and Installation Context</h2>
+            <h2 className="text-xl font-extrabold text-slate-950">Home Charger Location and Installation Context</h2>
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Installation address</Label>
               <Textarea
                 value={context.installation_address}
-                onChange={(event) => setContext({ ...context, installation_address: event.target.value })}
+                onChange={(event) => setContext({ ...context, installation_address: event.target.value, location_source: context.location_source || "manual" })}
                 className="min-h-[90px] resize-none rounded-xl"
+                placeholder="Enter the home address where the charger is installed."
               />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Button type="button" variant="outline" className="rounded-xl" onClick={useCurrentLocation} disabled={locationStatus === "locating"}>
+                  <LocateFixed className="mr-2 h-4 w-4" />
+                  {locationStatus === "locating" ? "Capturing location..." : "Use Current Location"}
+                </Button>
+                <p className="text-xs font-semibold text-slate-500">
+                  Location is approximate. Please confirm the exact home address and charger position.
+                </p>
+              </div>
+              {locationStatus === "success" && (
+                <p className="text-xs font-bold text-green-700">
+                  Location captured. Please confirm your home address and charger position.
+                </p>
+              )}
+              {(locationStatus === "denied" || locationStatus === "error") && (
+                <p className="text-xs font-bold text-amber-700">
+                  {locationError || "Location was not captured. You can still enter the address manually."}
+                </p>
+              )}
             </div>
             <FormGrid>
+              <SelectInput
+                label="Home charger location"
+                value={context.home_charger_location || "unknown"}
+                onChange={(value) => setContext({ ...context, home_charger_location: value as ChargerContext["home_charger_location"] })}
+                options={homeChargerLocationOptions}
+              />
               <SelectInput
                 label="Customer type"
                 value={context.customer_type}
@@ -203,10 +301,29 @@ export default function NewTicketPage() {
                 options={["rexharge", "third_party", "property_management", "unknown"]}
               />
               <TextInput label="Installer name" value={context.installer_name || ""} onChange={(value) => setContext({ ...context, installer_name: value })} />
-              <TextInput label="Charger serial number" value={context.charger_serial_number || ""} onChange={(value) => setContext({ ...context, charger_serial_number: value })} />
-              <TextInput label="Charger brand/model" value={context.charger_brand_model || ""} onChange={(value) => setContext({ ...context, charger_brand_model: value })} />
+              <TextInput
+                label="Charger serial number"
+                value={context.charger_serial_number || ""}
+                onChange={(value) => setContext({ ...context, charger_serial_number: value })}
+                helper="Optional. If visible in your charger photo, ChargerDoc will try to detect it automatically."
+              />
+              <TextInput
+                label="Charger brand/model"
+                value={context.charger_brand_model || ""}
+                onChange={(value) => setContext({ ...context, charger_brand_model: value })}
+                helper="Optional. You can confirm or edit this after uploading the charger photo."
+              />
               <TextInput label="Error/app code" value={context.error_code || ""} onChange={(value) => setContext({ ...context, error_code: value })} />
             </FormGrid>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Charger location notes</Label>
+              <Textarea
+                value={context.charger_location_notes || ""}
+                onChange={(event) => setContext({ ...context, charger_location_notes: event.target.value })}
+                className="min-h-[80px] resize-none rounded-xl"
+                placeholder="Example: car porch left wall, beside DB box, outdoor wall near gate"
+              />
+            </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Describe the issue</Label>
               <Textarea
@@ -240,6 +357,10 @@ export default function NewTicketPage() {
               onFileSelect={(selected) => {
                 setFile(selected);
                 setError("");
+                setUploadedEvidence(null);
+                setTriageResult(null);
+                setIdentitySuggestion(null);
+                setState("idle");
               }}
               fileName={file?.name}
               fileSize={file?.size}
@@ -258,22 +379,63 @@ export default function NewTicketPage() {
 
         {step === 4 && (
           <section className="space-y-5">
-            <h2 className="text-xl font-extrabold text-slate-950">Create Ticket</h2>
+            <h2 className="text-xl font-extrabold text-slate-950">AI Check and Charger Details</h2>
             <p className="text-sm font-medium leading-6 text-slate-600">
-              ChargerDoc will run Theme 2 triage, create a support ticket, and open the customer tracker.
+              ChargerDoc will check the photo first. Confirm any detected charger details before the support ticket is created.
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+            {triageResult && identitySuggestion && (
+              <Card className="rounded-2xl border border-green-100 bg-green-50 p-5">
+                <p className="technical-label text-green-700">Detected Charger Details</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Confirm or edit before creating the ticket</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{identitySuggestion.note}</p>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <TextInput
+                    label="Brand / model"
+                    value={context.charger_brand_model || ""}
+                    onChange={(value) => setContext({ ...context, charger_brand_model: value })}
+                  />
+                  <TextInput
+                    label="Serial number"
+                    value={context.charger_serial_number || ""}
+                    onChange={(value) => setContext({ ...context, charger_serial_number: value })}
+                  />
+                </div>
+                <div className="mt-4 grid gap-3 text-xs font-bold text-slate-600 sm:grid-cols-3">
+                  <span className="rounded-full bg-white px-3 py-2">Confidence: {formatIdentityConfidence(identitySuggestion.confidence)}</span>
+                  <span className="rounded-full bg-white px-3 py-2">Source: {identitySuggestion.source.replaceAll("_", " ")}</span>
+                  <span className="rounded-full bg-white px-3 py-2">
+                    {identitySuggestion.needs_closeup ? "Close-up may be needed" : "Ready for customer confirmation"}
+                  </span>
+                </div>
+              </Card>
+            )}
+            {uploadedEvidence && (
+              <p className="text-xs font-semibold text-slate-500">
+                Checked photo: {uploadedEvidence.filename}. Confirmed fields will be saved into the ticket.
+              </p>
+            )}
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button variant="outline" className="rounded-xl" onClick={() => setStep(3)} disabled={state === "running"}>
+              <Button variant="outline" className="rounded-xl" onClick={() => setStep(3)} disabled={state === "checking" || state === "creating"}>
                 Back
               </Button>
-              <Button
-                className="rounded-xl bg-green-700 font-bold hover:bg-green-800"
-                onClick={runTriageAndCreateTicket}
-                disabled={!file || state === "running"}
-              >
-                {state === "running" ? "Checking photo and creating ticket..." : "Check Photo and Create Ticket"}
-              </Button>
+              {!triageResult ? (
+                <Button
+                  className="rounded-xl bg-green-700 font-bold hover:bg-green-800"
+                  onClick={runTriageOnly}
+                  disabled={!file || state === "checking"}
+                >
+                  {state === "checking" ? "Checking photo..." : "Check Photo"}
+                </Button>
+              ) : (
+                <Button
+                  className="rounded-xl bg-green-700 font-bold hover:bg-green-800"
+                  onClick={createTicketAfterIdentityReview}
+                  disabled={state === "creating"}
+                >
+                  {state === "creating" ? "Creating ticket..." : "Confirm and Create Ticket"}
+                </Button>
+              )}
             </div>
           </section>
         )}
@@ -286,14 +448,17 @@ function FormGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-4 md:grid-cols-2">{children}</div>;
 }
 
-function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextInput({ label, value, helper, onChange }: { label: string; value: string; helper?: string; onChange: (value: string) => void }) {
   return (
     <div className="space-y-2">
       <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</Label>
       <Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl" />
+      {helper && <p className="text-xs font-semibold leading-5 text-slate-500">{helper}</p>}
     </div>
   );
 }
+
+type SelectOption = string | { value: string; label: string };
 
 function SelectInput({
   label,
@@ -303,7 +468,7 @@ function SelectInput({
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: SelectOption[];
   onChange: (value: string) => void;
 }) {
   return (
@@ -315,8 +480,8 @@ function SelectInput({
         className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
       >
         {options.map((option) => (
-          <option key={option} value={option}>
-            {formatInstallationSource(option)}
+          <option key={typeof option === "string" ? option : option.value} value={typeof option === "string" ? option : option.value}>
+            {typeof option === "string" ? formatInstallationSource(option) : option.label}
           </option>
         ))}
       </select>

@@ -228,6 +228,14 @@ class ChargerContext(BaseModel):
     charger_brand_model: Optional[str] = None
     symptom_text: Optional[str] = None
     error_code: Optional[str] = None
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
+    location_accuracy_m: Optional[float] = None
+    location_source: Optional[str] = None
+    google_place_id: Optional[str] = None
+    formatted_address: Optional[str] = None
+    home_charger_location: Optional[str] = None
+    charger_location_notes: Optional[str] = None
 
 
 class TicketFromTriageRequest(BaseModel):

@@ -10,6 +10,7 @@ import {
   fetchTicket,
   fetchWhatsAppPreview,
   formatFaultTypeV2,
+  formatHomeChargerLocation,
   formatObservationResult,
   resolveEvidenceUrl,
   submitTicketFeedback,
@@ -71,6 +72,12 @@ export default function CustomerTicketDetailPage() {
   const customerEvents = ticket.events.filter((event) => !hiddenCustomerEventTypes.has(event.event_type));
   const needsProof = ticket.status === "waiting_customer" && Boolean(ticket.required_proof_next);
   const hasUploadedProof = ticket.events.some((event) => event.event_type === "proof_uploaded");
+  const chargerIdentity =
+    ticket.charger_context.charger_brand_model || ticket.charger_context.charger_serial_number
+      ? `${ticket.charger_context.charger_brand_model || "Brand/model not provided"} / ${
+          ticket.charger_context.charger_serial_number || "Serial not provided"
+        }`
+      : "Not provided";
 
   const submitFeedback = async () => {
     const updated = await submitTicketFeedback(ticket.ticket_id, feedback);
@@ -136,6 +143,16 @@ export default function CustomerTicketDetailPage() {
               <SummaryBox label="Detected issue" value={formatObservationResult(ticket.observation_result)} />
               <SummaryBox label="Fault type" value={formatFaultTypeV2(ticket.fault_type_v2)} />
               <SummaryBox label="Route" value={ticket.assigned_team_id || ticket.recipient_type.replace("_", " ")} />
+            </div>
+          </Card>
+
+          <Card className="app-card p-6">
+            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Home charger details</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
+              <SummaryBox label="Charger position" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
+              <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes || "None"} />
+              <SummaryBox label="Charger details" value={chargerIdentity} />
             </div>
           </Card>
 

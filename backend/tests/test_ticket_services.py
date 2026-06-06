@@ -81,6 +81,24 @@ def test_priority_and_status_derive_from_theme2_output():
     assert tickets.derive_initial_ticket_status(triage) == "waiting_customer"
 
 
+def test_charger_context_accepts_home_location_metadata():
+    context = _context(
+        location_lat=3.139,
+        location_lng=101.6869,
+        location_accuracy_m=25.5,
+        location_source="browser_geolocation",
+        formatted_address="Kuala Lumpur, Malaysia",
+        home_charger_location="car_porch",
+        charger_location_notes="Car porch left wall beside DB box.",
+    )
+
+    assert context.location_lat == 3.139
+    assert context.location_lng == 101.6869
+    assert context.location_source == "browser_geolocation"
+    assert context.home_charger_location == "car_porch"
+    assert context.charger_location_notes == "Car porch left wall beside DB box."
+
+
 def test_wrong_or_missing_evdb_specs_are_critical():
     triage = _triage_output(
         input_component="evdb",

@@ -227,6 +227,14 @@ export type ChargerContext = {
   charger_brand_model?: string | null;
   symptom_text?: string | null;
   error_code?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  location_accuracy_m?: number | null;
+  location_source?: "manual" | "browser_geolocation" | "google_places" | "reverse_geocoded" | null;
+  google_place_id?: string | null;
+  formatted_address?: string | null;
+  home_charger_location?: "car_porch" | "garage" | "outdoor_wall" | "indoor_wall" | "other" | "unknown" | null;
+  charger_location_notes?: string | null;
 };
 
 export type TicketPriority = "Critical" | "High" | "Medium" | "Low";
@@ -603,6 +611,48 @@ export function formatInstallationSource(value?: string | null) {
     case undefined:
     case null:
       return "Unknown";
+    default:
+      return titleize(value);
+  }
+}
+
+export function formatHomeChargerLocation(value?: string | null) {
+  switch (value) {
+    case "car_porch":
+      return "Car porch";
+    case "garage":
+      return "Garage";
+    case "outdoor_wall":
+      return "Outdoor wall";
+    case "indoor_wall":
+      return "Indoor wall";
+    case "other":
+      return "Other";
+    case "unknown":
+    case "":
+    case undefined:
+    case null:
+      return "Not sure";
+    default:
+      return titleize(value);
+  }
+}
+
+export function formatLocationSource(value?: string | null) {
+  switch (value) {
+    case "manual":
+      return "Manual entry";
+    case "browser_geolocation":
+      return "Browser location";
+    case "google_places":
+      return "Google Places";
+    case "reverse_geocoded":
+      return "Reverse geocoded";
+    case "unknown":
+    case "":
+    case undefined:
+    case null:
+      return "Not provided";
     default:
       return titleize(value);
   }

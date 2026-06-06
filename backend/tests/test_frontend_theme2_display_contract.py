@@ -131,6 +131,39 @@ def test_ticket_routes_and_role_flows_exist():
     assert "addTicketEvidence" in api_source
 
 
+def test_home_location_and_identity_confirmation_contracts():
+    api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
+    identity_helper = _read(FRONTEND_ROOT / "lib" / "charger-identity.ts")
+    new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
+    customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
+    staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
+
+    assert "location_lat" in api_source
+    assert "location_lng" in api_source
+    assert "location_accuracy_m" in api_source
+    assert "home_charger_location" in api_source
+    assert "charger_location_notes" in api_source
+    assert "formatHomeChargerLocation" in api_source
+    assert "formatLocationSource" in api_source
+    assert "extractChargerIdentitySuggestion" in identity_helper
+    assert "competition_output" in identity_helper
+    assert "perception" in identity_helper
+    assert "The charger label was not readable" in identity_helper
+    assert "Home Charger Location and Installation Context" in new_ticket
+    assert "Use Current Location" in new_ticket
+    assert "navigator.geolocation.getCurrentPosition" in new_ticket
+    assert "Detected Charger Details" in new_ticket
+    assert "runTriageOnly" in new_ticket
+    assert "createTicketAfterIdentityReview" in new_ticket
+    assert "Check Photo and Create Ticket" not in new_ticket
+    assert "Optional. If visible in your charger photo, ChargerDoc will try to detect it automatically." in new_ticket
+    assert "Home charger details" in customer_detail
+    assert "formatHomeChargerLocation" in customer_detail
+    assert "Open in Google Maps" in staff_detail
+    assert "formatLocationSource" in staff_detail
+    assert "Not provided - request charger label close-up if needed." in staff_detail
+
+
 def test_customer_ticket_page_hides_debug_and_staff_only_fields():
     source = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
 
