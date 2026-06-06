@@ -86,6 +86,16 @@ export default function StaffTicketDetailPage() {
   const evidenceUrl = resolveEvidenceUrl(ticket.evidence_photos[0]);
   const additionalProof = ticket.evidence_photos.slice(1);
   const proofEvents = ticket.events.filter((event) => event.event_type === "proof_uploaded");
+  const chargerLabelEvidenceNames = new Set(
+    proofEvents
+      .filter((event) => /charger label photo/i.test(event.message))
+      .map((event) => {
+        const payload = event.payload_json || {};
+        const evidence = payload.evidence;
+        return typeof evidence === "object" && evidence && "filename" in evidence ? String(evidence.filename) : "";
+      })
+      .filter(Boolean)
+  );
   const isTerminalStatus = ["resolved", "closed", "cancelled"].includes(ticket.status);
   const mapHref =
     ticket.charger_context.location_lat != null && ticket.charger_context.location_lng != null
@@ -191,7 +201,9 @@ export default function StaffTicketDetailPage() {
               <InfoBox label="Contact" value={`${ticket.customer_profile.phone_number} / ${ticket.customer_profile.email}`} />
               <InfoBox label="Address" value={ticket.charger_context.installation_address} />
               <InfoBox label="Home charger location" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
-              <InfoBox label="Location notes" value={ticket.charger_context.charger_location_notes || "None"} />
+              {ticket.charger_context.charger_location_notes && (
+                <InfoBox label="Location notes" value={ticket.charger_context.charger_location_notes} />
+              )}
               <InfoBox label="Location source" value={formatLocationSource(ticket.charger_context.location_source)} />
               <InfoBox
                 label="Map coordinate"
@@ -230,6 +242,7 @@ export default function StaffTicketDetailPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 {additionalProof.map((item, index) => {
                   const url = resolveEvidenceUrl(item);
+                  const isLabelPhoto = chargerLabelEvidenceNames.has(item.filename || "");
                   return (
                     <a
                       key={`${item.storage_path || item.filename}-${index}`}
@@ -238,7 +251,9 @@ export default function StaffTicketDetailPage() {
                       rel="noreferrer"
                       className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 hover:border-blue-300"
                     >
-                      <p className="font-mono text-xs uppercase tracking-widest text-slate-500">{item.kind || "proof"}</p>
+                      <p className="font-mono text-xs uppercase tracking-widest text-slate-500">
+                        {isLabelPhoto ? "Charger label photo for brand/model and serial verification" : item.kind || "proof"}
+                      </p>
                       <p className="mt-2 text-slate-950">{item.filename || "Uploaded proof"}</p>
                     </a>
                   );

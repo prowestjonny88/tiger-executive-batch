@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, LocateFixed } from "lucide-react";
 
 import {
+  addTicketEvidence,
   createTicketFromTriage,
   formatInstallationSource,
   fetchPreview,
@@ -68,12 +69,15 @@ export default function NewTicketPage() {
   const [customer, setCustomer] = useState<CustomerProfile>(initialCustomer);
   const [context, setContext] = useState<ChargerContext>(initialContext);
   const [file, setFile] = useState<File | null>(null);
+  const [labelFile, setLabelFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [labelPreviewUrl, setLabelPreviewUrl] = useState("");
   const [state, setState] = useState<"idle" | "checking" | "ready" | "creating" | "error">("idle");
   const [error, setError] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "success" | "denied" | "error">("idle");
   const [locationError, setLocationError] = useState("");
   const [uploadedEvidence, setUploadedEvidence] = useState<UploadedPhotoEvidence | null>(null);
+  const [labelEvidence, setLabelEvidence] = useState<UploadedPhotoEvidence | null>(null);
   const [triageResult, setTriageResult] = useState<ApiTriageResponse | null>(null);
   const [identitySuggestion, setIdentitySuggestion] = useState<ChargerIdentitySuggestion | null>(null);
 
@@ -86,6 +90,16 @@ export default function NewTicketPage() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
+
+  useEffect(() => {
+    if (!labelFile) {
+      setLabelPreviewUrl("");
+      return;
+    }
+    const url = URL.createObjectURL(labelFile);
+    setLabelPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [labelFile]);
 
   const customerValid = useMemo(
     () =>
@@ -165,7 +179,7 @@ export default function NewTicketPage() {
         error_code: context.error_code || "",
         follow_up_answers: {},
       });
-      const suggestion = extractChargerIdentitySuggestion(triage);
+      const suggestion = extractChargerIdentitySuggestion(triage, { labelPhotoUploaded: Boolean(labelFile) });
       setUploadedEvidence(uploaded);
       setTriageResult(triage);
       setIdentitySuggestion(suggestion);
@@ -194,6 +208,21 @@ export default function NewTicketPage() {
         charger_context: context,
         customer_comments: context.symptom_text || undefined,
       });
+      if (labelFile) {
+        try {
+          const uploadedLabel = await uploadIncidentPhoto(labelFile);
+          setLabelEvidence(uploadedLabel);
+          await addTicketEvidence(created.ticket_id, {
+            evidence: uploadedLabel,
+            evidence_type: "closeup",
+            actor_role: "customer",
+            actor_name: customer.full_name,
+            message: "Customer uploaded charger label photo for brand/model and serial verification.",
+          });
+        } catch {
+          /* Optional label evidence should not block the created ticket. */
+        }
+      }
       saveDemoCustomerProfile(customer);
       router.push(`/customer/tickets/${created.ticket_id}`);
     } catch (err) {
@@ -252,7 +281,7 @@ export default function NewTicketPage() {
 
         {step === 2 && (
           <section className="space-y-5">
-            <h2 className="text-xl font-extrabold text-slate-950">Home Charger Location and Installation Context</h2>
+            <h2 className="text-xl font-extrabold text-slate-950">Home Charger Location and Issue Context</h2>
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Installation address</Label>
               <Textarea
@@ -289,41 +318,12 @@ export default function NewTicketPage() {
                 options={homeChargerLocationOptions}
               />
               <SelectInput
-                label="Customer type"
-                value={context.customer_type}
-                onChange={(value) => setContext({ ...context, customer_type: value as ChargerContext["customer_type"] })}
-                options={["home", "condo", "commercial", "public_site", "unknown"]}
-              />
-              <SelectInput
                 label="Installed by"
                 value={context.installed_by}
                 onChange={(value) => setContext({ ...context, installed_by: value as ChargerContext["installed_by"] })}
                 options={["rexharge", "third_party", "property_management", "unknown"]}
               />
-              <TextInput label="Installer name" value={context.installer_name || ""} onChange={(value) => setContext({ ...context, installer_name: value })} />
-              <TextInput
-                label="Charger serial number"
-                value={context.charger_serial_number || ""}
-                onChange={(value) => setContext({ ...context, charger_serial_number: value })}
-                helper="Optional. If visible in your charger photo, ChargerDoc will try to detect it automatically."
-              />
-              <TextInput
-                label="Charger brand/model"
-                value={context.charger_brand_model || ""}
-                onChange={(value) => setContext({ ...context, charger_brand_model: value })}
-                helper="Optional. You can confirm or edit this after uploading the charger photo."
-              />
-              <TextInput label="Error/app code" value={context.error_code || ""} onChange={(value) => setContext({ ...context, error_code: value })} />
             </FormGrid>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Charger location notes</Label>
-              <Textarea
-                value={context.charger_location_notes || ""}
-                onChange={(event) => setContext({ ...context, charger_location_notes: event.target.value })}
-                className="min-h-[80px] resize-none rounded-xl"
-                placeholder="Example: car porch left wall, beside DB box, outdoor wall near gate"
-              />
-            </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Describe the issue</Label>
               <Textarea
@@ -332,6 +332,11 @@ export default function NewTicketPage() {
                 className="min-h-[100px] resize-none rounded-xl"
               />
             </div>
+            <TextInput
+              label="Error code shown on charger/app, if any"
+              value={context.error_code || ""}
+              onChange={(value) => setContext({ ...context, error_code: value })}
+            />
             {context.installed_by === "third_party" && (
               <Alert variant="warning" className="rounded-2xl">
                 <AlertTriangle className="h-4 w-4" />
@@ -368,10 +373,27 @@ export default function NewTicketPage() {
               title="Upload charger, EVDB, or isolator evidence"
               subtitle="Keep labels and switch positions visible where possible."
             />
+            <UploadDropzone
+              onFileSelect={(selected) => {
+                setLabelFile(selected);
+                setLabelEvidence(null);
+                setError("");
+                setTriageResult(null);
+                setIdentitySuggestion(null);
+                setState("idle");
+              }}
+              fileName={labelFile?.name}
+              fileSize={labelFile?.size}
+              previewUrl={labelPreviewUrl}
+              title="Snap charger label for brand and serial number"
+              subtitle="Optional but recommended. Take a close-up of the visible charger label so ChargerDoc can try to read the brand/model and serial number."
+            />
             <Alert className="rounded-2xl">
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Safe photo reminder</AlertTitle>
-              <AlertDescription>Take photos from a safe distance. Do not open electrical panels unless authorized.</AlertDescription>
+              <AlertDescription>
+                Take photos from a safe distance. Do not open the charger casing or electrical panels.
+              </AlertDescription>
             </Alert>
             <StepActions canContinue={Boolean(file)} onBack={() => setStep(2)} onNext={() => setStep(4)} />
           </section>
@@ -381,22 +403,25 @@ export default function NewTicketPage() {
           <section className="space-y-5">
             <h2 className="text-xl font-extrabold text-slate-950">AI Check and Charger Details</h2>
             <p className="text-sm font-medium leading-6 text-slate-600">
-              ChargerDoc will check the photo first. Confirm any detected charger details before the support ticket is created.
+              Check the photo before creating ticket. ChargerDoc will try to read the charger label, then you can confirm the details.
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
             {triageResult && identitySuggestion && (
               <Card className="rounded-2xl border border-green-100 bg-green-50 p-5">
                 <p className="technical-label text-green-700">Detected Charger Details</p>
                 <h3 className="mt-2 text-xl font-extrabold text-slate-950">Confirm or edit before creating the ticket</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  ChargerDoc checked the uploaded photo and tried to read the charger label. Please confirm the details before creating the ticket.
+                </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{identitySuggestion.note}</p>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <TextInput
-                    label="Brand / model"
+                    label="Charger Brand/Model"
                     value={context.charger_brand_model || ""}
                     onChange={(value) => setContext({ ...context, charger_brand_model: value })}
                   />
                   <TextInput
-                    label="Serial number"
+                    label="Charger Serial Number"
                     value={context.charger_serial_number || ""}
                     onChange={(value) => setContext({ ...context, charger_serial_number: value })}
                   />
@@ -410,9 +435,21 @@ export default function NewTicketPage() {
                 </div>
               </Card>
             )}
+            {!triageResult && (
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-600">
+                {labelFile
+                  ? "Charger label photo uploaded. ChargerDoc will use it as additional evidence for brand/model and serial verification."
+                  : "No charger label photo uploaded. ChargerDoc will try to detect details from the main issue photo if visible."}
+              </p>
+            )}
             {uploadedEvidence && (
               <p className="text-xs font-semibold text-slate-500">
                 Checked photo: {uploadedEvidence.filename}. Confirmed fields will be saved into the ticket.
+              </p>
+            )}
+            {labelEvidence && (
+              <p className="text-xs font-semibold text-slate-500">
+                Charger label evidence attached: {labelEvidence.filename}.
               </p>
             )}
             <div className="flex flex-col gap-3 sm:flex-row">

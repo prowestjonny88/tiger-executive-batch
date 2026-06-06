@@ -149,19 +149,38 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "competition_output" in identity_helper
     assert "perception" in identity_helper
     assert "The charger label was not readable" in identity_helper
-    assert "Home Charger Location and Installation Context" in new_ticket
+    step2_source = new_ticket.split("{step === 2 &&", 1)[1].split("{step === 3 &&", 1)[0]
+    step3_source = new_ticket.split("{step === 3 &&", 1)[1].split("{step === 4 &&", 1)[0]
+    step4_source = new_ticket.split("{step === 4 &&", 1)[1]
+
+    assert "Home Charger Location and Issue Context" in step2_source
     assert "Use Current Location" in new_ticket
     assert "navigator.geolocation.getCurrentPosition" in new_ticket
-    assert "Detected Charger Details" in new_ticket
+    assert "Home charger location" in step2_source
+    assert "Installed by" in step2_source
+    assert "Describe the issue" in step2_source
+    assert "Error code shown on charger/app, if any" in step2_source
+    assert "Customer type" not in step2_source
+    assert "Installer name" not in step2_source
+    assert "Charger location notes" not in step2_source
+    assert "Charger serial number" not in step2_source
+    assert "Charger brand/model" not in step2_source
+    assert "Snap charger label for brand and serial number" in step3_source
+    assert "Do not open the charger casing or electrical panels." in step3_source
+    assert "Detected Charger Details" in step4_source
+    assert "Confirm and Create Ticket" in step4_source
     assert "runTriageOnly" in new_ticket
     assert "createTicketAfterIdentityReview" in new_ticket
     assert "Check Photo and Create Ticket" not in new_ticket
-    assert "Optional. If visible in your charger photo, ChargerDoc will try to detect it automatically." in new_ticket
     assert "Home charger details" in customer_detail
     assert "formatHomeChargerLocation" in customer_detail
+    assert "canRequestReschedule" in customer_detail
+    assert "Previous Scheduled Visit" in customer_detail
     assert "Open in Google Maps" in staff_detail
     assert "formatLocationSource" in staff_detail
+    assert "Charger label photo for brand/model and serial verification" in staff_detail
     assert "Not provided - request charger label close-up if needed." in staff_detail
+    assert "incident.charger_id" not in identity_helper
 
 
 def test_customer_ticket_page_hides_debug_and_staff_only_fields():

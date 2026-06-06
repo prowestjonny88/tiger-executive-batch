@@ -4,7 +4,7 @@ export type ChargerIdentitySuggestion = {
   brand_model?: string;
   serial_number?: string;
   confidence: "high" | "medium" | "low" | "unknown";
-  source: "triage_output" | "perception" | "incident" | "none";
+  source: "triage_output" | "perception" | "none";
   needs_closeup: boolean;
   note: string;
 };
@@ -13,21 +13,22 @@ function clean(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
 }
 
-export function extractChargerIdentitySuggestion(triage: ApiTriageResponse): ChargerIdentitySuggestion {
+export function extractChargerIdentitySuggestion(
+  triage: ApiTriageResponse,
+  options: { labelPhotoUploaded?: boolean } = {}
+): ChargerIdentitySuggestion {
   const output = triage.competition_output;
   const extraction = triage.perception?.extraction;
-  const incident = triage.incident;
 
   const outputSerial = clean(output?.charger_serial_number);
   const outputBrand = clean(output?.charger_brand_model);
   const extractionSerial = clean(extraction?.charger_serial_number);
   const extractionBrand = clean(extraction?.charger_brand_model);
-  const incidentSerial = clean(incident?.charger_id);
 
-  const serialNumber = outputSerial || extractionSerial || incidentSerial;
+  const serialNumber = outputSerial || extractionSerial;
   const brandModel = outputBrand || extractionBrand;
   const source: ChargerIdentitySuggestion["source"] =
-    outputSerial || outputBrand ? "triage_output" : extractionSerial || extractionBrand ? "perception" : incidentSerial ? "incident" : "none";
+    outputSerial || outputBrand ? "triage_output" : extractionSerial || extractionBrand ? "perception" : "none";
   const hasAnyIdentity = Boolean(serialNumber || brandModel);
 
   return {
@@ -38,7 +39,9 @@ export function extractChargerIdentitySuggestion(triage: ApiTriageResponse): Cha
     needs_closeup: !hasAnyIdentity,
     note: hasAnyIdentity
       ? "Possible charger identity found from the uploaded photo. Please confirm or edit before creating the ticket."
-      : "The charger label was not readable. You can continue without it, enter it manually, or upload a close-up label later.",
+      : options.labelPhotoUploaded
+        ? "Charger label photo uploaded, but the label was not readable. You can continue without it or enter the details manually."
+        : "The charger label was not readable. You can continue without it or enter the details manually.",
   };
 }
 

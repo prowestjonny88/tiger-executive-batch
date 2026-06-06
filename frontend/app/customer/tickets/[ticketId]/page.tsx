@@ -72,6 +72,8 @@ export default function CustomerTicketDetailPage() {
   const customerEvents = ticket.events.filter((event) => !hiddenCustomerEventTypes.has(event.event_type));
   const needsProof = ticket.status === "waiting_customer" && Boolean(ticket.required_proof_next);
   const hasUploadedProof = ticket.events.some((event) => event.event_type === "proof_uploaded");
+  const isTerminalStatus = ["resolved", "closed", "cancelled"].includes(ticket.status);
+  const canRequestReschedule = Boolean(ticket.scheduled_at) && !isTerminalStatus;
   const chargerIdentity =
     ticket.charger_context.charger_brand_model || ticket.charger_context.charger_serial_number
       ? `${ticket.charger_context.charger_brand_model || "Brand/model not provided"} / ${
@@ -151,7 +153,9 @@ export default function CustomerTicketDetailPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
               <SummaryBox label="Charger position" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
-              <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes || "None"} />
+              {ticket.charger_context.charger_location_notes && (
+                <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes} />
+              )}
               <SummaryBox label="Charger details" value={chargerIdentity} />
             </div>
           </Card>
@@ -222,16 +226,20 @@ export default function CustomerTicketDetailPage() {
             <Card className="app-card p-6">
               <div className="mb-4 flex items-center gap-3">
                 <CalendarClock className="h-5 w-5 text-blue-700" />
-                <h2 className="text-xl font-extrabold text-slate-950">Visit Scheduled</h2>
+                <h2 className="text-xl font-extrabold text-slate-950">
+                  {isTerminalStatus ? "Previous Scheduled Visit" : "Visit Scheduled"}
+                </h2>
               </div>
               <p className="text-sm font-semibold text-slate-700">{new Date(ticket.scheduled_at).toLocaleString()}</p>
               <p className="mt-1 text-sm font-semibold text-slate-700">{ticket.scheduled_window}</p>
               {ticket.assigned_technician && (
                 <p className="mt-1 text-sm font-semibold text-slate-700">Technician: {ticket.assigned_technician}</p>
               )}
-              <Button variant="outline" className="mt-5 w-full rounded-xl" onClick={requestReschedule}>
-                Request Reschedule
-              </Button>
+              {canRequestReschedule && (
+                <Button variant="outline" className="mt-5 w-full rounded-xl" onClick={requestReschedule}>
+                  Request Reschedule
+                </Button>
+              )}
             </Card>
           )}
 
