@@ -165,10 +165,22 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Charger location notes" not in step2_source
     assert "Charger serial number" not in step2_source
     assert "Charger brand/model" not in step2_source
-    assert "Snap charger label for brand and serial number" in step3_source
+    assert "Upload a photo of the charger issue" in step3_source
+    assert "Upload a clear photo of the charger, EVDB, isolator, or visible fault indicator." in step3_source
+    assert "Optional: Add charger label photo" in step3_source
+    assert "This helps after-sales verify your charger model and serial number faster." in step3_source
     assert "Do not open the charger casing or electrical panels." in step3_source
-    assert "Detected Charger Details" in step4_source
-    assert "Confirm and Create Ticket" in step4_source
+    assert "try to read" not in step3_source
+    assert "Contact" in new_ticket
+    assert "Home Charger" in new_ticket
+    assert "Problem Photo" in new_ticket
+    assert "Diagnosis & Ticket" in new_ticket
+    assert "Diagnosis Summary" in step4_source
+    assert "What happens next" in step4_source
+    assert "Optional Charger Details" in step4_source
+    assert step4_source.index("Diagnosis Summary") < step4_source.index("Optional Charger Details")
+    assert "Create Support Ticket" in step4_source
+    assert "Confirm and Create Ticket" not in step4_source
     assert "runTriageOnly" in new_ticket
     assert "createTicketAfterIdentityReview" in new_ticket
     assert "Check Photo and Create Ticket" not in new_ticket
@@ -204,6 +216,7 @@ def test_ticket_post_audit_frontend_contracts():
     customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
     staff_dashboard = _read(FRONTEND_ROOT / "app" / "staff" / "dashboard" / "page.tsx")
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
+    ticket_actions = _read(FRONTEND_ROOT / "lib" / "ticket-actions.ts")
     ticket_ui = _read(FRONTEND_ROOT / "lib" / "ticket-ui.ts")
     role_helper = _read(FRONTEND_ROOT / "lib" / "demo-role.ts")
     whatsapp_helper = _read(FRONTEND_ROOT / "lib" / "whatsapp-thread.ts")
@@ -248,6 +261,22 @@ def test_ticket_post_audit_frontend_contracts():
     assert "proof_uploaded" in staff_detail
     assert "Customer-uploaded proof for staff review" in staff_detail
     assert "const visibleTickets" in staff_dashboard
+    assert "Needs Review" in staff_dashboard
+    assert "Waiting Customer" in staff_dashboard
+    assert "High Priority" in staff_dashboard
+    assert "To Schedule" in staff_dashboard
+    assert "Scheduled Today" in staff_dashboard
+    assert "Reopened" in staff_dashboard
+    assert "Action Needed" in staff_dashboard
+    assert "Proof Status" in staff_dashboard
+    assert "Schedule Status" in staff_dashboard
+    assert "Last Updated" in staff_dashboard
+    assert "Recommended Staff Action" in staff_detail
+    assert "getTicketActionNeeded" in ticket_actions
+    assert "getProofStatus" in ticket_actions
+    assert "getScheduleStatus" in ticket_actions
+    assert "getTicketActionNeeded(ticket)" in staff_dashboard
+    assert "getTicketActionNeeded(ticket)" in staff_detail
 
 
 def test_frontend_theme2_files_do_not_contain_mojibake_or_problem_separators():

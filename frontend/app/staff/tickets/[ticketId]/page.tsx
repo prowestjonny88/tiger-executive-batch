@@ -26,6 +26,7 @@ import {
   type WhatsAppPreview,
 } from "../../../../lib/api";
 import { useDemoRoleGuard } from "../../../../lib/demo-role";
+import { getProofStatus, getScheduleStatus, getTicketActionNeeded } from "../../../../lib/ticket-actions";
 import { formatTicketStatus, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { PageShell } from "../../../../components/layout/page-shell";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
@@ -177,6 +178,16 @@ export default function StaffTicketDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
         <div className="space-y-6">
+          <Card className="app-card border-blue-100 bg-blue-50 p-6">
+            <p className="technical-label text-blue-700">Recommended Staff Action</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">{getTicketActionNeeded(ticket)}</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <InfoBox label="Proof status" value={getProofStatus(ticket)} />
+              <InfoBox label="Schedule status" value={getScheduleStatus(ticket)} />
+              <InfoBox label="Last updated" value={new Date(ticket.updated_at || ticket.created_at).toLocaleString()} />
+            </div>
+          </Card>
+
           <Card className="app-card p-6">
             <div className="flex flex-wrap gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-bold ${priorityClass(ticket.priority)}`}>{ticket.priority}</span>

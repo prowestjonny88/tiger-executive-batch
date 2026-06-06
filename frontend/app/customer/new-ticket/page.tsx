@@ -8,7 +8,10 @@ import { AlertTriangle, CheckCircle2, LocateFixed } from "lucide-react";
 import {
   addTicketEvidence,
   createTicketFromTriage,
+  formatFaultTypeV2,
   formatInstallationSource,
+  formatObservationResult,
+  formatRecipientType,
   fetchPreview,
   fetchSites,
   fetchTriage,
@@ -60,6 +63,13 @@ const homeChargerLocationOptions = [
   { value: "indoor_wall", label: "Indoor wall" },
   { value: "other", label: "Other" },
   { value: "unknown", label: "Not sure" },
+];
+
+const stepLabels: Array<{ step: Step; label: string }> = [
+  { step: 1, label: "Contact" },
+  { step: 2, label: "Home Charger" },
+  { step: 3, label: "Problem Photo" },
+  { step: 4, label: "Diagnosis & Ticket" },
 ];
 
 export default function NewTicketPage() {
@@ -242,15 +252,15 @@ export default function NewTicketPage() {
           </p>
         </div>
 
-        <div className="mb-8 grid grid-cols-4 gap-2">
-          {[1, 2, 3, 4].map((item) => (
+        <div className="mb-8 grid grid-cols-2 gap-2 md:grid-cols-4">
+          {stepLabels.map((item) => (
             <div
-              key={item}
+              key={item.step}
               className={`rounded-full px-3 py-2 text-center text-xs font-extrabold ${
-                step >= item ? "bg-green-700 text-white" : "bg-slate-100 text-slate-500"
+                step >= item.step ? "bg-green-700 text-white" : "bg-slate-100 text-slate-500"
               }`}
             >
-              Step {item}
+              {item.step}. {item.label}
             </div>
           ))}
         </div>
@@ -370,8 +380,8 @@ export default function NewTicketPage() {
               fileName={file?.name}
               fileSize={file?.size}
               previewUrl={previewUrl}
-              title="Upload charger, EVDB, or isolator evidence"
-              subtitle="Keep labels and switch positions visible where possible."
+              title="Upload a photo of the charger issue"
+              subtitle="Upload a clear photo of the charger, EVDB, isolator, or visible fault indicator."
             />
             <UploadDropzone
               onFileSelect={(selected) => {
@@ -385,8 +395,8 @@ export default function NewTicketPage() {
               fileName={labelFile?.name}
               fileSize={labelFile?.size}
               previewUrl={labelPreviewUrl}
-              title="Snap charger label for brand and serial number"
-              subtitle="Optional but recommended. Take a close-up of the visible charger label so ChargerDoc can try to read the brand/model and serial number."
+              title="Optional: Add charger label photo"
+              subtitle="This helps after-sales verify your charger model and serial number faster."
             />
             <Alert className="rounded-2xl">
               <CheckCircle2 className="h-4 w-4" />
@@ -401,17 +411,47 @@ export default function NewTicketPage() {
 
         {step === 4 && (
           <section className="space-y-5">
-            <h2 className="text-xl font-extrabold text-slate-950">AI Check and Charger Details</h2>
+            <h2 className="text-xl font-extrabold text-slate-950">Diagnosis & Ticket</h2>
             <p className="text-sm font-medium leading-6 text-slate-600">
-              Check the photo before creating ticket. ChargerDoc will try to read the charger label, then you can confirm the details.
+              ChargerDoc will inspect the uploaded problem photo and prepare a support-ticket summary.
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
-            {triageResult && identitySuggestion && (
+            {triageResult && (
               <Card className="rounded-2xl border border-green-100 bg-green-50 p-5">
-                <p className="technical-label text-green-700">Detected Charger Details</p>
-                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Confirm or edit before creating the ticket</h3>
+                <p className="technical-label text-green-700">Diagnosis Summary</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">What ChargerDoc found</h3>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <SummaryBox label="Detected issue" value={formatObservationResult(triageResult.competition_output.observation_result)} />
+                  <SummaryBox label="Likely fault type" value={formatFaultTypeV2(triageResult.competition_output.fault_type_v2)} />
+                  <SummaryBox label="Recommended next step" value={getCustomerNextStep(triageResult)} />
+                  <SummaryBox label="Priority preview" value={getPriorityPreview(triageResult)} />
+                </div>
+                <p className="mt-4 rounded-xl bg-white p-4 text-sm font-semibold leading-6 text-slate-700">
+                  {getDiagnosisNote(triageResult)}
+                </p>
+              </Card>
+            )}
+            {triageResult && (
+              <Card className="rounded-2xl border border-slate-200 bg-white p-5">
+                <p className="technical-label text-slate-500">What happens next</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Create a support ticket and track progress</h3>
+                <ol className="mt-4 space-y-2 text-sm font-semibold leading-6 text-slate-600">
+                  <li>1. A support ticket will be created.</li>
+                  <li>2. After-sales staff will review your evidence and details.</li>
+                  <li>3. If needed, they may request more proof or schedule a visit.</li>
+                  <li>4. You can track everything from My Tickets.</li>
+                </ol>
+                <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">
+                  {getWhatHappensNextNote(triageResult)}
+                </p>
+              </Card>
+            )}
+            {triageResult && identitySuggestion && (
+              <Card className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <p className="technical-label text-slate-500">Optional Charger Details</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Confirm details if you know them</h3>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  ChargerDoc checked the uploaded photo and tried to read the charger label. Please confirm the details before creating the ticket.
+                  If ChargerDoc detected or you know the charger details, confirm them below. You can also leave them blank.
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{identitySuggestion.note}</p>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -439,7 +479,7 @@ export default function NewTicketPage() {
               <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-600">
                 {labelFile
                   ? "Charger label photo uploaded. ChargerDoc will use it as additional evidence for brand/model and serial verification."
-                  : "No charger label photo uploaded. ChargerDoc will try to detect details from the main issue photo if visible."}
+                  : "No charger label photo uploaded. You can still check the problem photo and create the ticket."}
               </p>
             )}
             {uploadedEvidence && (
@@ -470,7 +510,7 @@ export default function NewTicketPage() {
                   onClick={createTicketAfterIdentityReview}
                   disabled={state === "creating"}
                 >
-                  {state === "creating" ? "Creating ticket..." : "Confirm and Create Ticket"}
+                  {state === "creating" ? "Creating ticket..." : "Create Support Ticket"}
                 </Button>
               )}
             </div>
@@ -483,6 +523,50 @@ export default function NewTicketPage() {
 
 function FormGrid({ children }: { children: ReactNode }) {
   return <div className="grid gap-4 md:grid-cols-2">{children}</div>;
+}
+
+function SummaryBox({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="technical-label text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-extrabold leading-6 text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function getCustomerNextStep(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "More proof may be needed";
+  if (output.recipient_type === "after_sales_team") return "After-sales review required";
+  if (output.recipient_type === "customer") return "Customer guidance available";
+  if (output.recipient_type === "none") return "No routing required";
+  return formatRecipientType(output.recipient_type);
+}
+
+function getPriorityPreview(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "Verification needed";
+  if (output.recipient_type === "after_sales_team") return output.fault_type_v2 === "protection_issue" ? "High" : "Medium";
+  if (output.recipient_type === "customer") return "Customer action";
+  return "Low";
+}
+
+function getDiagnosisNote(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.required_proof_next) return output.required_proof_next;
+  if (triage.perception.hazard_signals.length > 0) return "Safety signals were detected. Keep distance and wait for proper support if unsure.";
+  if (output.evidence_notes.length > 0) return output.evidence_notes[0];
+  return output.action_message;
+}
+
+function getWhatHappensNextNote(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "More proof may be requested after ticket creation.";
+  if (output.recipient_type === "after_sales_team") return "This will be routed to after-sales for review.";
+  if (output.recipient_type === "customer") {
+    return "This looks like a customer-action case. A ticket will still be saved so you can track the guidance and reopen if needed.";
+  }
+  return "The ticket will store the diagnosis and evidence for your records.";
 }
 
 function TextInput({ label, value, helper, onChange }: { label: string; value: string; helper?: string; onChange: (value: string) => void }) {
