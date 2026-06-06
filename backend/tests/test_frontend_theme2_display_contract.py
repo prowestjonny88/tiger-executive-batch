@@ -176,6 +176,8 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Problem Photo" in new_ticket
     assert "Diagnosis & Ticket" in new_ticket
     assert "Diagnosis Summary" in step4_source
+    assert "Urgency preview" in step4_source
+    assert "Priority preview" not in step4_source
     assert "What happens next" in step4_source
     assert "Optional Charger Details" in step4_source
     assert step4_source.index("Diagnosis Summary") < step4_source.index("Optional Charger Details")
@@ -271,6 +273,16 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Proof Status" in staff_dashboard
     assert "Schedule Status" in staff_dashboard
     assert "Last Updated" in staff_dashboard
+    assert "const [allTickets, setAllTickets]" in staff_dashboard
+    assert "const [tickets, setTickets]" in staff_dashboard
+    assert "loadAllTickets" in staff_dashboard
+    assert "loadFilteredTickets" in staff_dashboard
+    assert "allTickets.filter(isNeedsReviewTicket).length" in staff_dashboard
+    assert "tickets.filter((ticket) => matchesWorkflowTab(ticket, activeTab))" in staff_dashboard
+    assert "No tickets need review right now" in staff_dashboard
+    assert "Try Waiting Customer, To Schedule, Scheduled, or All Tickets." in staff_dashboard
+    assert "No tickets yet" in staff_dashboard
+    assert "Try clearing search or filters." in staff_dashboard
     assert "Recommended Staff Action" in staff_detail
     assert "getTicketActionNeeded" in ticket_actions
     assert "getProofStatus" in ticket_actions

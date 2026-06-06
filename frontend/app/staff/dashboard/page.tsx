@@ -51,59 +51,67 @@ const workflowTabs: Array<{ id: WorkflowTab; label: string }> = [
 
 export default function StaffDashboardPage() {
   useDemoRoleGuard("staff");
+  const [allTickets, setAllTickets] = useState<TicketRecord[]>([]);
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<WorkflowTab>("needs_review");
   const [error, setError] = useState("");
 
-  const loadTickets = () => {
+  const loadAllTickets = () => {
+    fetchTickets({})
+      .then((data) => setAllTickets(data.tickets))
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
+  };
+
+  const loadFilteredTickets = () => {
     fetchTickets(filters)
       .then((data) => setTickets(data.tickets))
       .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
   };
 
-  useEffect(loadTickets, [filters]);
+  useEffect(loadAllTickets, []);
+  useEffect(loadFilteredTickets, [filters]);
   const summaryCards = useMemo(
     () => [
       {
         label: "Needs Review",
-        count: tickets.filter(isNeedsReviewTicket).length,
+        count: allTickets.filter(isNeedsReviewTicket).length,
         helper: "New or assigned tickets requiring staff attention",
         onClick: () => setActiveTab("needs_review"),
       },
       {
         label: "Waiting Customer",
-        count: tickets.filter((ticket) => ticket.status === "waiting_customer").length,
+        count: allTickets.filter((ticket) => ticket.status === "waiting_customer").length,
         helper: "Tickets waiting for customer proof or clarification",
         onClick: () => setActiveTab("waiting_customer"),
       },
       {
         label: "High Priority",
-        count: tickets.filter((ticket) => ticket.priority === "High").length,
+        count: allTickets.filter((ticket) => ticket.priority === "High").length,
         helper: "High priority cases to review first",
         onClick: () => setFilters({ ...filters, priority: filters.priority === "High" ? "" : "High" }),
       },
       {
         label: "To Schedule",
-        count: tickets.filter(isToScheduleTicket).length,
+        count: allTickets.filter(isToScheduleTicket).length,
         helper: "After-sales tickets without a visit slot",
         onClick: () => setActiveTab("to_schedule"),
       },
       {
         label: "Scheduled Today",
-        count: tickets.filter(isScheduledToday).length,
+        count: allTickets.filter(isScheduledToday).length,
         helper: "Visits scheduled for today",
         onClick: () => setActiveTab("scheduled"),
       },
       {
         label: "Reopened",
-        count: tickets.filter((ticket) => ticket.status === "reopened").length,
+        count: allTickets.filter((ticket) => ticket.status === "reopened").length,
         helper: "Tickets returned for review after feedback",
         onClick: () => setActiveTab("reopened"),
       },
     ],
-    [filters, tickets]
+    [allTickets, filters]
   );
 
   const tabbedTickets = useMemo(
@@ -133,6 +141,7 @@ export default function StaffDashboardPage() {
       return searchable.includes(query);
     });
   }, [search, tabbedTickets]);
+  const emptyState = getEmptyStateCopy(activeTab, allTickets.length > 0, search.trim().length > 0 || Object.values(filters).some(Boolean));
 
   return (
     <PageShell maxWidth="6xl">
@@ -220,7 +229,8 @@ export default function StaffDashboardPage() {
         {visibleTickets.length === 0 ? (
           <Card className="app-card p-8 text-center">
             <Headphones className="mx-auto mb-4 h-10 w-10 text-slate-400" />
-            <h2 className="text-xl font-extrabold text-slate-950">No tickets match these filters</h2>
+            <h2 className="text-xl font-extrabold text-slate-950">{emptyState.title}</h2>
+            <p className="mt-2 text-sm font-semibold text-slate-500">{emptyState.body}</p>
           </Card>
         ) : (
           visibleTickets.map((ticket) => (
@@ -287,4 +297,58 @@ function isScheduledToday(ticket: TicketRecord) {
   const scheduled = new Date(ticket.scheduled_at);
   const today = new Date();
   return scheduled.toDateString() === today.toDateString();
+}
+
+function getEmptyStateCopy(activeTab: WorkflowTab, hasAnyTickets: boolean, hasSearchOrFilters: boolean) {
+  if (!hasAnyTickets) {
+    return {
+      title: "No tickets yet",
+      body: "New customer support tickets will appear here once submitted.",
+    };
+  }
+
+  if (hasSearchOrFilters) {
+    return {
+      title: "No tickets match these filters",
+      body: "Try clearing search or filters.",
+    };
+  }
+
+  switch (activeTab) {
+    case "needs_review":
+      return {
+        title: "No tickets need review right now",
+        body: "Try Waiting Customer, To Schedule, Scheduled, or All Tickets.",
+      };
+    case "waiting_customer":
+      return {
+        title: "No tickets are waiting for customers",
+        body: "Proof-request tickets will appear here.",
+      };
+    case "to_schedule":
+      return {
+        title: "No tickets need scheduling",
+        body: "After-sales tickets without visit slots will appear here.",
+      };
+    case "scheduled":
+      return {
+        title: "No active scheduled visits",
+        body: "Scheduled tickets will appear here.",
+      };
+    case "resolved":
+      return {
+        title: "No resolved tickets in this view",
+        body: "Resolved and closed cases will appear here.",
+      };
+    case "reopened":
+      return {
+        title: "No reopened tickets",
+        body: "Tickets reopened after feedback will appear here.",
+      };
+    default:
+      return {
+        title: "No tickets match these filters",
+        body: "Try clearing search or filters.",
+      };
+  }
 }

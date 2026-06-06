@@ -424,7 +424,7 @@ export default function NewTicketPage() {
                   <SummaryBox label="Detected issue" value={formatObservationResult(triageResult.competition_output.observation_result)} />
                   <SummaryBox label="Likely fault type" value={formatFaultTypeV2(triageResult.competition_output.fault_type_v2)} />
                   <SummaryBox label="Recommended next step" value={getCustomerNextStep(triageResult)} />
-                  <SummaryBox label="Priority preview" value={getPriorityPreview(triageResult)} />
+                  <SummaryBox label="Urgency preview" value={getPriorityPreview(triageResult)} />
                 </div>
                 <p className="mt-4 rounded-xl bg-white p-4 text-sm font-semibold leading-6 text-slate-700">
                   {getDiagnosisNote(triageResult)}
