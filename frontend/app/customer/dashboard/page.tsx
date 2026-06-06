@@ -62,8 +62,11 @@ export default function CustomerDashboardPage() {
             <Ticket className="mx-auto mb-4 h-10 w-10 text-slate-400" />
             <h2 className="text-xl font-extrabold text-slate-950">No customer profile found</h2>
             <p className="mt-2 text-sm font-medium text-slate-500">
-              Start a new support ticket so this demo dashboard can show only your tickets.
+              Start your first support ticket so this demo dashboard can show only your tickets.
             </p>
+            <Button asChild className="mt-5 rounded-xl bg-green-700 font-bold hover:bg-green-800">
+              <Link href="/customer/new-ticket">Start your first support ticket</Link>
+            </Button>
           </Card>
         ) : tickets.length === 0 ? (
           <Card className="app-card p-8 text-center">

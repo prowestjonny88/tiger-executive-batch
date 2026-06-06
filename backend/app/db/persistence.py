@@ -567,6 +567,7 @@ def append_ticket_evidence_record(
                 UPDATE tickets
                 SET evidence_photos_json = evidence_photos_json || %s::jsonb,
                     status = CASE WHEN status = 'waiting_customer' THEN 'assigned' ELSE status END,
+                    required_proof_next = CASE WHEN status = 'waiting_customer' THEN NULL ELSE required_proof_next END,
                     updated_at = NOW()
                 WHERE ticket_id = %s
                 RETURNING *

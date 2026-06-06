@@ -20,7 +20,7 @@ import {
 } from "../../../../lib/api";
 import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { formatTicketStatus, nextActionForTicket, priorityClass, statusClass } from "../../../../lib/ticket-ui";
-import { buildWhatsAppThread } from "../../../../lib/whatsapp-thread";
+import { buildWhatsAppThread, hiddenCustomerEventTypes } from "../../../../lib/whatsapp-thread";
 import { PageShell } from "../../../../components/layout/page-shell";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { UploadDropzone } from "../../../../components/triage/upload-dropzone";
@@ -68,7 +68,9 @@ export default function CustomerTicketDetailPage() {
 
   const evidenceUrl = resolveEvidenceUrl(ticket.evidence_photos[0]);
   const annotations = ticket.triage_result?.perception?.extraction?.bounding_boxes ?? [];
-  const customerEvents = ticket.events.filter((event) => event.event_type !== "staff_note_added");
+  const customerEvents = ticket.events.filter((event) => !hiddenCustomerEventTypes.has(event.event_type));
+  const needsProof = ticket.status === "waiting_customer" && Boolean(ticket.required_proof_next);
+  const hasUploadedProof = ticket.events.some((event) => event.event_type === "proof_uploaded");
 
   const submitFeedback = async () => {
     const updated = await submitTicketFeedback(ticket.ticket_id, feedback);
@@ -137,7 +139,7 @@ export default function CustomerTicketDetailPage() {
             </div>
           </Card>
 
-          {ticket.required_proof_next && (
+          {needsProof && (
             <Card id="proof-upload" className="rounded-2xl border-amber-200 bg-amber-50 p-5">
               <div className="flex gap-3">
                 <UploadCloud className="mt-1 h-5 w-5 text-amber-700" />
@@ -161,11 +163,20 @@ export default function CustomerTicketDetailPage() {
                     >
                       {proofStatus === "uploading" ? "Uploading proof..." : "Upload Proof"}
                     </Button>
-                    {proofStatus === "done" && <p className="text-xs font-bold text-amber-800">Proof uploaded and added to the ticket timeline.</p>}
+                    {proofStatus === "done" && <p className="text-xs font-bold text-amber-800">Proof uploaded. Your ticket has returned to after-sales review.</p>}
                     {proofStatus === "error" && <p className="text-xs font-bold text-red-700">Proof upload failed. Please try again.</p>}
                   </div>
                 </div>
               </div>
+            </Card>
+          )}
+
+          {!needsProof && (proofStatus === "done" || hasUploadedProof) && (
+            <Card className="rounded-2xl border-green-200 bg-green-50 p-5">
+              <h2 className="font-extrabold text-green-950">Proof received</h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-green-900">
+                Proof uploaded. Your ticket has returned to after-sales review.
+              </p>
             </Card>
           )}
 
@@ -179,7 +190,7 @@ export default function CustomerTicketDetailPage() {
                   <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">{event.event_type.replaceAll("_", " ")}</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
                     {event.event_type === "status_changed"
-                      ? "Ticket status was updated by the support team."
+                      ? `Your ticket status is now: ${formatTicketStatus(String(event.payload_json?.status || event.payload_json?.new_status || ticket.status))}.`
                       : event.message}
                   </p>
                   <p className="mt-1 text-xs font-medium text-slate-500">{new Date(event.created_at).toLocaleString()}</p>
@@ -198,7 +209,9 @@ export default function CustomerTicketDetailPage() {
               </div>
               <p className="text-sm font-semibold text-slate-700">{new Date(ticket.scheduled_at).toLocaleString()}</p>
               <p className="mt-1 text-sm font-semibold text-slate-700">{ticket.scheduled_window}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-700">Technician: {ticket.assigned_technician}</p>
+              {ticket.assigned_technician && (
+                <p className="mt-1 text-sm font-semibold text-slate-700">Technician: {ticket.assigned_technician}</p>
+              )}
               <Button variant="outline" className="mt-5 w-full rounded-xl" onClick={requestReschedule}>
                 Request Reschedule
               </Button>
@@ -242,9 +255,11 @@ export default function CustomerTicketDetailPage() {
                 <Button variant="outline" className="rounded-xl" onClick={() => document.getElementById("ticket-timeline")?.scrollIntoView({ behavior: "smooth" })}>
                   Check Status
                 </Button>
-                <Button variant="outline" className="rounded-xl" onClick={() => document.getElementById("proof-upload")?.scrollIntoView({ behavior: "smooth" })}>
-                  Upload Proof
-                </Button>
+                {needsProof && (
+                  <Button variant="outline" className="rounded-xl" onClick={() => document.getElementById("proof-upload")?.scrollIntoView({ behavior: "smooth" })}>
+                    Upload Proof
+                  </Button>
+                )}
               </div>
             </Card>
           )}

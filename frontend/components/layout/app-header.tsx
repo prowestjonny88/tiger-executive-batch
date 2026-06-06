@@ -3,12 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Zap } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 
 export function AppHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncRole = () => setRole(window.localStorage.getItem("chargerdoc_role"));
+    syncRole();
+    window.addEventListener("storage", syncRole);
+    return () => window.removeEventListener("storage", syncRole);
+  }, []);
 
   if (pathname === "/") {
     return null;
@@ -17,22 +25,39 @@ export function AppHeader() {
   // Helper to check active state
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
-    if (path === "/support") {
-      return ["/upload", "/questions", "/result", "/guidance", "/escalation", "/confirmation"].includes(pathname);
-    }
     if (path === "/portal") {
       return pathname.startsWith("/login") || pathname.startsWith("/customer") || pathname.startsWith("/staff");
     }
     return pathname.startsWith(path);
   };
 
-  const navLinks = [
-    { name: "Home", href: "/", activeKey: "/" },
-    { name: "New Report", href: "/upload", activeKey: "/support" },
-    { name: "Portal", href: "/login", activeKey: "/portal" },
-    { name: "History", href: "/history", activeKey: "/history" },
-    { name: "Safety", href: "/safety", activeKey: "/safety" },
-  ];
+  const navLinks =
+    role === "customer"
+      ? [
+          { name: "Home", href: "/", activeKey: "/" },
+          { name: "My Tickets", href: "/customer/dashboard", activeKey: "/customer/dashboard" },
+          { name: "New Ticket", href: "/customer/new-ticket", activeKey: "/customer/new-ticket" },
+          { name: "Safety", href: "/safety", activeKey: "/safety" },
+          { name: "Switch Role", href: "/login", activeKey: "/login" },
+        ]
+      : role === "staff"
+        ? [
+            { name: "Home", href: "/", activeKey: "/" },
+            { name: "Ticket Queue", href: "/staff/dashboard", activeKey: "/staff/dashboard" },
+            { name: "Incident Audit", href: "/staff/history", activeKey: "/staff/history" },
+            { name: "Safety", href: "/safety", activeKey: "/safety" },
+            { name: "Switch Role", href: "/login", activeKey: "/login" },
+          ]
+        : [
+            { name: "Home", href: "/", activeKey: "/" },
+            { name: "Portal", href: "/login", activeKey: "/portal" },
+            { name: "Safety", href: "/safety", activeKey: "/safety" },
+          ];
+  const cta = role === "customer"
+    ? { href: "/customer/new-ticket", label: "New Ticket" }
+    : role === "staff"
+      ? { href: "/staff/dashboard", label: "Ticket Queue" }
+      : { href: "/login", label: "Start Report" };
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-50 w-full">
@@ -70,10 +95,10 @@ export function AppHeader() {
 
         <div className="hidden md:block">
           <Link
-            href="/login"
+            href={cta.href}
             className="bg-green-700 hover:bg-green-800 text-white font-medium py-2.5 px-6 rounded-lg transition-colors shadow-sm flex items-center gap-2"
           >
-            Start Report
+            {cta.label}
           </Link>
         </div>
 
@@ -106,11 +131,11 @@ export function AppHeader() {
                 ))}
                 <div className="pt-6 border-t border-slate-100">
                   <Link
-                    href="/login"
+                    href={cta.href}
                     onClick={() => setOpen(false)}
                     className="flex justify-center bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-sm w-full"
                   >
-                    Start Report
+                    {cta.label}
                   </Link>
                 </div>
               </nav>

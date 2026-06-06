@@ -83,11 +83,13 @@ export default function StaffTicketDetailPage() {
   const evidenceUrl = resolveEvidenceUrl(ticket.evidence_photos[0]);
   const additionalProof = ticket.evidence_photos.slice(1);
   const proofEvents = ticket.events.filter((event) => event.event_type === "proof_uploaded");
+  const isTerminalStatus = ["resolved", "closed", "cancelled"].includes(ticket.status);
   const shouldShowScheduling =
-    showScheduling ||
-    ticket.recipient_type === "after_sales_team" ||
-    ["assigned", "scheduled", "reschedule_requested"].includes(ticket.status) ||
-    ["pending", "scheduled", "reschedule_requested"].includes(ticket.schedule_status);
+    !isTerminalStatus &&
+    (showScheduling ||
+      ticket.recipient_type === "after_sales_team" ||
+      ["assigned", "scheduled", "reschedule_requested"].includes(ticket.status) ||
+      ["pending", "scheduled", "reschedule_requested"].includes(ticket.schedule_status));
 
   const setStatus = async (status: TicketStatus) => {
     const updated = await updateTicketStatus(ticket.ticket_id, {
@@ -185,7 +187,10 @@ export default function StaffTicketDetailPage() {
 
           {(additionalProof.length > 0 || proofEvents.length > 0) && (
             <Card className="app-card p-6">
-              <h2 className="mb-4 text-xl font-extrabold text-slate-950">Customer uploaded proof</h2>
+              <h2 className="mb-1 text-xl font-extrabold text-slate-950">Customer-uploaded proof for staff review</h2>
+              <p className="mb-4 text-sm font-semibold leading-6 text-slate-600">
+                Supplemental proof is attached for staff review and does not imply automatic AI re-analysis.
+              </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 {additionalProof.map((item, index) => {
                   const url = resolveEvidenceUrl(item);
@@ -251,7 +256,22 @@ export default function StaffTicketDetailPage() {
             </div>
           </Card>
 
-          {shouldShowScheduling ? (
+          {isTerminalStatus && ticket.scheduled_at ? (
+            <Card className="app-card p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <CalendarClock className="h-5 w-5 text-slate-500" />
+                <h2 className="text-xl font-extrabold text-slate-950">Previous scheduled visit</h2>
+              </div>
+              <p className="text-sm font-semibold text-slate-700">{new Date(ticket.scheduled_at).toLocaleString()}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{ticket.scheduled_window}</p>
+              {ticket.assigned_technician && (
+                <p className="mt-1 text-sm font-semibold text-slate-700">Technician: {ticket.assigned_technician}</p>
+              )}
+              <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
+                This ticket is {formatTicketStatus(ticket.status).toLowerCase()}; scheduling controls are locked.
+              </p>
+            </Card>
+          ) : shouldShowScheduling ? (
             <Card className="app-card p-6">
               <div className="mb-4 flex items-center gap-3">
                 <CalendarClock className="h-5 w-5 text-blue-700" />

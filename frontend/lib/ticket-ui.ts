@@ -9,7 +9,7 @@ export function formatTicketStatus(status?: TicketStatus | string | null) {
     case "waiting_customer":
       return "More Info Needed";
     case "assigned":
-      return "Technician Assigned";
+      return "After-sales Review";
     case "scheduled":
       return "Visit Scheduled";
     case "reschedule_requested":

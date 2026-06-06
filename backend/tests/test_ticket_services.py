@@ -3,7 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.core.models import ChargerContext, CustomerProfile, TicketEvidenceRequest, TicketFromTriageRequest, TicketStatusUpdateRequest
+from app.core.models import (
+    ChargerContext,
+    CustomerProfile,
+    TicketEvidenceRequest,
+    TicketFromTriageRequest,
+    TicketScheduleRequest,
+    TicketStatusUpdateRequest,
+)
 from app.services import tickets
 
 
@@ -174,6 +181,29 @@ def test_attach_ticket_evidence_appends_proof_and_returns_ticket(monkeypatch):
     assert captured["message"] == "Customer uploaded additional proof: closeup.jpg."
 
 
+def test_terminal_ticket_schedule_noops_without_new_event(monkeypatch):
+    schedule_calls = []
+    event_calls = []
+    terminal_ticket = {"ticket_id": "RXT-20260604-0001", "status": "closed", "events": []}
+
+    monkeypatch.setattr("app.services.tickets.get_ticket_by_ticket_id", lambda ticket_id: terminal_ticket)
+    monkeypatch.setattr("app.db.persistence.schedule_ticket_record", lambda *args, **kwargs: schedule_calls.append(kwargs))
+    monkeypatch.setattr("app.services.tickets.add_ticket_event", lambda *args, **kwargs: event_calls.append(kwargs))
+
+    result = tickets.schedule_ticket_visit(
+        "RXT-20260604-0001",
+        TicketScheduleRequest(
+            scheduled_at="2026-06-06T10:00:00+00:00",
+            scheduled_window="10:00 AM - 12:00 PM",
+            assigned_technician="Ahmad",
+        ),
+    )
+
+    assert result == terminal_ticket
+    assert schedule_calls == []
+    assert event_calls == []
+
+
 def test_ticket_schema_and_routes_are_additive_source_contract():
     repo_root = Path(__file__).resolve().parents[2]
     persistence_source = (repo_root / "backend" / "app" / "db" / "persistence.py").read_text(encoding="utf-8")
@@ -185,6 +215,7 @@ def test_ticket_schema_and_routes_are_additive_source_contract():
     assert "app_screenshot_evidence_json" in persistence_source
     assert "append_ticket_evidence_record" in persistence_source
     assert "proof_uploaded" in persistence_source
+    assert "required_proof_next = CASE WHEN status = 'waiting_customer' THEN NULL ELSE required_proof_next END" in persistence_source
     assert "customer_profile_json ->> 'email'" in persistence_source
     assert "customer_profile_json ->> 'phone_number'" in persistence_source
     assert "customer_profile_json ->> 'whatsapp_number'" in persistence_source

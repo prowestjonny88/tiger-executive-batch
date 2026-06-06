@@ -166,7 +166,7 @@ function LandingHeader() {
         </nav>
 
         <div className="hidden lg:block">
-          <PillCta href="/upload">Check a Photo</PillCta>
+          <PillCta href="/login">Start Report</PillCta>
         </div>
 
         <button
@@ -188,8 +188,8 @@ function LandingHeader() {
                 {item.label}
               </a>
             ))}
-            <Link href="/upload" className="rounded-full bg-[var(--rex-green)] px-5 py-3 text-center text-sm font-bold text-white">
-              Check a Photo
+            <Link href="/login" className="rounded-full bg-[var(--rex-green)] px-5 py-3 text-center text-sm font-bold text-white">
+              Start Report
             </Link>
           </nav>
         </div>
@@ -222,7 +222,7 @@ function HeroSection() {
             Upload a charger, EVDB, or isolator photo. ChargerDoc checks the evidence, shows what was observed, and routes the case to customer guidance or after-sales support.
           </p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-            <PillCta href="/upload">Check a Photo</PillCta>
+            <PillCta href="/login">Start Report</PillCta>
             <PillCta href="#workflow" dark>
               See the Flow
             </PillCta>
@@ -615,7 +615,7 @@ function FinalCtaSection() {
           <h2 className="text-4xl font-extrabold leading-tight md:text-6xl">Start a guided charger support check.</h2>
           <p className="mx-auto mt-6 max-w-xl text-lg leading-8 text-white/72">Open the dashboard, upload evidence, and generate a structured support result.</p>
           <div className="mt-9">
-            <PillCta href="/upload">Check a Photo</PillCta>
+            <PillCta href="/login">Start Report</PillCta>
           </div>
           <p className="mt-5 text-sm font-semibold text-white/62">Demo mode is available for judge walkthroughs.</p>
         </motion.div>
@@ -626,7 +626,7 @@ function FinalCtaSection() {
 
 function LandingFooter() {
   const groups = [
-    ["Product", "Dashboard", "Upload Evidence", "History", "Safety"],
+    ["Product", "Portal", "New Ticket", "Incident Audit", "Safety"],
     ["Evidence Types", "Charger", "EVDB", "Isolator"],
     ["Competition", "Theme 2 MVP", "Output Requirements", "Demo Mode"],
     ["Support", "Contact", "Safety Notice"],

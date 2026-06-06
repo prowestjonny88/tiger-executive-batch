@@ -1,4 +1,5 @@
 import type { TicketEvent, TicketRecord } from "./api";
+import { formatTicketStatus } from "./ticket-ui";
 
 export type WhatsAppThreadBubble = {
   id: string;
@@ -7,7 +8,12 @@ export type WhatsAppThreadBubble = {
   align: "left" | "right";
 };
 
-const hiddenEventTypes = new Set(["staff_note_added"]);
+export const hiddenCustomerEventTypes = new Set([
+  "staff_note_added",
+  "whatsapp_preview_marked_sent",
+  "internal_status_note",
+  "internal_assignment_note",
+]);
 
 function eventMessage(ticket: TicketRecord, event: TicketEvent) {
   if (event.event_type === "ticket_created") {
@@ -23,7 +29,10 @@ function eventMessage(ticket: TicketRecord, event: TicketEvent) {
     return "Additional proof was uploaded and added to the ticket.";
   }
   if (event.event_type === "status_changed") {
-    return "Ticket status was updated by the support team.";
+    const status = event.payload_json?.status || event.payload_json?.new_status;
+    return status
+      ? `Your ticket status is now: ${formatTicketStatus(String(status))}.`
+      : "Your ticket status was updated by the support team.";
   }
   if (event.event_type === "visit_scheduled") {
     return event.message;
@@ -36,7 +45,7 @@ function eventMessage(ticket: TicketRecord, event: TicketEvent) {
 
 export function buildWhatsAppThread(ticket: TicketRecord): WhatsAppThreadBubble[] {
   return ticket.events
-    .filter((event) => !hiddenEventTypes.has(event.event_type))
+    .filter((event) => !hiddenCustomerEventTypes.has(event.event_type))
     .map((event) => ({
       id: String(event.id),
       message: eventMessage(ticket, event),

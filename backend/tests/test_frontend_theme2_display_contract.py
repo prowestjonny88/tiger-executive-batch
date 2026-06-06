@@ -113,6 +113,7 @@ def test_ticket_routes_and_role_flows_exist():
         FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx",
         FRONTEND_ROOT / "app" / "staff" / "dashboard" / "page.tsx",
         FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx",
+        FRONTEND_ROOT / "app" / "staff" / "history" / "page.tsx",
         FRONTEND_ROOT / "app" / "api" / "tickets" / "route.ts",
         FRONTEND_ROOT / "app" / "api" / "tickets" / "from-triage" / "route.ts",
         FRONTEND_ROOT / "app" / "api" / "tickets" / "[ticketId]" / "evidence" / "route.ts",
@@ -140,29 +141,60 @@ def test_customer_ticket_page_hides_debug_and_staff_only_fields():
 
 
 def test_ticket_post_audit_frontend_contracts():
+    app_header = _read(FRONTEND_ROOT / "components" / "layout" / "app-header.tsx")
+    landing = _read(FRONTEND_ROOT / "components" / "landing" / "landing-page.tsx")
+    upload = _read(FRONTEND_ROOT / "app" / "upload" / "page.tsx")
+    history = _read(FRONTEND_ROOT / "app" / "history" / "page.tsx")
+    staff_history = _read(FRONTEND_ROOT / "app" / "staff" / "history" / "page.tsx")
     customer_dashboard = _read(FRONTEND_ROOT / "app" / "customer" / "dashboard" / "page.tsx")
     new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
+    login = _read(FRONTEND_ROOT / "app" / "login" / "page.tsx")
     customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
     staff_dashboard = _read(FRONTEND_ROOT / "app" / "staff" / "dashboard" / "page.tsx")
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
+    ticket_ui = _read(FRONTEND_ROOT / "lib" / "ticket-ui.ts")
     role_helper = _read(FRONTEND_ROOT / "lib" / "demo-role.ts")
     whatsapp_helper = _read(FRONTEND_ROOT / "lib" / "whatsapp-thread.ts")
 
+    assert "New Report" not in app_header
+    assert 'href: "/upload"' not in app_header
+    assert "Switch Role" in app_header
+    assert "Incident Audit" in app_header
+    assert 'href="/upload"' not in landing
+    assert "Check a Photo" not in landing
+    assert 'router.replace(role === "customer" ? "/customer/new-ticket" : "/login")' in upload
+    assert 'router.replace("/staff/history")' in history
+    assert 'useDemoRoleGuard("staff")' in staff_history
+    assert "Incident Audit History" in staff_history
+    assert "New Incident" not in staff_history
     assert "chargerdoc_customer_profile" in role_helper
+    assert 'role === "customer" ? "/customer/new-ticket" : "/staff/dashboard"' in login
     assert 'useDemoRoleGuard("customer")' in customer_dashboard
     assert 'useDemoRoleGuard("customer")' in new_ticket
     assert 'useDemoRoleGuard("customer")' in customer_detail
     assert 'useDemoRoleGuard("staff")' in staff_dashboard
     assert 'useDemoRoleGuard("staff")' in staff_detail
     assert "fetchTickets({ customer_email: profile.email })" in customer_dashboard
+    assert "Start your first support ticket" in customer_dashboard
     assert "saveDemoCustomerProfile(customer)" in new_ticket
     assert "addTicketEvidence" in customer_detail
+    assert 'ticket.status === "waiting_customer"' in customer_detail
+    assert "Proof uploaded. Your ticket has returned to after-sales review." in customer_detail
     assert "ticket.triage_result?.perception?.extraction?.bounding_boxes ?? []" in customer_detail
     assert "buildWhatsAppThread" in whatsapp_helper
+    assert "hiddenCustomerEventTypes" in whatsapp_helper
     assert "staff_note_added" in whatsapp_helper
+    assert "whatsapp_preview_marked_sent" in whatsapp_helper
+    assert "internal_status_note" in whatsapp_helper
+    assert "internal_assignment_note" in whatsapp_helper
+    assert "After-sales Review" in ticket_ui
+    assert "Technician Assigned" not in ticket_ui
     assert "showScheduling" in staff_detail
     assert "Open Scheduling" in staff_detail
+    assert "isTerminalStatus" in staff_detail
+    assert "Previous scheduled visit" in staff_detail
     assert "proof_uploaded" in staff_detail
+    assert "Customer-uploaded proof for staff review" in staff_detail
     assert "const visibleTickets" in staff_dashboard
 
 

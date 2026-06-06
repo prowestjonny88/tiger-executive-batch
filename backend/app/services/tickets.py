@@ -247,6 +247,12 @@ def suggested_slots(priority: str, now: datetime | None = None) -> list[dict[str
 def schedule_ticket_visit(ticket_id: str, request: TicketScheduleRequest) -> dict[str, Any] | None:
     from app.db.persistence import schedule_ticket_record
 
+    existing_ticket = get_ticket_by_ticket_id(ticket_id)
+    if not existing_ticket:
+        return None
+    if existing_ticket.get("status") in {"resolved", "closed", "cancelled"}:
+        return existing_ticket
+
     ticket = schedule_ticket_record(
         ticket_id=ticket_id,
         scheduled_at=request.scheduled_at,
