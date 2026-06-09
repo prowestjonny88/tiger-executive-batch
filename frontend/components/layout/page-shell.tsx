@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 interface PageShellProps {
   children: ReactNode;
   className?: string;
-  maxWidth?: "3xl" | "4xl" | "5xl" | "6xl";
+  maxWidth?: "3xl" | "4xl" | "5xl" | "6xl" | "7xl";
 }
 
 export function PageShell({ children, className, maxWidth = "5xl" }: PageShellProps) {
@@ -13,6 +13,7 @@ export function PageShell({ children, className, maxWidth = "5xl" }: PageShellPr
     "4xl": "max-w-4xl",
     "5xl": "max-w-5xl",
     "6xl": "max-w-6xl",
+    "7xl": "max-w-7xl",
   }[maxWidth];
 
   return (

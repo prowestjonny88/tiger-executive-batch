@@ -2,14 +2,21 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Clipboard, RotateCcw } from "lucide-react";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../../components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "../../components/ui/alert";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import {
   ApiTriageResponse,
+  CompetitionOutput,
   fetchIncidentById,
   fetchTriage,
+  formatFaultTypeV2,
+  formatInputComponent,
+  formatObservationResult,
+  Theme2VisualExtraction,
   resolveEvidenceUrl,
   uploadIncidentPhoto,
 } from "../../lib/api";
@@ -26,7 +33,6 @@ import {
   type OrganizerOutputField,
 } from "../../lib/theme2-result-fields";
 import { deriveResultState } from "../../lib/theme2-result-state";
-import { FieldCard } from "../../components/triage/field-card";
 import { RouteBadge } from "../../components/triage/route-badge";
 
 export default function ResultAssessmentPage() {
@@ -180,59 +186,71 @@ function ResultAssessment() {
   };
 
   return (
-    <PageShell maxWidth="5xl">
-      <Card className="w-full shadow-sm border-slate-200 mb-8 rounded-2xl overflow-hidden bg-white">
-        <div className="bg-white border-b border-slate-100 p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <PageShell maxWidth="7xl">
+      <Card className="mb-8 w-full overflow-hidden rounded-3xl border-slate-200/80 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-white p-6 md:p-8">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 mb-1">
+            <p className="technical-label text-green-700">Engineering workspace</p>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 md:text-4xl">
               Triage Complete
             </h1>
-            <p className="text-slate-500 font-medium">Evidence-based Theme 2 troubleshooting result.</p>
+            <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-slate-500">
+              Evidence-based Theme 2 result with routing, component telemetry, and audit trace.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="h-10 rounded-xl border-slate-200 px-4 text-xs font-bold text-slate-700">
+            <a href="/upload">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Run Triage Again
+            </a>
+          </Button>
           </div>
         </div>
 
-        <CardContent className="space-y-8 p-6 md:p-8">
-          <ResultVerdictCard triage={triage} />
+        <CardContent className="p-4 md:p-6 lg:p-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <main className="space-y-6">
+              <ResultVerdictCard triage={triage} />
 
-          <section className="rounded-2xl border border-green-100 bg-green-50/45 p-5 md:p-6">
-            <div className="mb-5">
-              <p className="text-xs font-extrabold uppercase tracking-widest text-green-700">
-                Result Summary
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-                <h2 className="text-xl font-extrabold text-slate-900">What ChargerDoc found</h2>
-                <span className="rounded-full border border-green-200 bg-white px-3 py-1 text-xs font-bold text-green-800">
-                  Theme 2 required output
-                </span>
-                <RouteBadge recipientType={output.recipient_type} />
-              </div>
-            </div>
-            <FieldGrid fields={coreFields} />
-          </section>
+              <DeviceTelemetryGrid
+                output={output}
+                extraction={triage.perception.extraction}
+                coreFields={coreFields}
+                componentFields={componentEvidenceFields}
+              />
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-            <div className="mb-5">
-              <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">
-                Component Evidence
-              </p>
-              <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-                Evidence details for the detected component
-              </h2>
-            </div>
-            <FieldGrid fields={componentEvidenceFields} />
-          </section>
+              <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
+                <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="technical-label text-slate-500">Operational protocol</p>
+                    <h2 className="mt-1 text-xl font-extrabold text-slate-950">Required action and proof posture</h2>
+                  </div>
+                  <RouteBadge recipientType={output.recipient_type} />
+                </div>
 
-          <section className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="flex flex-col">
-              <div className="mb-6">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Evidence and Proof</h2>
-                <p className="mt-1 text-sm font-medium text-slate-500">
-                  Uploaded evidence remains visible; proof prompts appear only when the system needs clarification.
-                </p>
-              </div>
+                <Alert className="mb-4 rounded-r-xl rounded-l-sm border-green-200 border-l-4 border-l-green-600 bg-green-50/30">
+                  <AlertTitle className="text-xs font-extrabold uppercase tracking-widest text-green-800">
+                    Mandatory next action
+                  </AlertTitle>
+                  <AlertDescription className="font-semibold leading-6 text-green-950">
+                    {output.action_message}
+                  </AlertDescription>
+                </Alert>
+
+                {output.required_proof_next && (
+                  <Alert variant="warning" className="mb-4 rounded-r-xl rounded-l-sm border-l-4 border-l-amber-500 bg-amber-50/60">
+                    <AlertTitle className="text-xs font-extrabold uppercase tracking-widest text-amber-800">
+                      Proof required
+                    </AlertTitle>
+                    <AlertDescription className="font-semibold leading-6 text-amber-950">
+                      {output.required_proof_next}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
               {showFallbackWarning && (
-                <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
                   <div>
                     <strong className="mb-0.5 block text-xs font-extrabold uppercase tracking-widest text-amber-800">
@@ -250,14 +268,64 @@ function ResultAssessment() {
                 prompts={triage.follow_up_prompts}
                 resultProofState={resultState.proofState}
               />
+              </section>
+
+              <Accordion type="single" collapsible className="space-y-4">
+                <AccordionItem value="routing-trace" className="rounded-xl border border-slate-200/80 bg-white px-5 shadow-sm">
+                  <AccordionTrigger className="text-xs font-extrabold uppercase tracking-widest text-slate-600 hover:no-underline">
+                    Show routing decision trace
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <DecisionChain
+                      observationResult={output.observation_result}
+                      faultType={output.fault_type_v2}
+                      recipientType={output.recipient_type}
+                      assignedTeamId={output.assigned_team_id}
+                      actionMessage={output.action_message}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="advanced-debug" className="rounded-xl border border-slate-200/80 bg-white px-5 shadow-sm">
+                  <AccordionTrigger className="text-xs font-extrabold uppercase tracking-widest text-slate-500 hover:no-underline">
+                    Advanced Debug Info
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                      For development and judging audit only.
+                    </p>
+                    <pre className="max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-[11px] leading-relaxed text-slate-300">
+                      {JSON.stringify(
+                        {
+                          perception_mode: triage.debug.perception_mode,
+                          fallback_used: triage.debug.fallback_used,
+                          rule_key: triage.debug.rule_key,
+                          error_type: triage.perception.error_type,
+                          scene_summary: triage.perception.scene_summary,
+                          evidence_notes: output.evidence_notes,
+                        },
+                        null,
+                        2
+                      )}
+                    </pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </main>
+
+            <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+              <EvidencePanel
+                imageUrl={imageUrl}
+                annotations={triage.perception.extraction.bounding_boxes ?? []}
+              />
+
+              <NextStepRoutingCard resultState={resultState} output={output} />
 
               {(appScreenshotPrompt || hasAppScreenshot) && (
-                <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-4">
-                    <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">
-                      EV App Screenshot
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-slate-600">
+                    <p className="technical-label text-slate-500">EV App Screenshot</p>
+                    <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
                       {hasAppScreenshot
                         ? "EV app screenshot included in this triage result."
                         : appScreenshotPrompt?.prompt}
@@ -280,93 +348,168 @@ function ResultAssessment() {
                         type="button"
                         onClick={handleAppScreenshotSubmit}
                         disabled={!appScreenshotFile || appScreenshotStatus === "uploading"}
-                        className="w-full rounded-xl bg-green-700 font-bold hover:bg-green-800"
+                        className="h-11 w-full rounded-xl bg-green-600 text-xs font-semibold text-white shadow-sm hover:bg-green-700"
                       >
                         {appScreenshotStatus === "uploading" ? "Parsing app screenshot..." : "Add App Screenshot"}
                       </Button>
                     </div>
                   )}
-                </div>
+                </section>
               )}
-
-              <EvidencePanel
-                imageUrl={imageUrl}
-                annotations={triage.perception.extraction.bounding_boxes ?? []}
-              />
-            </div>
-
-            <div className="self-start rounded-2xl border border-slate-200 bg-slate-50 p-5 md:p-6">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Next Step</h2>
-              <p className="mt-2 text-base font-semibold text-slate-900">
-                {resultState.nextStep}
-              </p>
-              <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Case Status</p>
-                <p className="mt-1 text-sm font-bold text-slate-900">{resultState.status}</p>
-                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{resultState.recipientHelper}</p>
-              </div>
-              <div className="mt-6 space-y-3">
-                <Button asChild size="lg" className="h-14 w-full rounded-xl bg-green-700 text-lg font-bold shadow-sm hover:bg-green-800">
-                  <a href={resultState.primaryCtaHref}>{resultState.primaryCtaLabel}</a>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="h-14 w-full rounded-xl border-slate-200 font-bold text-slate-600 hover:bg-white">
-                  <a href="/upload">Run Triage Again</a>
-                </Button>
-              </div>
-            </div>
-          </section>
-
-          <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-500 hover:text-slate-700">
-              Show routing decision trace
-            </summary>
-            <div className="mt-6">
-              <DecisionChain
-                observationResult={output.observation_result}
-                faultType={output.fault_type_v2}
-                recipientType={output.recipient_type}
-                assignedTeamId={output.assigned_team_id}
-                actionMessage={output.action_message}
-              />
-            </div>
-          </details>
-
-          <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <summary className="cursor-pointer text-xs font-extrabold uppercase tracking-widest text-slate-400 transition-colors hover:text-slate-600">
-              Advanced Debug Info
-            </summary>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">
-                For development and judging audit only.
-              </p>
-              <pre className="whitespace-pre-wrap break-words font-mono text-xs text-slate-600">
-                {JSON.stringify(
-                  {
-                    perception_mode: triage.debug.perception_mode,
-                    fallback_used: triage.debug.fallback_used,
-                    rule_key: triage.debug.rule_key,
-                    error_type: triage.perception.error_type,
-                    scene_summary: triage.perception.scene_summary,
-                    evidence_notes: output.evidence_notes,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            </div>
-          </details>
+            </aside>
+          </div>
         </CardContent>
       </Card>
     </PageShell>
   );
 }
 
-function FieldGrid({ fields }: { fields: OrganizerOutputField[] }) {
+function NextStepRoutingCard({
+  resultState,
+  output,
+}: {
+  resultState: ReturnType<typeof deriveResultState>;
+  output: CompetitionOutput;
+}) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {fields.map(({ label, value }) => (
-        <FieldCard key={label} label={label} value={value} />
-      ))}
+    <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm md:p-6">
+      <p className="technical-label text-slate-500">Routing control</p>
+      <h2 className="mt-2 text-xl font-extrabold text-slate-950">Next Step</h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-700">{resultState.nextStep}</p>
+
+      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+        <p className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">Case Status</p>
+        <p className="mt-1 text-sm font-bold text-slate-950">{resultState.status}</p>
+        <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{resultState.recipientHelper}</p>
+        {output.assigned_team_id && (
+          <p className="mt-3 font-mono text-xs font-bold text-blue-700">{output.assigned_team_id}</p>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3">
+        <Button asChild className="h-11 rounded-xl bg-green-600 text-xs font-semibold text-white shadow-sm hover:bg-green-700">
+          <a href={resultState.primaryCtaHref}>{resultState.primaryCtaLabel}</a>
+        </Button>
+        <a href="/history" className="text-center text-xs font-bold text-slate-500 underline-offset-4 hover:text-slate-800 hover:underline">
+          View incident audit
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function DeviceTelemetryGrid({
+  output,
+  extraction,
+  coreFields,
+  componentFields,
+}: {
+  output: CompetitionOutput;
+  extraction: Theme2VisualExtraction;
+  coreFields: OrganizerOutputField[];
+  componentFields: OrganizerOutputField[];
+}) {
+  const field = (fields: OrganizerOutputField[], label: string) => fields.find((item) => item.label === label)?.value || "Unknown";
+
+  return (
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div>
+          <p className="technical-label text-slate-500">Device Telemetry</p>
+          <h2 className="mt-1 text-xl font-extrabold text-slate-950">Result Summary</h2>
+        </div>
+        <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-bold text-green-800">
+          Theme 2 required output
+        </span>
+        <RouteBadge recipientType={output.recipient_type} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="technical-label text-slate-500">System identifiers</p>
+          <div className="mt-4 grid gap-3">
+            <MetricRow label="Input Component" value={output.input_component} />
+            <MetricRow label="Observation Result" value={output.observation_result} />
+            <MetricRow label="Fault Type" value={output.fault_type_v2} />
+            <MetricRow label="Recipient" value={output.recipient_type} />
+            {output.assigned_team_id && <MetricRow label="Assigned Team" value={output.assigned_team_id} />}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="technical-label text-slate-500">Human-readable output</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <CompactMetric label="Component" value={field(coreFields, "Input Component")} />
+            <CompactMetric label="Observation" value={field(coreFields, "Observation Result")} />
+            <CompactMetric label="Issue Type" value={field(coreFields, "Fault Type")} />
+            <CompactMetric label="Sent To" value={field(coreFields, "Recipient")} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="technical-label text-slate-500">Hardware keys</p>
+          <div className="mt-4 space-y-3">
+            <HardwareKey label="Serial Number" value={output.charger_serial_number || extraction.charger_serial_number || "Not readable"} />
+            <HardwareKey label="Brand Model" value={output.charger_brand_model || extraction.charger_brand_model || "Not readable"} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="technical-label text-slate-500">Component Evidence</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {componentFields.map((item) => (
+              <CompactMetric key={item.label} label={item.label} value={item.value} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MetricRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <span className="text-xs font-bold text-slate-500">{label}</span>
+      <code className="rounded border border-slate-100 bg-slate-50 px-1.5 py-0.5 font-mono text-xs font-bold text-slate-800">
+        {value}
+      </code>
+    </div>
+  );
+}
+
+function CompactMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+      <p className="technical-label text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-extrabold leading-6 text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function HardwareKey({ label, value }: { label: string; value: string }) {
+  const copyValue = () => {
+    if (value && value !== "Not readable") void navigator.clipboard.writeText(value);
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="technical-label text-slate-500">{label}</p>
+        <button
+          type="button"
+          onClick={copyValue}
+          className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 transition hover:text-slate-900"
+          aria-label={`Copy ${label}`}
+        >
+          <Clipboard className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <code className="mt-2 inline-block select-all rounded border border-slate-100 bg-white px-1.5 py-0.5 font-mono text-xs font-bold text-slate-900">
+        {value}
+      </code>
     </div>
   );
 }
