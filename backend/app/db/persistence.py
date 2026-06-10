@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import re
+import time
 from contextlib import contextmanager
 from typing import Any, Iterator
 
 DEFAULT_POSTGRES_URL = "postgresql://omnitriage:omnitriage@localhost:5432/omnitriage"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_POSTGRES_URL)
+_TICKET_ID_SUFFIX_RE = re.compile(r"^RXT-\d{8}-(\d{4})$")
+_TICKET_INSERT_RETRIES = 3
+timing_logger = logging.getLogger("omnitriage.timing")
 
 try:
     import psycopg
@@ -390,98 +396,141 @@ def _attach_ticket_children(ticket: dict[str, Any]) -> dict[str, Any]:
     return ticket
 
 
-def _next_ticket_id(cur: Any) -> str:
+def _log_timing(label: str, started_at: float) -> None:
+    timing_logger.info("[TIMING] %s: %sms", label, round((time.perf_counter() - started_at) * 1000, 2))
+
+
+def _today_ticket_prefix() -> str:
     from app.services.tickets import generate_ticket_id
 
-    prefix = generate_ticket_id(sequence=0)[:13]
-    cur.execute("SELECT COUNT(*) AS count FROM tickets WHERE ticket_id LIKE %s", (f"{prefix}-%",))
+    return generate_ticket_id(sequence=0)[:-4]
+
+
+def _next_ticket_id(cur: Any) -> str:
+    started_at = time.perf_counter()
+    prefix = _today_ticket_prefix()
+    cur.execute(
+        """
+        SELECT ticket_id
+        FROM tickets
+        WHERE ticket_id LIKE %s
+        ORDER BY ticket_id DESC
+        LIMIT 1
+        """,
+        (f"{prefix}%",),
+    )
     row = cur.fetchone()
-    sequence = int(row["count"]) + 1
-    return generate_ticket_id(sequence=sequence)
+    _log_timing("tickets.create.id_generation", started_at)
+    if not row or not row.get("ticket_id"):
+        return f"{prefix}0001"
+
+    match = _TICKET_ID_SUFFIX_RE.match(str(row["ticket_id"]))
+    if not match:
+        return f"{prefix}0001"
+
+    return f"{prefix}{int(match.group(1)) + 1:04d}"
 
 
 def create_ticket_record(values: dict[str, Any]) -> dict[str, Any]:
+    ticket: dict[str, Any] | None = None
     with _pg_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            ticket_id = _next_ticket_id(cur)
-            cur.execute(
-                """
-                INSERT INTO tickets (
-                    ticket_id,
-                    incident_id,
-                    customer_profile_json,
-                    charger_context_json,
-                    input_component,
-                    observation_result,
-                    fault_type_v2,
-                    recipient_type,
-                    assigned_team_id,
-                    priority,
-                    status,
-                    ai_summary,
-                    customer_comments,
-                    required_proof_next,
-                    evidence_photos_json,
-                    triage_result_json,
-                    schedule_status
-                )
-                VALUES (
-                    %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s
-                )
-                RETURNING *
-                """,
-                (
-                    ticket_id,
-                    values.get("incident_id"),
-                    json.dumps(values.get("customer_profile", {})),
-                    json.dumps(values.get("charger_context", {})),
-                    values.get("input_component"),
-                    values.get("observation_result"),
-                    values.get("fault_type_v2"),
-                    values.get("recipient_type"),
-                    values.get("assigned_team_id"),
-                    values.get("priority"),
-                    values.get("status"),
-                    values.get("ai_summary"),
-                    values.get("customer_comments"),
-                    values.get("required_proof_next"),
-                    json.dumps(values.get("evidence_photos", [])),
-                    json.dumps(values.get("triage_result", {})),
-                    values.get("schedule_status", "not_required"),
-                ),
-            )
-            ticket = _extract_ticket_row(cur.fetchone())
-            event_payloads = [
-                ("ticket_created", "system", "Support ticket created.", {}),
-                (
-                    "triage_completed",
-                    "system",
-                    f"AI triage completed: {ticket['observation_result']} -> {ticket['fault_type_v2']}.",
-                    {
-                        "observation_result": ticket["observation_result"],
-                        "fault_type_v2": ticket["fault_type_v2"],
-                        "recipient_type": ticket["recipient_type"],
-                    },
-                ),
-            ]
-            if ticket.get("required_proof_next"):
-                event_payloads.append(
-                    (
-                        "proof_requested",
-                        "system",
-                        str(ticket["required_proof_next"]),
-                        {"required_proof_next": ticket["required_proof_next"]},
+            for attempt in range(_TICKET_INSERT_RETRIES):
+                ticket_id = _next_ticket_id(cur)
+                cur.execute("SAVEPOINT ticket_insert_attempt")
+                try:
+                    insert_started_at = time.perf_counter()
+                    cur.execute(
+                        """
+                        INSERT INTO tickets (
+                            ticket_id,
+                            incident_id,
+                            customer_profile_json,
+                            charger_context_json,
+                            input_component,
+                            observation_result,
+                            fault_type_v2,
+                            recipient_type,
+                            assigned_team_id,
+                            priority,
+                            status,
+                            ai_summary,
+                            customer_comments,
+                            required_proof_next,
+                            evidence_photos_json,
+                            triage_result_json,
+                            schedule_status
+                        )
+                        VALUES (
+                            %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s
+                        )
+                        RETURNING *
+                        """,
+                        (
+                            ticket_id,
+                            values.get("incident_id"),
+                            json.dumps(values.get("customer_profile", {})),
+                            json.dumps(values.get("charger_context", {})),
+                            values.get("input_component"),
+                            values.get("observation_result"),
+                            values.get("fault_type_v2"),
+                            values.get("recipient_type"),
+                            values.get("assigned_team_id"),
+                            values.get("priority"),
+                            values.get("status"),
+                            values.get("ai_summary"),
+                            values.get("customer_comments"),
+                            values.get("required_proof_next"),
+                            json.dumps(values.get("evidence_photos", [])),
+                            json.dumps(values.get("triage_result", {})),
+                            values.get("schedule_status", "not_required"),
+                        ),
                     )
-                )
-            for event_type, actor_role, message, payload in event_payloads:
-                cur.execute(
-                    """
-                    INSERT INTO ticket_events (ticket_id, event_type, actor_role, message, payload_json)
-                    VALUES (%s, %s, %s, %s, %s::jsonb)
-                    """,
-                    (ticket_id, event_type, actor_role, message, json.dumps(payload)),
-                )
+                    _log_timing("tickets.create.insert", insert_started_at)
+                    ticket = _extract_ticket_row(cur.fetchone())
+                    event_payloads = [
+                        ("ticket_created", "system", "Support ticket created.", {}),
+                        (
+                            "triage_completed",
+                            "system",
+                            f"AI triage completed: {ticket['observation_result']} -> {ticket['fault_type_v2']}.",
+                            {
+                                "observation_result": ticket["observation_result"],
+                                "fault_type_v2": ticket["fault_type_v2"],
+                                "recipient_type": ticket["recipient_type"],
+                            },
+                        ),
+                    ]
+                    if ticket.get("required_proof_next"):
+                        event_payloads.append(
+                            (
+                                "proof_requested",
+                                "system",
+                                str(ticket["required_proof_next"]),
+                                {"required_proof_next": ticket["required_proof_next"]},
+                            )
+                        )
+                    events_started_at = time.perf_counter()
+                    for event_type, actor_role, message, payload in event_payloads:
+                        cur.execute(
+                            """
+                            INSERT INTO ticket_events (ticket_id, event_type, actor_role, message, payload_json)
+                            VALUES (%s, %s, %s, %s, %s::jsonb)
+                            """,
+                            (ticket_id, event_type, actor_role, message, json.dumps(payload)),
+                        )
+                    _log_timing("tickets.create.event_insert", events_started_at)
+                    cur.execute("RELEASE SAVEPOINT ticket_insert_attempt")
+                    break
+                except Exception as exc:
+                    cur.execute("ROLLBACK TO SAVEPOINT ticket_insert_attempt")
+                    cur.execute("RELEASE SAVEPOINT ticket_insert_attempt")
+                    if psycopg is not None and isinstance(exc, psycopg.errors.UniqueViolation) and attempt < _TICKET_INSERT_RETRIES - 1:
+                        continue
+                    raise
+            if ticket is None:
+                raise RuntimeError("Unable to generate a unique ticket ID after retries.")
     return _attach_ticket_children(ticket)
 
 

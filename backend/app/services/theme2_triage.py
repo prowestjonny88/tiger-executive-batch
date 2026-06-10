@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 from app.core.models import IncidentInput, Theme2DebugInfo, Theme2FollowUpPrompt, Theme2PerceptionAssessment, Theme2TriageResult
 from app.services.theme2_mapper import build_competition_output, detect_error_log_key
 from app.services.theme2_perception import assess_theme2_perception
+
+timing_logger = logging.getLogger("omnitriage.timing")
+
+
+def _log_timing(label: str, started_at: float) -> None:
+    timing_logger.info("[TIMING] %s: %sms", label, round((time.perf_counter() - started_at) * 1000, 2))
 
 
 def _evdb_needs_label_proof(perception: Theme2PerceptionAssessment) -> bool:
@@ -84,9 +92,15 @@ def build_theme2_followups(
 
 
 def run_theme2_triage_with_debug(incident: IncidentInput) -> tuple[Theme2TriageResult, dict[str, Any]]:
+    started_at = time.perf_counter()
     perception = assess_theme2_perception(incident)
+    _log_timing("triage.perception", started_at)
+    started_at = time.perf_counter()
     output, rule_metadata = build_competition_output(incident, perception)
+    _log_timing("triage.mapping", started_at)
+    started_at = time.perf_counter()
     followups = build_theme2_followups(incident, perception)
+    _log_timing("triage.follow_up_generation", started_at)
     debug = Theme2DebugInfo(
         perception_mode=perception.mode,
         provider_attempted=perception.provider_attempted,

@@ -72,6 +72,29 @@ const stepLabels: Array<{ step: Step; label: string }> = [
   { step: 4, label: "Diagnosis & Ticket" },
 ];
 
+const CUSTOMER_DIRECT_TRIAGE = process.env.NEXT_PUBLIC_CUSTOMER_DIRECT_TRIAGE !== "false";
+
+type CheckStage = "idle" | "uploading" | "previewing" | "checking" | "preparing" | "ready" | "error";
+type CreateStage = "idle" | "creating" | "attaching_label" | "redirecting" | "error";
+
+const checkStageLabels: Record<CheckStage, string> = {
+  idle: "",
+  uploading: "Uploading photo...",
+  previewing: "Preparing intake...",
+  checking: "Checking charger issue...",
+  preparing: "Preparing diagnosis summary...",
+  ready: "Diagnosis ready.",
+  error: "Photo check needs retry.",
+};
+
+const createStageLabels: Record<CreateStage, string> = {
+  idle: "",
+  creating: "Creating support ticket...",
+  attaching_label: "Attaching optional charger label photo...",
+  redirecting: "Redirecting to ticket tracker...",
+  error: "Ticket creation failed. Please retry.",
+};
+
 export default function NewTicketPage() {
   useDemoRoleGuard("customer");
   const router = useRouter();
@@ -83,6 +106,8 @@ export default function NewTicketPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [labelPreviewUrl, setLabelPreviewUrl] = useState("");
   const [state, setState] = useState<"idle" | "checking" | "ready" | "creating" | "error">("idle");
+  const [checkStage, setCheckStage] = useState<CheckStage>("idle");
+  const [createStage, setCreateStage] = useState<CreateStage>("idle");
   const [error, setError] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "success" | "denied" | "error">("idle");
   const [locationError, setLocationError] = useState("");
@@ -152,9 +177,16 @@ export default function NewTicketPage() {
     );
   };
 
+  const logTiming = (label: string, startedAt: number) => {
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.info(`[TIMING] ${label}: ${elapsed}ms`);
+  };
+
   const runTriageOnly = async () => {
     if (!file || state === "checking" || state === "creating") return;
     setState("checking");
+    setCheckStage("uploading");
+    setCreateStage("idle");
     setError("");
     setTriageResult(null);
     setIdentitySuggestion(null);
@@ -168,19 +200,30 @@ export default function NewTicketPage() {
         /* local fallback for demos */
       }
 
+      const uploadStartedAt = performance.now();
       const uploaded = await uploadIncidentPhoto(file);
+      logTiming("uploadIncidentPhoto", uploadStartedAt);
       const photoHint = `Customer ticket photo: ${file.name}`;
-      const preview = await fetchPreview({
-        site_id: siteId,
-        charger_id: context.charger_serial_number || undefined,
-        photo_evidence: uploaded,
-        photo_hint: photoHint,
-        symptom_text: context.symptom_text || "",
-        error_code: context.error_code || "",
-        follow_up_answers: {},
-      });
+      let incidentId: number | undefined;
+      if (!CUSTOMER_DIRECT_TRIAGE) {
+        setCheckStage("previewing");
+        const previewStartedAt = performance.now();
+        const preview = await fetchPreview({
+          site_id: siteId,
+          charger_id: context.charger_serial_number || undefined,
+          photo_evidence: uploaded,
+          photo_hint: photoHint,
+          symptom_text: context.symptom_text || "",
+          error_code: context.error_code || "",
+          follow_up_answers: {},
+        });
+        logTiming("fetchPreview", previewStartedAt);
+        incidentId = preview.incident_id;
+      }
+      setCheckStage("checking");
+      const triageStartedAt = performance.now();
       const triage = await fetchTriage({
-        incident_id: preview.incident_id,
+        incident_id: incidentId,
         site_id: siteId,
         charger_id: context.charger_serial_number || undefined,
         photo_evidence: uploaded,
@@ -189,7 +232,11 @@ export default function NewTicketPage() {
         error_code: context.error_code || "",
         follow_up_answers: {},
       });
+      logTiming("fetchTriage", triageStartedAt);
+      setCheckStage("preparing");
+      const preparingStartedAt = performance.now();
       const suggestion = extractChargerIdentitySuggestion(triage, { labelPhotoUploaded: Boolean(labelFile) });
+      logTiming("prepareDiagnosisSummary", preparingStartedAt);
       setUploadedEvidence(uploaded);
       setTriageResult(triage);
       setIdentitySuggestion(suggestion);
@@ -199,8 +246,10 @@ export default function NewTicketPage() {
         charger_brand_model: current.charger_brand_model || suggestion.brand_model || "",
       }));
       setState("ready");
+      setCheckStage("ready");
     } catch (err) {
       setState("error");
+      setCheckStage("error");
       setError(err instanceof Error ? err.message : "Photo check failed. Please try again.");
     }
   };
@@ -208,9 +257,11 @@ export default function NewTicketPage() {
   const createTicketAfterIdentityReview = async () => {
     if (!triageResult || state === "creating") return;
     setState("creating");
+    setCreateStage("creating");
     setError("");
 
     try {
+      const createStartedAt = performance.now();
       const created = await createTicketFromTriage({
         incident_id: triageResult.incident_id,
         triage_result: triageResult,
@@ -218,10 +269,15 @@ export default function NewTicketPage() {
         charger_context: context,
         customer_comments: context.symptom_text || undefined,
       });
+      logTiming("createTicketFromTriage", createStartedAt);
       if (labelFile) {
         try {
+          setCreateStage("attaching_label");
+          const labelUploadStartedAt = performance.now();
           const uploadedLabel = await uploadIncidentPhoto(labelFile);
+          logTiming("uploadOptionalLabelPhoto", labelUploadStartedAt);
           setLabelEvidence(uploadedLabel);
+          const evidenceStartedAt = performance.now();
           await addTicketEvidence(created.ticket_id, {
             evidence: uploadedLabel,
             evidence_type: "closeup",
@@ -229,15 +285,22 @@ export default function NewTicketPage() {
             actor_name: customer.full_name,
             message: "Customer uploaded charger label photo for brand/model and serial verification.",
           });
+          logTiming("addTicketEvidence", evidenceStartedAt);
         } catch {
           /* Optional label evidence should not block the created ticket. */
         }
       }
       saveDemoCustomerProfile(customer);
+      setCreateStage("redirecting");
       router.push(`/customer/tickets/${created.ticket_id}`);
     } catch (err) {
       setState("error");
-      setError(err instanceof Error ? err.message : "Ticket creation failed. Please try again.");
+      setCreateStage("error");
+      setError(
+        `Ticket creation failed, but your diagnosis is still available. Please retry creating the support ticket.${
+          err instanceof Error ? ` ${err.message}` : ""
+        }`
+      );
     }
   };
 
@@ -376,6 +439,8 @@ export default function NewTicketPage() {
                 setTriageResult(null);
                 setIdentitySuggestion(null);
                 setState("idle");
+                setCheckStage("idle");
+                setCreateStage("idle");
               }}
               fileName={file?.name}
               fileSize={file?.size}
@@ -391,6 +456,8 @@ export default function NewTicketPage() {
                 setTriageResult(null);
                 setIdentitySuggestion(null);
                 setState("idle");
+                setCheckStage("idle");
+                setCreateStage("idle");
               }}
               fileName={labelFile?.name}
               fileSize={labelFile?.size}
@@ -416,6 +483,16 @@ export default function NewTicketPage() {
               ChargerDoc will inspect the uploaded problem photo and prepare a support-ticket summary.
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
+            {(state === "checking" || checkStage !== "idle") && !triageResult && (
+              <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm font-bold text-green-800">
+                {checkStageLabels[checkStage]}
+              </div>
+            )}
+            {(state === "creating" || createStage === "error") && triageResult && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-blue-800">
+                {createStageLabels[createStage]}
+              </div>
+            )}
             {triageResult && (
               <Card className="rounded-2xl border border-green-100 bg-green-50 p-5">
                 <p className="technical-label text-green-700">Diagnosis Summary</p>
@@ -502,7 +579,7 @@ export default function NewTicketPage() {
                   onClick={runTriageOnly}
                   disabled={!file || state === "checking"}
                 >
-                  {state === "checking" ? "Checking photo..." : "Check Photo"}
+                  {state === "checking" ? checkStageLabels[checkStage] || "Checking photo..." : "Check Photo"}
                 </Button>
               ) : (
                 <Button
@@ -510,7 +587,11 @@ export default function NewTicketPage() {
                   onClick={createTicketAfterIdentityReview}
                   disabled={state === "creating"}
                 >
-                  {state === "creating" ? "Creating ticket..." : "Create Support Ticket"}
+                  {state === "creating"
+                    ? createStageLabels[createStage] || "Creating support ticket..."
+                    : state === "error" && createStage === "error"
+                      ? "Retry Create Support Ticket"
+                      : "Create Support Ticket"}
                 </Button>
               )}
             </div>

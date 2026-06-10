@@ -71,6 +71,10 @@ def _runtime_health_payload() -> dict[str, object]:
     }
 
 
+def _log_timing(label: str, started_at: float) -> None:
+    runtime_logger.info("[TIMING] %s: %sms", label, round((time.perf_counter() - started_at) * 1000, 2))
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -147,7 +151,10 @@ def get_incident(incident_id: int):
 
 @app.post("/api/v1/tickets/from-triage")
 def create_ticket(payload: TicketFromTriageRequest):
-    ticket = create_ticket_from_triage(payload)
+    try:
+        ticket = create_ticket_from_triage(payload)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {
         "ticket_id": ticket["ticket_id"],
         "status": ticket["status"],
@@ -280,9 +287,16 @@ def intake_preview(incident: IncidentInput):
     if incident.site_id not in _validated_site_ids():
         raise HTTPException(status_code=404, detail="Unknown site_id")
 
+    started_at = time.perf_counter()
     quality = assess_image_quality(incident.photo_hint, incident.photo_evidence, incident=incident)
+    _log_timing("intake.preview.quality_assessment", started_at)
+    started_at = time.perf_counter()
     follow_up_questions = build_follow_up_questions(incident, quality.quality_status)
+    _log_timing("intake.preview.follow_up_generation", started_at)
+    started_at = time.perf_counter()
     incident_id = _persist_incident(incident)
+    _log_timing("intake.preview.incident_persistence", started_at)
+    started_at = time.perf_counter()
     save_audit(
         "intake_preview",
         {
@@ -291,6 +305,7 @@ def intake_preview(incident: IncidentInput):
         },
         incident_id,
     )
+    _log_timing("intake.preview.audit_persistence", started_at)
     return {
         "incident_id": incident_id,
         "quality": quality,
@@ -303,10 +318,16 @@ def triage(incident: IncidentInput):
     if incident.site_id not in _validated_site_ids():
         raise HTTPException(status_code=404, detail="Unknown site_id")
 
+    started_at = time.perf_counter()
     incident_id = _persist_incident(incident)
+    _log_timing("triage.incident_persistence", started_at)
     incident.incident_id = incident_id
+    started_at = time.perf_counter()
     result, debug = run_theme2_triage_with_debug(incident)
+    _log_timing("triage.run_theme2", started_at)
+    started_at = time.perf_counter()
     save_audit("theme2_perception", result.perception.model_dump(), incident_id)
     save_audit("theme2_mapping", {**result.competition_output.model_dump(), "debug": debug}, incident_id)
     save_audit("triage_result", result.model_dump(), incident_id)
+    _log_timing("triage.audit_persistence", started_at)
     return {"incident_id": incident_id, **result.model_dump()}

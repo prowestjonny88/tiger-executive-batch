@@ -131,6 +131,26 @@ def test_ticket_routes_and_role_flows_exist():
     assert "addTicketEvidence" in api_source
 
 
+def test_frontend_api_helpers_parse_errors_and_use_timeouts():
+    api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
+
+    assert "ApiTimeoutError" in api_source
+    assert "fetchWithTimeout" in api_source
+    assert "parseApiError" in api_source
+    assert "data.detail" in api_source
+    assert "data.message" in api_source
+    assert "data.error" in api_source
+    assert "text.slice(0, 300)" in api_source
+    assert "UPLOAD_TIMEOUT_MS = 60_000" in api_source
+    assert "PREVIEW_TIMEOUT_MS = 90_000" in api_source
+    assert "TRIAGE_TIMEOUT_MS = 120_000" in api_source
+    assert "TICKET_CREATE_TIMEOUT_MS = 30_000" in api_source
+    assert "TICKET_EVIDENCE_TIMEOUT_MS = 45_000" in api_source
+    assert "postJson<CreateTicketResponse>" in api_source
+    assert "postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/evidence`, payload, TICKET_EVIDENCE_TIMEOUT_MS)" in api_source
+    assert "Request failed: ${response.status}`)" not in api_source
+
+
 def test_home_location_and_identity_confirmation_contracts():
     api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
     identity_helper = _read(FRONTEND_ROOT / "lib" / "charger-identity.ts")
@@ -185,6 +205,28 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Confirm and Create Ticket" not in step4_source
     assert "runTriageOnly" in new_ticket
     assert "createTicketAfterIdentityReview" in new_ticket
+    assert "CUSTOMER_DIRECT_TRIAGE" in new_ticket
+    assert 'process.env.NEXT_PUBLIC_CUSTOMER_DIRECT_TRIAGE !== "false"' in new_ticket
+    assert 'setCheckStage("uploading")' in new_ticket
+    assert 'setCheckStage("previewing")' in new_ticket
+    assert 'setCheckStage("checking")' in new_ticket
+    assert 'setCheckStage("preparing")' in new_ticket
+    assert 'setCreateStage("creating")' in new_ticket
+    assert 'setCreateStage("attaching_label")' in new_ticket
+    assert 'setCreateStage("redirecting")' in new_ticket
+    assert "Uploading photo..." in new_ticket
+    assert "Preparing intake..." in new_ticket
+    assert "Checking charger issue..." in new_ticket
+    assert "Preparing diagnosis summary..." in new_ticket
+    assert "Creating support ticket..." in new_ticket
+    assert "Attaching optional charger label photo..." in new_ticket
+    assert "Redirecting to ticket tracker..." in new_ticket
+    assert "Retry Create Support Ticket" in new_ticket
+    assert "Ticket creation failed, but your diagnosis is still available." in new_ticket
+    assert "logTiming(\"uploadIncidentPhoto\"" in new_ticket
+    assert "logTiming(\"fetchTriage\"" in new_ticket
+    assert "logTiming(\"createTicketFromTriage\"" in new_ticket
+    assert "incidentId = preview.incident_id" in new_ticket
     assert "Check Photo and Create Ticket" not in new_ticket
     assert "Home charger details" in customer_detail
     assert "formatHomeChargerLocation" in customer_detail

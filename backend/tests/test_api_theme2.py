@@ -89,6 +89,25 @@ def test_preview_then_triage_reuses_same_incident_id_and_returns_clean_contract(
     assert "artifact" not in payload
 
 
+def test_triage_without_preview_creates_incident_id_for_customer_flow():
+    triage = client.post(
+        "/api/v1/triage",
+        json={
+            "site_id": "site-mall-01",
+            "charger_id": "rex-ac-01",
+            "photo_hint": "charger red light",
+            "symptom_text": "Customer reports charger red light.",
+            "error_code": "",
+        },
+    )
+
+    assert triage.status_code == 200
+    payload = triage.json()
+    assert isinstance(payload["incident_id"], int)
+    assert payload["incident_id"] > 0
+    assert payload["competition_output"]["observation_result"] == "charger_red_light"
+
+
 def test_recent_incidents_endpoint_includes_theme2_summary():
     triage = client.post(
         "/api/v1/triage",

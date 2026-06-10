@@ -334,6 +334,19 @@ export type ScheduleSuggestions = {
 };
 
 const backendAssetBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "";
+const DEFAULT_TIMEOUT_MS = 60_000;
+const UPLOAD_TIMEOUT_MS = 60_000;
+const PREVIEW_TIMEOUT_MS = 90_000;
+const TRIAGE_TIMEOUT_MS = 120_000;
+const TICKET_CREATE_TIMEOUT_MS = 30_000;
+const TICKET_EVIDENCE_TIMEOUT_MS = 45_000;
+
+export class ApiTimeoutError extends Error {
+  constructor(message = "The request took too long. Please try again.") {
+    super(message);
+    this.name = "ApiTimeoutError";
+  }
+}
 
 export function resolveEvidenceUrl(evidenceOrPath?: UploadedPhotoEvidence | string | null) {
   if (!evidenceOrPath) return "";
@@ -363,29 +376,71 @@ export function resolveEvidenceUrl(evidenceOrPath?: UploadedPhotoEvidence | stri
   return `${backendAssetBase.replace(/\/$/, "")}${normalizedPath}`;
 }
 
-async function postJson<T>(url: string, payload: object): Promise<T> {
-  const response = await fetch(url, {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiTimeoutError();
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+async function parseApiError(response: Response): Promise<string> {
+  const statusPrefix = `Request failed: ${response.status}`;
+  try {
+    const text = await response.text();
+    if (!text) return statusPrefix;
+    try {
+      const data = JSON.parse(text) as { detail?: unknown; message?: unknown; error?: unknown };
+      const detail =
+        typeof data.detail === "string"
+          ? data.detail
+          : typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : "";
+      return detail ? `${statusPrefix}: ${detail}` : `${statusPrefix}: ${text.slice(0, 300)}`;
+    } catch {
+      return `${statusPrefix}: ${text.slice(0, 300)}`;
+    }
+  } catch {
+    return statusPrefix;
+  }
+}
+
+async function postJson<T>(url: string, payload: object, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  }, timeoutMs);
+  if (!response.ok) throw new Error(await parseApiError(response));
   return (await response.json()) as T;
 }
 
-async function patchJson<T>(url: string, payload: object): Promise<T> {
-  const response = await fetch(url, {
+async function patchJson<T>(url: string, payload: object, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const response = await fetchWithTimeout(url, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  }, timeoutMs);
+  if (!response.ok) throw new Error(await parseApiError(response));
   return (await response.json()) as T;
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+async function getJson<T>(url: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const response = await fetchWithTimeout(url, { cache: "no-store" }, timeoutMs);
+  if (!response.ok) throw new Error(await parseApiError(response));
   return (await response.json()) as T;
 }
 
@@ -425,7 +480,7 @@ export async function createTicketFromTriage(payload: {
   charger_context: ChargerContext;
   customer_comments?: string;
 }) {
-  return postJson<CreateTicketResponse>("/api/tickets/from-triage", payload);
+  return postJson<CreateTicketResponse>("/api/tickets/from-triage", payload, TICKET_CREATE_TIMEOUT_MS);
 }
 
 export async function updateTicketStatus(ticketId: string, payload: {
@@ -448,7 +503,7 @@ export async function addTicketEvent(ticketId: string, payload: {
 }
 
 export async function addTicketEvidence(ticketId: string, payload: TicketEvidencePayload) {
-  return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/evidence`, payload);
+  return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/evidence`, payload, TICKET_EVIDENCE_TIMEOUT_MS);
 }
 
 export async function scheduleTicket(ticketId: string, payload: {
@@ -490,7 +545,7 @@ export async function fetchPreview(payload: {
   follow_up_answers?: Record<string, string>;
   demo_scenario_id?: string;
 }) {
-  return postJson<PreviewResponse>("/api/intake/preview", payload);
+  return postJson<PreviewResponse>("/api/intake/preview", payload, PREVIEW_TIMEOUT_MS);
 }
 
 export async function fetchTriage(payload: {
@@ -505,7 +560,7 @@ export async function fetchTriage(payload: {
   follow_up_answers?: Record<string, string>;
   demo_scenario_id?: string;
 }) {
-  return postJson<ApiTriageResponse>("/api/triage", payload);
+  return postJson<ApiTriageResponse>("/api/triage", payload, TRIAGE_TIMEOUT_MS);
 }
 
 export async function uploadIncidentPhoto(file: File) {
@@ -519,7 +574,7 @@ export async function uploadIncidentPhoto(file: File) {
     filename: uploadFile.name,
     media_type: uploadFile.type || "image/jpeg",
     content_base64: btoa(binary),
-  });
+  }, UPLOAD_TIMEOUT_MS);
 }
 
 function titleize(value: string) {

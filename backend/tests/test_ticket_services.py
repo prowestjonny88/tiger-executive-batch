@@ -11,6 +11,7 @@ from app.core.models import (
     TicketScheduleRequest,
     TicketStatusUpdateRequest,
 )
+from app.db import persistence
 from app.services import tickets
 
 
@@ -72,6 +73,43 @@ def _triage_output(**output_overrides):
 
 def test_generate_ticket_id_uses_required_format():
     assert tickets.generate_ticket_id(datetime(2026, 6, 4, tzinfo=timezone.utc), 7) == "RXT-20260604-0007"
+
+
+class _TicketIdCursor:
+    def __init__(self, row):
+        self.row = row
+        self.calls = []
+
+    def execute(self, query, params=()):
+        self.calls.append((query, params))
+
+    def fetchone(self):
+        return self.row
+
+
+def test_next_ticket_id_first_ticket_of_day(monkeypatch):
+    monkeypatch.setattr(tickets, "generate_ticket_id", lambda now=None, sequence=1: f"RXT-20260610-{sequence:04d}")
+    cursor = _TicketIdCursor(None)
+
+    assert persistence._next_ticket_id(cursor) == "RXT-20260610-0001"
+    assert cursor.calls[0][1] == ("RXT-20260610-%",)
+
+
+def test_next_ticket_id_after_existing_same_day_ticket(monkeypatch):
+    monkeypatch.setattr(tickets, "generate_ticket_id", lambda now=None, sequence=1: f"RXT-20260610-{sequence:04d}")
+    cursor = _TicketIdCursor({"ticket_id": "RXT-20260610-0001"})
+
+    assert persistence._next_ticket_id(cursor) == "RXT-20260610-0002"
+
+
+def test_ticket_creation_persistence_retries_unique_ticket_id_source_contract():
+    source = Path(persistence.__file__).read_text(encoding="utf-8")
+
+    assert "_TICKET_INSERT_RETRIES = 3" in source
+    assert "SAVEPOINT ticket_insert_attempt" in source
+    assert "ROLLBACK TO SAVEPOINT ticket_insert_attempt" in source
+    assert "UniqueViolation" in source
+    assert "RXT-YYYYMMDD--%" not in source
 
 
 def test_priority_and_status_derive_from_theme2_output():
@@ -142,6 +180,13 @@ def test_create_ticket_from_triage_builds_record(monkeypatch):
     assert captured["input_component"] == "charger"
     assert captured["evidence_photos"][0]["filename"] == "charger.jpg"
     assert captured["triage_result"]["competition_output"]["observation_result"] == "charger_red_light"
+
+
+def test_ticket_creation_service_does_not_call_gemini_or_vlm():
+    source = Path(tickets.__file__).read_text(encoding="utf-8").lower()
+
+    assert "gemini" not in source
+    assert "assess_theme2_perception" not in source
 
 
 def test_status_update_writes_timeline_event(monkeypatch):
