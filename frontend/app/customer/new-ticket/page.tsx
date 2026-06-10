@@ -22,7 +22,7 @@ import {
   uploadIncidentPhoto,
 } from "../../../lib/api";
 import { extractChargerIdentitySuggestion, formatIdentityConfidence, type ChargerIdentitySuggestion } from "../../../lib/charger-identity";
-import { saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
+import { loadDemoCustomerProfile, saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { PageShell } from "../../../components/layout/page-shell";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
@@ -109,12 +109,19 @@ export default function NewTicketPage() {
   const [checkStage, setCheckStage] = useState<CheckStage>("idle");
   const [createStage, setCreateStage] = useState<CreateStage>("idle");
   const [error, setError] = useState("");
+  const [rememberDetails, setRememberDetails] = useState(true);
+  const [customerResolved, setCustomerResolved] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "success" | "denied" | "error">("idle");
   const [locationError, setLocationError] = useState("");
   const [uploadedEvidence, setUploadedEvidence] = useState<UploadedPhotoEvidence | null>(null);
   const [labelEvidence, setLabelEvidence] = useState<UploadedPhotoEvidence | null>(null);
   const [triageResult, setTriageResult] = useState<ApiTriageResponse | null>(null);
   const [identitySuggestion, setIdentitySuggestion] = useState<ChargerIdentitySuggestion | null>(null);
+
+  useEffect(() => {
+    const saved = loadDemoCustomerProfile<CustomerProfile>();
+    if (saved) setCustomer(saved);
+  }, []);
 
   useEffect(() => {
     if (!file) {
@@ -190,6 +197,7 @@ export default function NewTicketPage() {
     setError("");
     setTriageResult(null);
     setIdentitySuggestion(null);
+    setCustomerResolved(false);
 
     try {
       let siteId = "site-mall-01";
@@ -259,6 +267,7 @@ export default function NewTicketPage() {
     setState("creating");
     setCreateStage("creating");
     setError("");
+    setCustomerResolved(false);
 
     try {
       const createStartedAt = performance.now();
@@ -290,7 +299,7 @@ export default function NewTicketPage() {
           /* Optional label evidence should not block the created ticket. */
         }
       }
-      saveDemoCustomerProfile(customer);
+      if (rememberDetails) saveDemoCustomerProfile(customer);
       setCreateStage("redirecting");
       router.push(`/customer/tickets/${created.ticket_id}`);
     } catch (err) {
@@ -343,7 +352,36 @@ export default function NewTicketPage() {
                 options={["whatsapp", "phone", "email"]}
               />
             </FormGrid>
-            <StepActions canContinue={Boolean(customerValid)} onNext={() => setStep(2)} />
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={rememberDetails}
+                onChange={(event) => setRememberDetails(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+              />
+              <span>
+                Remember my contact details on this device
+                <span className="block text-xs font-medium text-slate-500">Stored only in this demo browser.</span>
+              </span>
+            </label>
+            <button
+              type="button"
+              className="text-xs font-bold text-slate-500 underline-offset-4 hover:text-slate-900 hover:underline"
+              onClick={() => {
+                window.localStorage.removeItem("chargerdoc_customer_profile");
+                setCustomer(initialCustomer);
+                setRememberDetails(false);
+              }}
+            >
+              Clear saved details
+            </button>
+            <StepActions
+              canContinue={Boolean(customerValid)}
+              onNext={() => {
+                if (rememberDetails) saveDemoCustomerProfile(customer);
+                setStep(2);
+              }}
+            />
             {!customerValid && (
               <p className="text-xs font-semibold text-slate-500">
                 Enter a name, valid email, and reachable phone/WhatsApp numbers to continue.
@@ -438,6 +476,7 @@ export default function NewTicketPage() {
                 setUploadedEvidence(null);
                 setTriageResult(null);
                 setIdentitySuggestion(null);
+                setCustomerResolved(false);
                 setState("idle");
                 setCheckStage("idle");
                 setCreateStage("idle");
@@ -455,6 +494,7 @@ export default function NewTicketPage() {
                 setError("");
                 setTriageResult(null);
                 setIdentitySuggestion(null);
+                setCustomerResolved(false);
                 setState("idle");
                 setCheckStage("idle");
                 setCreateStage("idle");
@@ -502,21 +542,50 @@ export default function NewTicketPage() {
                   <SummaryBox label="Likely fault type" value={formatFaultTypeV2(triageResult.competition_output.fault_type_v2)} />
                   <SummaryBox label="Recommended next step" value={getCustomerNextStep(triageResult)} />
                   <SummaryBox label="Urgency preview" value={getPriorityPreview(triageResult)} />
+                  <SummaryBox label="Diagnosis Confidence" value={formatDiagnosisConfidence(getDiagnosisConfidenceScore(triageResult))} />
                 </div>
                 <p className="mt-4 rounded-xl bg-white p-4 text-sm font-semibold leading-6 text-slate-700">
                   {getDiagnosisNote(triageResult)}
                 </p>
+                {formatDiagnosisConfidence(getDiagnosisConfidenceScore(triageResult)) === "Low" && (
+                  <p className="mt-3 rounded-xl bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-800">
+                    If this does not match what you see, create a support ticket or upload clearer evidence.
+                  </p>
+                )}
+              </Card>
+            )}
+            {triageResult && isCustomerRouted(triageResult) && !needsProof(triageResult) && (
+              <Card className="rounded-2xl border border-green-200 bg-white p-5">
+                <p className="technical-label text-green-700">Try this first</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Safe customer action</h3>
+                <p className="mt-4 rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-slate-800">
+                  {triageResult.competition_output.action_message}
+                </p>
+                <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-800">
+                  Only perform simple visible checks. Do not open the charger casing, EVDB, isolator, or any electrical panels.
+                </p>
+                {customerResolved ? (
+                  <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+                    <p className="text-sm font-extrabold text-green-800">Marked as solved. No support ticket was created.</p>
+                    <Button type="button" variant="outline" className="mt-3 rounded-xl" onClick={() => router.push("/customer/dashboard")}>
+                      Back to Dashboard
+                    </Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => setCustomerResolved(true)}>
+                    Issue Solved
+                  </Button>
+                )}
               </Card>
             )}
             {triageResult && (
               <Card className="rounded-2xl border border-slate-200 bg-white p-5">
                 <p className="technical-label text-slate-500">What happens next</p>
-                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Create a support ticket and track progress</h3>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">{getWhatHappensNextTitle(triageResult)}</h3>
                 <ol className="mt-4 space-y-2 text-sm font-semibold leading-6 text-slate-600">
-                  <li>1. A support ticket will be created.</li>
-                  <li>2. After-sales staff will review your evidence and details.</li>
-                  <li>3. If needed, they may request more proof or schedule a visit.</li>
-                  <li>4. You can track everything from My Tickets.</li>
+                  {getWhatHappensNextSteps(triageResult).map((item, index) => (
+                    <li key={item}>{index + 1}. {item}</li>
+                  ))}
                 </ol>
                 <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">
                   {getWhatHappensNextNote(triageResult)}
@@ -587,11 +656,7 @@ export default function NewTicketPage() {
                   onClick={createTicketAfterIdentityReview}
                   disabled={state === "creating"}
                 >
-                  {state === "creating"
-                    ? createStageLabels[createStage] || "Creating support ticket..."
-                    : state === "error" && createStage === "error"
-                      ? "Retry Create Support Ticket"
-                      : "Create Support Ticket"}
+                  {getCreateTicketButtonLabel(triageResult, state, createStage)}
                 </Button>
               )}
             </div>
@@ -632,6 +697,41 @@ function getPriorityPreview(triage: ApiTriageResponse) {
   return "Low";
 }
 
+function getDiagnosisConfidenceScore(triage: ApiTriageResponse) {
+  return (
+    triage.competition_output?.confidence_score ??
+    triage.perception?.confidence_score ??
+    triage.perception?.extraction?.confidence_score ??
+    null
+  );
+}
+
+function formatDiagnosisConfidence(score?: number | null) {
+  if (score == null) return "Not available";
+  if (score >= 0.8) return "High";
+  if (score >= 0.5) return "Medium";
+  return "Low";
+}
+
+function isCustomerRouted(triage: ApiTriageResponse) {
+  return triage.competition_output.recipient_type === "customer";
+}
+
+function needsProof(triage: ApiTriageResponse) {
+  return Boolean(triage.competition_output.required_proof_next || triage.follow_up_prompts.length > 0);
+}
+
+function getCreateTicketButtonLabel(
+  triage: ApiTriageResponse,
+  state: "idle" | "checking" | "ready" | "creating" | "error",
+  createStage: CreateStage
+) {
+  if (state === "creating") return createStageLabels[createStage] || "Creating support ticket...";
+  if (state === "error" && createStage === "error") return "Retry Create Support Ticket";
+  if (isCustomerRouted(triage) && !needsProof(triage)) return "Create Support Ticket if Issue Persists";
+  return "Create Support Ticket";
+}
+
 function getDiagnosisNote(triage: ApiTriageResponse) {
   const output = triage.competition_output;
   if (output.required_proof_next) return output.required_proof_next;
@@ -640,12 +740,41 @@ function getDiagnosisNote(triage: ApiTriageResponse) {
   return output.action_message;
 }
 
+function getWhatHappensNextTitle(triage: ApiTriageResponse) {
+  if (needsProof(triage)) return "More evidence may be needed";
+  if (isCustomerRouted(triage)) return "Try the safe steps first";
+  return "Create a support ticket and track progress";
+}
+
+function getWhatHappensNextSteps(triage: ApiTriageResponse) {
+  if (needsProof(triage)) {
+    return [
+      "ChargerDoc needs clearer evidence to confirm the issue.",
+      "You may upload the requested proof.",
+      "You can still create a support ticket if the issue is urgent.",
+    ];
+  }
+  if (isCustomerRouted(triage)) {
+    return [
+      "Try the safe steps shown above.",
+      "If the issue is solved, no ticket is needed.",
+      "If the issue persists, create a support ticket and after-sales can review it.",
+    ];
+  }
+  return [
+    "A support ticket will be created.",
+    "After-sales staff will review your evidence and details.",
+    "If needed, they may request more proof or schedule a visit.",
+    "You can track everything from My Tickets.",
+  ];
+}
+
 function getWhatHappensNextNote(triage: ApiTriageResponse) {
   const output = triage.competition_output;
   if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "More proof may be requested after ticket creation.";
   if (output.recipient_type === "after_sales_team") return "This will be routed to after-sales for review.";
   if (output.recipient_type === "customer") {
-    return "This looks like a customer-action case. A ticket will still be saved so you can track the guidance and reopen if needed.";
+    return "This looks like a customer-action case. Try the safe step first, then create a ticket only if the issue persists.";
   }
   return "The ticket will store the diagnosis and evidence for your records.";
 }

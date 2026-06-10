@@ -670,8 +670,8 @@ export function LandingPage() {
         <ServiceCardsSection />
         <ProblemSection />
         <WorkflowSection />
-        <OutputPreviewSection />
         <EvidenceTabsSection />
+        <OutputPreviewSection />
         <ProofSection />
         <CaseStudiesSection />
         <MvpAlignmentSection />

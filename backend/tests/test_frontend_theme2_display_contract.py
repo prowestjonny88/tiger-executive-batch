@@ -157,6 +157,7 @@ def test_home_location_and_identity_confirmation_contracts():
     new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
     customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
+    landing = _read(FRONTEND_ROOT / "components" / "landing" / "landing-page.tsx")
 
     assert "location_lat" in api_source
     assert "location_lng" in api_source
@@ -198,6 +199,20 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Diagnosis Summary" in step4_source
     assert "Urgency preview" in step4_source
     assert "Priority preview" not in step4_source
+    assert "Diagnosis Confidence" in step4_source
+    assert "getDiagnosisConfidenceScore" in new_ticket
+    assert "formatDiagnosisConfidence" in new_ticket
+    assert "accuracy" not in step4_source.lower()
+    assert "Try this first" in step4_source
+    assert "Only perform simple visible checks" in step4_source
+    assert "Do not open the charger casing, EVDB, isolator, or any electrical panels." in step4_source
+    assert "Issue Solved" in step4_source
+    assert "Marked as solved. No support ticket was created." in step4_source
+    assert "Create Support Ticket if Issue Persists" in step4_source
+    assert "getCreateTicketButtonLabel" in new_ticket
+    assert "Try the safe steps shown above." in new_ticket
+    assert "If the issue is solved, no ticket is needed." in new_ticket
+    assert "If the issue persists, create a support ticket and after-sales can review it." in new_ticket
     assert "What happens next" in step4_source
     assert "Optional Charger Details" in step4_source
     assert step4_source.index("Diagnosis Summary") < step4_source.index("Optional Charger Details")
@@ -205,6 +220,12 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Confirm and Create Ticket" not in step4_source
     assert "runTriageOnly" in new_ticket
     assert "createTicketAfterIdentityReview" in new_ticket
+    assert "loadDemoCustomerProfile<CustomerProfile>()" in new_ticket
+    assert "rememberDetails" in new_ticket
+    assert "Remember my contact details on this device" in new_ticket
+    assert "Stored only in this demo browser." in new_ticket
+    assert "Clear saved details" in new_ticket
+    assert "window.localStorage.removeItem(\"chargerdoc_customer_profile\")" in new_ticket
     assert "CUSTOMER_DIRECT_TRIAGE" in new_ticket
     assert 'process.env.NEXT_PUBLIC_CUSTOMER_DIRECT_TRIAGE !== "false"' in new_ticket
     assert 'setCheckStage("uploading")' in new_ticket
@@ -227,6 +248,7 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "logTiming(\"fetchTriage\"" in new_ticket
     assert "logTiming(\"createTicketFromTriage\"" in new_ticket
     assert "incidentId = preview.incident_id" in new_ticket
+    assert landing.index("<EvidenceTabsSection />") < landing.index("<OutputPreviewSection />")
     assert "Check Photo and Create Ticket" not in new_ticket
     assert "Home charger details" in customer_detail
     assert "formatHomeChargerLocation" in customer_detail
