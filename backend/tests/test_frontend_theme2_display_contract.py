@@ -154,6 +154,7 @@ def test_frontend_api_helpers_parse_errors_and_use_timeouts():
 def test_home_location_and_identity_confirmation_contracts():
     api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
     identity_helper = _read(FRONTEND_ROOT / "lib" / "charger-identity.ts")
+    phone_helper = _read(FRONTEND_ROOT / "lib" / "phone.ts")
     new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
     customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
@@ -170,6 +171,15 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "competition_output" in identity_helper
     assert "perception" in identity_helper
     assert "The charger label was not readable" in identity_helper
+    assert "digitsOnly" in phone_helper
+    assert "toMalaysiaLocalNumber" in phone_helper
+    assert "toMalaysiaPhoneNumber" in phone_helper
+    assert "isValidMalaysiaPhoneNumber" in phone_helper
+    assert "value.replace(/\\D/g, \"\")" in phone_helper
+    assert "digits.startsWith(\"60\")" in phone_helper
+    assert "digits.startsWith(\"0\")" in phone_helper
+    assert "`+60${local}`" in phone_helper
+    assert "local.length >= 8 && local.length <= 10" in phone_helper
     step2_source = new_ticket.split("{step === 2 &&", 1)[1].split("{step === 3 &&", 1)[0]
     step3_source = new_ticket.split("{step === 3 &&", 1)[1].split("{step === 4 &&", 1)[0]
     step4_source = new_ticket.split("{step === 4 &&", 1)[1]
@@ -196,6 +206,17 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Home Charger" in new_ticket
     assert "Problem Photo" in new_ticket
     assert "Diagnosis & Ticket" in new_ticket
+    assert "MalaysiaPhoneInput" in new_ticket
+    assert "+60" in new_ticket
+    assert "Enter the number after +60." in new_ticket
+    assert 'placeholder="12 345 6789"' in new_ticket
+    assert 'inputMode="tel"' in new_ticket
+    assert 'autoComplete="tel-national"' in new_ticket
+    assert "isValidMalaysiaPhoneNumber(customer.phone_number)" in new_ticket
+    assert "isValidMalaysiaPhoneNumber(customer.whatsapp_number)" in new_ticket
+    assert "toMalaysiaLocalNumber(value)" in new_ticket
+    assert "toMalaysiaPhoneNumber(event.target.value)" in new_ticket
+    assert "getNormalizedCustomer" in new_ticket
     assert "Diagnosis Summary" in step4_source
     assert "Urgency preview" in step4_source
     assert "Priority preview" not in step4_source
@@ -207,7 +228,10 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Only perform simple visible checks" in step4_source
     assert "Do not open the charger casing, EVDB, isolator, or any electrical panels." in step4_source
     assert "Issue Solved" in step4_source
-    assert "Marked as solved. No support ticket was created." in step4_source
+    assert "Issue marked as solved." in step4_source
+    assert "No support ticket was created because you indicated the issue was resolved." in step4_source
+    assert "Start a New Check" in step4_source
+    assert "Go to Home" in step4_source
     assert "Create Support Ticket if Issue Persists" in step4_source
     assert "getCreateTicketButtonLabel" in new_ticket
     assert "Try the safe steps shown above." in new_ticket
@@ -307,7 +331,7 @@ def test_ticket_post_audit_frontend_contracts():
     assert 'useDemoRoleGuard("staff")' in staff_detail
     assert "fetchTickets({ customer_email: profile.email })" in customer_dashboard
     assert "Start your first support ticket" in customer_dashboard
-    assert "saveDemoCustomerProfile(customer)" in new_ticket
+    assert "saveDemoCustomerProfile(normalizedCustomer)" in new_ticket
     assert "addTicketEvidence" in customer_detail
     assert 'ticket.status === "waiting_customer"' in customer_detail
     assert "Proof uploaded. Your ticket has returned to after-sales review." in customer_detail

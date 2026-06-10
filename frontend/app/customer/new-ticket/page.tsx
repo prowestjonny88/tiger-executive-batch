@@ -23,6 +23,7 @@ import {
 } from "../../../lib/api";
 import { extractChargerIdentitySuggestion, formatIdentityConfidence, type ChargerIdentitySuggestion } from "../../../lib/charger-identity";
 import { loadDemoCustomerProfile, saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
+import { isValidMalaysiaPhoneNumber, toMalaysiaLocalNumber, toMalaysiaPhoneNumber } from "../../../lib/phone";
 import { PageShell } from "../../../components/layout/page-shell";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
@@ -146,8 +147,8 @@ export default function NewTicketPage() {
   const customerValid = useMemo(
     () =>
       customer.full_name.trim().length >= 2 &&
-      customer.phone_number.replace(/\D/g, "").length >= 7 &&
-      customer.whatsapp_number.replace(/\D/g, "").length >= 7 &&
+      isValidMalaysiaPhoneNumber(customer.phone_number) &&
+      isValidMalaysiaPhoneNumber(customer.whatsapp_number) &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email),
     [customer]
   );
@@ -187,6 +188,27 @@ export default function NewTicketPage() {
   const logTiming = (label: string, startedAt: number) => {
     const elapsed = Math.round(performance.now() - startedAt);
     console.info(`[TIMING] ${label}: ${elapsed}ms`);
+  };
+
+  const getNormalizedCustomer = (): CustomerProfile => ({
+    ...customer,
+    phone_number: toMalaysiaPhoneNumber(customer.phone_number),
+    whatsapp_number: toMalaysiaPhoneNumber(customer.whatsapp_number),
+  });
+
+  const startNewCheck = () => {
+    setFile(null);
+    setLabelFile(null);
+    setUploadedEvidence(null);
+    setLabelEvidence(null);
+    setTriageResult(null);
+    setIdentitySuggestion(null);
+    setCustomerResolved(false);
+    setError("");
+    setState("idle");
+    setCheckStage("idle");
+    setCreateStage("idle");
+    setStep(3);
   };
 
   const runTriageOnly = async () => {
@@ -271,10 +293,11 @@ export default function NewTicketPage() {
 
     try {
       const createStartedAt = performance.now();
+      const normalizedCustomer = getNormalizedCustomer();
       const created = await createTicketFromTriage({
         incident_id: triageResult.incident_id,
         triage_result: triageResult,
-        customer_profile: customer,
+        customer_profile: normalizedCustomer,
         charger_context: context,
         customer_comments: context.symptom_text || undefined,
       });
@@ -291,7 +314,7 @@ export default function NewTicketPage() {
             evidence: uploadedLabel,
             evidence_type: "closeup",
             actor_role: "customer",
-            actor_name: customer.full_name,
+            actor_name: normalizedCustomer.full_name,
             message: "Customer uploaded charger label photo for brand/model and serial verification.",
           });
           logTiming("addTicketEvidence", evidenceStartedAt);
@@ -299,7 +322,7 @@ export default function NewTicketPage() {
           /* Optional label evidence should not block the created ticket. */
         }
       }
-      if (rememberDetails) saveDemoCustomerProfile(customer);
+      if (rememberDetails) saveDemoCustomerProfile(normalizedCustomer);
       setCreateStage("redirecting");
       router.push(`/customer/tickets/${created.ticket_id}`);
     } catch (err) {
@@ -342,8 +365,18 @@ export default function NewTicketPage() {
             <h2 className="text-xl font-extrabold text-slate-950">Customer Details</h2>
             <FormGrid>
               <TextInput label="Full name" value={customer.full_name} onChange={(value) => setCustomer({ ...customer, full_name: value })} />
-              <TextInput label="Phone number" value={customer.phone_number} onChange={(value) => setCustomer({ ...customer, phone_number: value })} />
-              <TextInput label="WhatsApp number" value={customer.whatsapp_number} onChange={(value) => setCustomer({ ...customer, whatsapp_number: value })} />
+              <MalaysiaPhoneInput
+                label="Phone number"
+                value={customer.phone_number}
+                helper="Enter the number after +60."
+                onChange={(value) => setCustomer({ ...customer, phone_number: value })}
+              />
+              <MalaysiaPhoneInput
+                label="WhatsApp number"
+                value={customer.whatsapp_number}
+                helper="Enter the number after +60."
+                onChange={(value) => setCustomer({ ...customer, whatsapp_number: value })}
+              />
               <TextInput label="Email" value={customer.email} onChange={(value) => setCustomer({ ...customer, email: value })} />
               <SelectInput
                 label="Preferred contact"
@@ -378,13 +411,15 @@ export default function NewTicketPage() {
             <StepActions
               canContinue={Boolean(customerValid)}
               onNext={() => {
-                if (rememberDetails) saveDemoCustomerProfile(customer);
+                const normalizedCustomer = getNormalizedCustomer();
+                setCustomer(normalizedCustomer);
+                if (rememberDetails) saveDemoCustomerProfile(normalizedCustomer);
                 setStep(2);
               }}
             />
             {!customerValid && (
               <p className="text-xs font-semibold text-slate-500">
-                Enter a name, valid email, and reachable phone/WhatsApp numbers to continue.
+                Enter a name, valid email, and Malaysian phone/WhatsApp numbers after +60.
               </p>
             )}
           </section>
@@ -566,10 +601,18 @@ export default function NewTicketPage() {
                 </p>
                 {customerResolved ? (
                   <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
-                    <p className="text-sm font-extrabold text-green-800">Marked as solved. No support ticket was created.</p>
-                    <Button type="button" variant="outline" className="mt-3 rounded-xl" onClick={() => router.push("/customer/dashboard")}>
-                      Back to Dashboard
-                    </Button>
+                    <p className="text-sm font-extrabold text-green-800">Issue marked as solved.</p>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-green-800">
+                      No support ticket was created because you indicated the issue was resolved.
+                    </p>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <Button type="button" variant="outline" className="rounded-xl" onClick={startNewCheck}>
+                        Start a New Check
+                      </Button>
+                      <Button type="button" className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={() => router.push("/")}>
+                        Go to Home
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => setCustomerResolved(true)}>
@@ -784,6 +827,38 @@ function TextInput({ label, value, helper, onChange }: { label: string; value: s
     <div className="space-y-2">
       <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</Label>
       <Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl" />
+      {helper && <p className="text-xs font-semibold leading-5 text-slate-500">{helper}</p>}
+    </div>
+  );
+}
+
+function MalaysiaPhoneInput({
+  label,
+  value,
+  helper,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</Label>
+      <div className="flex">
+        <span className="inline-flex h-10 items-center rounded-l-xl border border-r-0 border-slate-200 bg-slate-50 px-3 text-sm font-extrabold text-slate-700">
+          +60
+        </span>
+        <Input
+          value={toMalaysiaLocalNumber(value)}
+          onChange={(event) => onChange(toMalaysiaPhoneNumber(event.target.value))}
+          className="rounded-l-none rounded-r-xl"
+          placeholder="12 345 6789"
+          inputMode="tel"
+          autoComplete="tel-national"
+        />
+      </div>
       {helper && <p className="text-xs font-semibold leading-5 text-slate-500">{helper}</p>}
     </div>
   );
