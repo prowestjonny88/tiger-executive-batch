@@ -62,6 +62,12 @@ function ResultAssessment() {
     const replayId = searchParams.get("replay");
 
     if (replayId) {
+      if (window.localStorage.getItem("chargerdoc_role") !== "staff") {
+        router.replace("/login");
+        setLoaded(true);
+        return;
+      }
+
       fetchIncidentById(parseInt(replayId, 10))
         .then((incidentDetail) => {
           if (incidentDetail.triage_payload) {
@@ -109,7 +115,7 @@ function ResultAssessment() {
     const session = readSession();
     if (session.triage) setTriage(session.triage);
     setLoaded(true);
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   if (!loaded) {
     return (

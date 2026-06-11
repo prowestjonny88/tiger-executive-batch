@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "../ui/sheet";
 
 export function AppHeader() {
@@ -11,12 +11,21 @@ export function AppHeader() {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
 
+  const syncRole = useCallback(() => setRole(window.localStorage.getItem("chargerdoc_role")), []);
+
   useEffect(() => {
-    const syncRole = () => setRole(window.localStorage.getItem("chargerdoc_role"));
     syncRole();
     window.addEventListener("storage", syncRole);
-    return () => window.removeEventListener("storage", syncRole);
-  }, []);
+    window.addEventListener("chargerdoc_role_changed", syncRole);
+    return () => {
+      window.removeEventListener("storage", syncRole);
+      window.removeEventListener("chargerdoc_role_changed", syncRole);
+    };
+  }, [syncRole]);
+
+  useEffect(() => {
+    syncRole();
+  }, [pathname, syncRole]);
 
   if (pathname === "/") {
     return null;

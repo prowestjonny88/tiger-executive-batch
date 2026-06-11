@@ -90,7 +90,10 @@ export default function StaffDashboardPage() {
         label: "High Priority",
         count: allTickets.filter((ticket) => ticket.priority === "High").length,
         helper: "High priority cases to review first",
-        onClick: () => setFilters({ ...filters, priority: filters.priority === "High" ? "" : "High" }),
+        onClick: () => {
+          setActiveTab("all");
+          setFilters((current) => ({ ...current, priority: current.priority === "High" ? "" : "High" }));
+        },
       },
       {
         label: "To Schedule",
@@ -111,7 +114,7 @@ export default function StaffDashboardPage() {
         onClick: () => setActiveTab("reopened"),
       },
     ],
-    [allTickets, filters]
+    [allTickets]
   );
 
   const tabbedTickets = useMemo(

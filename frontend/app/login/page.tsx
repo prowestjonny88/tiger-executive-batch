@@ -12,6 +12,7 @@ export default function LoginPage() {
 
   const selectRole = (role: "customer" | "staff") => {
     window.localStorage.setItem("chargerdoc_role", role);
+    window.dispatchEvent(new Event("chargerdoc_role_changed"));
     router.push(role === "customer" ? "/customer/new-ticket" : "/staff/dashboard");
   };
 

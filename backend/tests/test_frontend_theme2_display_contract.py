@@ -298,6 +298,7 @@ def test_ticket_post_audit_frontend_contracts():
     app_header = _read(FRONTEND_ROOT / "components" / "layout" / "app-header.tsx")
     landing = _read(FRONTEND_ROOT / "components" / "landing" / "landing-page.tsx")
     upload = _read(FRONTEND_ROOT / "app" / "upload" / "page.tsx")
+    result_page = _read(FRONTEND_ROOT / "app" / "result" / "page.tsx")
     history = _read(FRONTEND_ROOT / "app" / "history" / "page.tsx")
     staff_history = _read(FRONTEND_ROOT / "app" / "staff" / "history" / "page.tsx")
     customer_dashboard = _read(FRONTEND_ROOT / "app" / "customer" / "dashboard" / "page.tsx")
@@ -313,11 +314,20 @@ def test_ticket_post_audit_frontend_contracts():
 
     assert "New Report" not in app_header
     assert 'href: "/upload"' not in app_header
+    assert 'window.addEventListener("storage", syncRole)' in app_header
+    assert 'window.addEventListener("chargerdoc_role_changed", syncRole)' in app_header
+    assert 'window.removeEventListener("chargerdoc_role_changed", syncRole)' in app_header
+    assert "[pathname, syncRole]" in app_header
+    assert 'window.dispatchEvent(new Event("chargerdoc_role_changed"))' in login
     assert "Switch Role" in app_header
     assert "Incident Audit" in app_header
     assert 'href="/upload"' not in landing
     assert "Check a Photo" not in landing
     assert 'router.replace(role === "customer" ? "/customer/new-ticket" : "/login")' in upload
+    assert 'searchParams.get("replay")' in result_page
+    assert 'window.localStorage.getItem("chargerdoc_role") !== "staff"' in result_page
+    assert 'router.replace("/login")' in result_page
+    assert "fetchIncidentById" in result_page
     assert 'router.replace("/staff/history")' in history
     assert 'useDemoRoleGuard("staff")' in staff_history
     assert "Incident Audit History" in staff_history
@@ -354,6 +364,8 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Needs Review" in staff_dashboard
     assert "Waiting Customer" in staff_dashboard
     assert "High Priority" in staff_dashboard
+    assert 'setActiveTab("all");' in staff_dashboard
+    assert 'setFilters((current) => ({ ...current, priority: current.priority === "High" ? "" : "High" }))' in staff_dashboard
     assert "To Schedule" in staff_dashboard
     assert "Scheduled Today" in staff_dashboard
     assert "Reopened" in staff_dashboard
@@ -367,6 +379,10 @@ def test_ticket_post_audit_frontend_contracts():
     assert "loadFilteredTickets" in staff_dashboard
     assert "allTickets.filter(isNeedsReviewTicket).length" in staff_dashboard
     assert "tickets.filter((ticket) => matchesWorkflowTab(ticket, activeTab))" in staff_dashboard
+    assert 'filteredIncidents.map((incident) => {' in staff_history
+    assert 'return incident.latest_stage === "triage_result" ?' in staff_history
+    assert '<div key={incident.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">' in staff_history
+    assert "Incomplete" in staff_history
     assert "No tickets need review right now" in staff_dashboard
     assert "Try Waiting Customer, To Schedule, Scheduled, or All Tickets." in staff_dashboard
     assert "No tickets yet" in staff_dashboard

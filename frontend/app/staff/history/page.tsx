@@ -195,25 +195,42 @@ export default function StaffIncidentAuditHistoryPage() {
               No incidents recorded yet.
             </div>
           ) : (
-            filteredIncidents.map((incident) => (
-              <Link key={incident.id} href={`/result?replay=${incident.id}`} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-mono text-sm font-extrabold text-slate-900">INC-{incident.id}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
-                    </p>
+            filteredIncidents.map((incident) => {
+              const cardContent = (
+                <>
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm font-extrabold text-slate-900">INC-{incident.id}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {formatDistanceToNow(new Date(incident.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <IncidentStatusBadge recipientType={incident.latest_recipient_type} />
                   </div>
-                  <IncidentStatusBadge recipientType={incident.latest_recipient_type} />
+                  <p className="text-base font-extrabold text-slate-950">
+                    {formatObservationResult(incident.latest_observation_result)}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    {formatInputComponent(incident.latest_input_component)} / {formatFaultTypeV2(incident.latest_fault_type_v2)}
+                  </p>
+                  {incident.latest_stage !== "triage_result" && (
+                    <span className="mt-4 inline-flex rounded bg-slate-100 px-2 py-1 text-xs font-medium uppercase tracking-widest text-slate-400">
+                      Incomplete
+                    </span>
+                  )}
+                </>
+              );
+
+              return incident.latest_stage === "triage_result" ? (
+                <Link key={incident.id} href={`/result?replay=${incident.id}`} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  {cardContent}
+                </Link>
+              ) : (
+                <div key={incident.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  {cardContent}
                 </div>
-                <p className="text-base font-extrabold text-slate-950">
-                  {formatObservationResult(incident.latest_observation_result)}
-                </p>
-                <p className="mt-2 text-sm font-semibold text-slate-600">
-                  {formatInputComponent(incident.latest_input_component)} / {formatFaultTypeV2(incident.latest_fault_type_v2)}
-                </p>
-              </Link>
-            ))
+              );
+            })
           )}
         </div>
       </div>
