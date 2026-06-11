@@ -442,13 +442,21 @@ export default function NewTicketPage() {
                   {locationStatus === "locating" ? "Capturing location..." : "Use Current Location"}
                 </Button>
                 <p className="text-xs font-semibold text-slate-500">
-                  Location is approximate. Please confirm the exact home address and charger position.
+                  GPS coordinates help after-sales locate the charger, but the written home address is still required.
                 </p>
               </div>
               {locationStatus === "success" && (
-                <p className="text-xs font-bold text-green-700">
-                  Location captured. Please confirm your home address and charger position.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-green-700">
+                    GPS location captured. Please enter or confirm your full home address above.
+                  </p>
+                  {typeof context.location_lat === "number" && typeof context.location_lng === "number" && (
+                    <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                      GPS captured: {context.location_lat.toFixed(6)}, {context.location_lng.toFixed(6)}
+                      {typeof context.location_accuracy_m === "number" ? ` · accuracy ±${Math.round(context.location_accuracy_m)}m` : ""}
+                    </p>
+                  )}
+                </div>
               )}
               {(locationStatus === "denied" || locationStatus === "error") && (
                 <p className="text-xs font-bold text-amber-700">

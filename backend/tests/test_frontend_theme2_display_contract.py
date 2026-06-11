@@ -187,6 +187,13 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Home Charger Location and Issue Context" in step2_source
     assert "Use Current Location" in new_ticket
     assert "navigator.geolocation.getCurrentPosition" in new_ticket
+    assert "context.installation_address.trim().length >= 8" in new_ticket
+    assert "GPS coordinates help after-sales locate the charger, but the written home address is still required." in step2_source
+    assert "GPS location captured. Please enter or confirm your full home address above." in step2_source
+    assert "GPS captured:" in step2_source
+    assert "context.location_lat.toFixed(6)" in step2_source
+    assert "context.location_lng.toFixed(6)" in step2_source
+    assert "Math.round(context.location_accuracy_m)" in step2_source
     assert "Home charger location" in step2_source
     assert "Installed by" in step2_source
     assert "Describe the issue" in step2_source
