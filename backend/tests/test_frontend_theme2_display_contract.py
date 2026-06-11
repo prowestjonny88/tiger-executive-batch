@@ -155,10 +155,15 @@ def test_home_location_and_identity_confirmation_contracts():
     api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
     identity_helper = _read(FRONTEND_ROOT / "lib" / "charger-identity.ts")
     phone_helper = _read(FRONTEND_ROOT / "lib" / "phone.ts")
+    google_maps_helper = _read(FRONTEND_ROOT / "lib" / "google-maps.ts")
+    address_autocomplete = _read(FRONTEND_ROOT / "components" / "location" / "address-autocomplete.tsx")
+    reverse_geocode_route = _read(FRONTEND_ROOT / "app" / "api" / "geocode" / "reverse" / "route.ts")
     new_ticket = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "page.tsx")
     customer_detail = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "page.tsx")
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
     landing = _read(FRONTEND_ROOT / "components" / "landing" / "landing-page.tsx")
+    readme = _read(REPO_ROOT / "README.md")
+    deployment_doc = _read(REPO_ROOT / "docs" / "deployment_cloudrun_vercel.md")
 
     assert "location_lat" in api_source
     assert "location_lng" in api_source
@@ -167,6 +172,23 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "charger_location_notes" in api_source
     assert "formatHomeChargerLocation" in api_source
     assert "formatLocationSource" in api_source
+    assert '"browser_geolocation_reverse_geocoded"' in api_source
+    assert "reverseGeocodeLocation" in api_source
+    assert "GooglePlaceSelection" in google_maps_helper
+    assert "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" in google_maps_helper
+    assert "libraries=places" in google_maps_helper
+    assert 'componentRestrictions: { country: "my" }' in address_autocomplete
+    assert 'fields: ["formatted_address", "geometry.location", "place_id"]' in address_autocomplete
+    assert "Please confirm the suggested address before continuing." in address_autocomplete
+    assert "Type the full home address manually." in address_autocomplete
+    assert "GOOGLE_MAPS_SERVER_KEY" in reverse_geocode_route
+    assert "https://maps.googleapis.com/maps/api/geocode/json" in reverse_geocode_route
+    assert "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" not in reverse_geocode_route
+    assert "Maps JavaScript API" in readme
+    assert "Places API" in readme
+    assert "Geocoding API" in readme
+    assert "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" in deployment_doc
+    assert "GOOGLE_MAPS_SERVER_KEY" in deployment_doc
     assert "extractChargerIdentitySuggestion" in identity_helper
     assert "competition_output" in identity_helper
     assert "perception" in identity_helper
@@ -185,11 +207,20 @@ def test_home_location_and_identity_confirmation_contracts():
     step4_source = new_ticket.split("{step === 4 &&", 1)[1]
 
     assert "Home Charger Location and Issue Context" in step2_source
+    assert "AddressAutocomplete" in new_ticket
     assert "Use Current Location" in new_ticket
     assert "navigator.geolocation.getCurrentPosition" in new_ticket
+    assert "reverseGeocodeLocation(lat, lng)" in new_ticket
+    assert 'location_source: "google_places"' in new_ticket
+    assert 'location_source: "browser_geolocation_reverse_geocoded"' in new_ticket
+    assert "installation_address: place.formatted_address" in new_ticket
+    assert "installation_address: result.formatted_address" in new_ticket
+    assert "google_place_id: place.place_id" in new_ticket
+    assert "google_place_id: result.google_place_id" in new_ticket
     assert "context.installation_address.trim().length >= 8" in new_ticket
     assert "GPS coordinates help after-sales locate the charger, but the written home address is still required." in step2_source
     assert "GPS location captured. Please enter or confirm your full home address above." in step2_source
+    assert "GPS captured. Please enter full home address manually." in new_ticket
     assert "GPS captured:" in step2_source
     assert "context.location_lat.toFixed(6)" in step2_source
     assert "context.location_lng.toFixed(6)" in step2_source

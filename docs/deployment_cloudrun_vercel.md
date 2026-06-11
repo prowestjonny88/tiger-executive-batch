@@ -70,9 +70,19 @@ Set these in Vercel:
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://YOUR-CLOUD-RUN-URL
 API_BASE_URL=https://YOUR-CLOUD-RUN-URL
+NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=your_browser_restricted_key
+GOOGLE_MAPS_SERVER_KEY=your_server_restricted_key
 ```
 
 Both are required because browser helpers and Next.js server proxy routes need the backend URL.
+
+Address autocomplete and GPS reverse geocoding also require these Google Cloud APIs:
+
+- Maps JavaScript API
+- Places API
+- Geocoding API
+
+Use `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` only for browser Places Autocomplete. Use `GOOGLE_MAPS_SERVER_KEY` only in Vercel server-side route handlers such as `/api/geocode/reverse`; do not expose it to browser code.
 
 ## Google Cloud Setup
 

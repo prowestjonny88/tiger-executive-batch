@@ -83,7 +83,17 @@ Create `frontend/.env.local`:
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
 API_BASE_URL=http://127.0.0.1:8001
+NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=your_browser_restricted_key
+GOOGLE_MAPS_SERVER_KEY=your_server_restricted_key
 ```
+
+Google address assistance requires these Google Cloud APIs:
+
+- Maps JavaScript API
+- Places API
+- Geocoding API
+
+Use `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` only for browser Places Autocomplete, and keep `GOOGLE_MAPS_SERVER_KEY` server-only for reverse geocoding.
 
 Start local Postgres if needed:
 

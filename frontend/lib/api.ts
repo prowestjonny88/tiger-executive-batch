@@ -230,7 +230,7 @@ export type ChargerContext = {
   location_lat?: number | null;
   location_lng?: number | null;
   location_accuracy_m?: number | null;
-  location_source?: "manual" | "browser_geolocation" | "google_places" | "reverse_geocoded" | null;
+  location_source?: "manual" | "browser_geolocation" | "google_places" | "reverse_geocoded" | "browser_geolocation_reverse_geocoded" | null;
   google_place_id?: string | null;
   formatted_address?: string | null;
   home_charger_location?: "car_porch" | "garage" | "outdoor_wall" | "indoor_wall" | "other" | "unknown" | null;
@@ -313,6 +313,13 @@ export type TicketRecord = {
 
 export type TicketListResponse = {
   tickets: TicketRecord[];
+};
+
+export type ReverseGeocodeResponse = {
+  formatted_address: string;
+  google_place_id: string;
+  location_lat: number;
+  location_lng: number;
 };
 
 export type CreateTicketResponse = {
@@ -458,6 +465,10 @@ export async function fetchIncidents() {
 
 export async function fetchIncidentById(id: number) {
   return getJson<IncidentHistoryDetailItem>(`/api/incidents/${id}`);
+}
+
+export async function reverseGeocodeLocation(lat: number, lng: number) {
+  return postJson<ReverseGeocodeResponse>("/api/geocode/reverse", { lat, lng });
 }
 
 export async function fetchTickets(filters: Record<string, string> = {}) {
@@ -703,6 +714,8 @@ export function formatLocationSource(value?: string | null) {
       return "Google Places";
     case "reverse_geocoded":
       return "Reverse geocoded";
+    case "browser_geolocation_reverse_geocoded":
+      return "GPS reverse geocoded";
     case "unknown":
     case "":
     case undefined:

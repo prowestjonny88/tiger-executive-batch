@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, LocateFixed } from "lucide-react";
@@ -15,6 +15,7 @@ import {
   fetchPreview,
   fetchSites,
   fetchTriage,
+  reverseGeocodeLocation,
   type ApiTriageResponse,
   type ChargerContext,
   type CustomerProfile,
@@ -24,6 +25,7 @@ import {
 import { extractChargerIdentitySuggestion, formatIdentityConfidence, type ChargerIdentitySuggestion } from "../../../lib/charger-identity";
 import { loadDemoCustomerProfile, saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { isValidMalaysiaPhoneNumber, toMalaysiaLocalNumber, toMalaysiaPhoneNumber } from "../../../lib/phone";
+import { AddressAutocomplete } from "../../../components/location/address-autocomplete";
 import { PageShell } from "../../../components/layout/page-shell";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
@@ -157,6 +159,29 @@ export default function NewTicketPage() {
     [context]
   );
 
+  const selectGooglePlace = useCallback((place: { formatted_address: string; place_id: string; location_lat: number; location_lng: number }) => {
+    setContext((current) => ({
+      ...current,
+      installation_address: place.formatted_address,
+      formatted_address: place.formatted_address,
+      google_place_id: place.place_id,
+      location_lat: place.location_lat,
+      location_lng: place.location_lng,
+      location_source: "google_places",
+    }));
+    setLocationStatus("success");
+    setLocationError("");
+  }, []);
+
+  const updateManualAddress = useCallback((value: string) => {
+    setContext((current) => ({
+      ...current,
+      installation_address: value,
+      formatted_address: value,
+      location_source: current.location_source || "manual",
+    }));
+  }, []);
+
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       setLocationStatus("error");
@@ -167,15 +192,35 @@ export default function NewTicketPage() {
     setLocationStatus("locating");
     setLocationError("");
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
         setContext((current) => ({
           ...current,
-          location_lat: position.coords.latitude,
-          location_lng: position.coords.longitude,
-          location_accuracy_m: position.coords.accuracy,
+          location_lat: lat,
+          location_lng: lng,
+          location_accuracy_m: accuracy,
           location_source: "browser_geolocation",
         }));
-        setLocationStatus("success");
+        try {
+          const result = await reverseGeocodeLocation(lat, lng);
+          setContext((current) => ({
+            ...current,
+            installation_address: result.formatted_address,
+            formatted_address: result.formatted_address,
+            google_place_id: result.google_place_id,
+            location_lat: lat,
+            location_lng: lng,
+            location_accuracy_m: accuracy,
+            location_source: "browser_geolocation_reverse_geocoded",
+          }));
+          setLocationStatus("success");
+          setLocationError("");
+        } catch {
+          setLocationStatus("success");
+          setLocationError("GPS captured. Please enter full home address manually.");
+        }
       },
       (geoError) => {
         setLocationStatus(geoError.code === geoError.PERMISSION_DENIED ? "denied" : "error");
@@ -429,12 +474,12 @@ export default function NewTicketPage() {
           <section className="space-y-5">
             <h2 className="text-xl font-extrabold text-slate-950">Home Charger Location and Issue Context</h2>
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Installation address</Label>
-              <Textarea
+              <AddressAutocomplete
+                label="Installation address"
                 value={context.installation_address}
-                onChange={(event) => setContext({ ...context, installation_address: event.target.value, location_source: context.location_source || "manual" })}
-                className="min-h-[90px] resize-none rounded-xl"
                 placeholder="Enter the home address where the charger is installed."
+                onAddressChange={updateManualAddress}
+                onPlaceSelect={selectGooglePlace}
               />
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" className="rounded-xl" onClick={useCurrentLocation} disabled={locationStatus === "locating"}>
@@ -450,6 +495,11 @@ export default function NewTicketPage() {
                   <p className="text-xs font-bold text-green-700">
                     GPS location captured. Please enter or confirm your full home address above.
                   </p>
+                  {locationError && (
+                    <p className="text-xs font-bold text-amber-700">
+                      {locationError}
+                    </p>
+                  )}
                   {typeof context.location_lat === "number" && typeof context.location_lng === "number" && (
                     <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
                       GPS captured: {context.location_lat.toFixed(6)}, {context.location_lng.toFixed(6)}
