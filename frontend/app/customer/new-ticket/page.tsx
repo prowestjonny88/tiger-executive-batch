@@ -500,12 +500,6 @@ export default function NewTicketPage() {
                       {locationError}
                     </p>
                   )}
-                  {typeof context.location_lat === "number" && typeof context.location_lng === "number" && (
-                    <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
-                      GPS captured: {context.location_lat.toFixed(6)}, {context.location_lng.toFixed(6)}
-                      {typeof context.location_accuracy_m === "number" ? ` · accuracy ±${Math.round(context.location_accuracy_m)}m` : ""}
-                    </p>
-                  )}
                 </div>
               )}
               {(locationStatus === "denied" || locationStatus === "error") && (

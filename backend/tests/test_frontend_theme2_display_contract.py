@@ -221,10 +221,10 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "GPS coordinates help after-sales locate the charger, but the written home address is still required." in step2_source
     assert "GPS location captured. Please enter or confirm your full home address above." in step2_source
     assert "GPS captured. Please enter full home address manually." in new_ticket
-    assert "GPS captured:" in step2_source
-    assert "context.location_lat.toFixed(6)" in step2_source
-    assert "context.location_lng.toFixed(6)" in step2_source
-    assert "Math.round(context.location_accuracy_m)" in step2_source
+    assert "GPS captured:" not in step2_source
+    assert "context.location_lat.toFixed(6)" not in step2_source
+    assert "context.location_lng.toFixed(6)" not in step2_source
+    assert "Math.round(context.location_accuracy_m)" not in step2_source
     assert "Home charger location" in step2_source
     assert "Installed by" in step2_source
     assert "Describe the issue" in step2_source
