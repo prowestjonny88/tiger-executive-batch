@@ -106,6 +106,27 @@ const createStageLabels: Record<CreateStage, string> = {
   error: "Ticket creation failed. Please retry.",
 };
 
+function buildDiagnosisChecklist(stage: CheckStage, hasLabelPhoto: boolean) {
+  const stages: CheckStage[] = [
+    "uploading",
+    ...(CUSTOMER_DIRECT_TRIAGE ? [] : (["previewing"] as CheckStage[])),
+    "checking",
+    ...(hasLabelPhoto ? (["scanning_label"] as CheckStage[]) : []),
+    "preparing",
+  ];
+  const currentIndex = stages.indexOf(stage);
+  return stages.map((item, index) => ({
+    label: checkStageLabels[item],
+    status: getChecklistStatus(index, currentIndex),
+  }));
+}
+
+function getChecklistStatus(index: number, currentIndex: number) {
+  if (currentIndex === -1 || index > currentIndex) return "pending" as const;
+  if (index === currentIndex) return "active" as const;
+  return "done" as const;
+}
+
 export default function NewTicketPage() {
   useDemoRoleGuard("customer");
   const router = useRouter();
@@ -681,7 +702,10 @@ export default function NewTicketPage() {
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
             {(state === "checking" || checkStage !== "idle") && !triageResult && (
-              <DiagnosisLoadingCard label={checkStageLabels[checkStage] || "Checking your charger photo..."} />
+              <DiagnosisLoadingCard
+                label={checkStageLabels[checkStage] || "Checking your charger photo..."}
+                items={buildDiagnosisChecklist(checkStage, Boolean(labelFile))}
+              />
             )}
             {(state === "creating" || createStage === "error") && triageResult && (
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-blue-800">

@@ -58,17 +58,49 @@ export function TicketDetailSkeleton() {
   );
 }
 
-export function DiagnosisLoadingCard({ label = "Checking your charger photo..." }: { label?: string }) {
+type ChecklistStatus = "pending" | "active" | "done";
+
+type DiagnosisChecklistItem = {
+  label: string;
+  status: ChecklistStatus;
+};
+
+export function DiagnosisLoadingCard({
+  label = "Checking your charger photo...",
+  items = [],
+}: {
+  label?: string;
+  items?: DiagnosisChecklistItem[];
+}) {
   return (
     <div className="rounded-3xl border border-green-200 bg-green-50 p-5 shadow-sm">
-      <LoadingSpinner label={label} />
-      <div className="mt-4 grid gap-2 text-sm font-semibold leading-6 text-green-900">
-        <p>Reading visible charger, EVDB, isolator, or app evidence.</p>
-        <p>Matching fault type and routing recommendation.</p>
-        <p>Preparing a clear support-ticket summary.</p>
-      </div>
+      <p className="text-base font-extrabold text-green-950">{label}</p>
+      {items.length > 0 && (
+        <ol className="mt-5 grid gap-3 text-sm font-semibold leading-6 text-slate-700">
+          {items.map((item) => (
+            <li key={item.label} className="flex items-center gap-3">
+              <ChecklistIcon status={item.status} />
+              <span className={item.status === "active" ? "font-extrabold text-green-900" : "text-slate-700"}>{item.label}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
+}
+
+function ChecklistIcon({ status }: { status: ChecklistStatus }) {
+  if (status === "done") {
+    return (
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-700 text-xs font-extrabold text-white">
+        OK
+      </span>
+    );
+  }
+  if (status === "active") {
+    return <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-green-200 border-t-green-700" />;
+  }
+  return <span className="h-5 w-5 shrink-0 rounded-full border-2 border-slate-200 bg-white" />;
 }
 
 function SkeletonLine({ className }: { className?: string }) {
