@@ -1,6 +1,8 @@
 # ChargerDoc Theme 2 Triage
 
-ChargerDoc Theme 2 Triage is an EV charger troubleshooting and support-ticket prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini-backed visual perception with deterministic fallbacks, maps findings to the organizer's Theme 2 rules, routes the result either to the customer or to `AS_TEAM_01`, and can generate trackable customer support tickets for after-sales handling.
+**Live Demo:** [https://chargerdocs.vercel.app/](https://chargerdocs.vercel.app/)
+
+ChargerDoc Theme 2 Triage is an EV charger troubleshooting and support-ticket prototype for the ESUM Theme 2 guide. It accepts charger, EVDB, isolator, and optional EV app screenshot evidence, uses Gemini VLM for perception, deterministic Theme 2 rule mapping, and Neon Postgres for persistence.
 
 The current product is Theme 2 only. Round 1 known-case retrieval, pgvector, KB gates, `issue_family`, and `resolver_tier` are archived under `_archive/round1/` and are not part of the live runtime.
 
