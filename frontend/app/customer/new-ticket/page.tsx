@@ -27,6 +27,7 @@ import { loadDemoCustomerProfile, saveDemoCustomerProfile, useDemoRoleGuard } fr
 import { isValidMalaysiaPhoneNumber, toMalaysiaLocalNumber, toMalaysiaPhoneNumber } from "../../../lib/phone";
 import { AddressAutocomplete } from "../../../components/location/address-autocomplete";
 import { PageShell } from "../../../components/layout/page-shell";
+import { ButtonLoadingLabel, DiagnosisLoadingCard } from "../../../components/support";
 import { UploadDropzone } from "../../../components/triage/upload-dropzone";
 import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/alert";
 import { Button } from "../../../components/ui/button";
@@ -489,7 +490,7 @@ export default function NewTicketPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" className="rounded-xl" onClick={useCurrentLocation} disabled={locationStatus === "locating"}>
                   <LocateFixed className="mr-2 h-4 w-4" />
-                  {locationStatus === "locating" ? "Capturing location..." : "Use Current Location"}
+                  {locationStatus === "locating" ? <ButtonLoadingLabel label="Locating..." /> : "Use Current Location"}
                 </Button>
                 <p className="text-xs font-semibold text-slate-500">
                   GPS coordinates help after-sales locate the charger, but the written home address is still required.
@@ -645,9 +646,7 @@ export default function NewTicketPage() {
             </p>
             {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
             {(state === "checking" || checkStage !== "idle") && !triageResult && (
-              <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm font-bold text-green-800">
-                {checkStageLabels[checkStage]}
-              </div>
+              <DiagnosisLoadingCard label={checkStageLabels[checkStage] || "Checking your charger photo..."} />
             )}
             {(state === "creating" || createStage === "error") && triageResult && (
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-bold text-blue-800">
@@ -729,15 +728,19 @@ export default function NewTicketPage() {
                   If ChargerDoc detected or you know the charger details, confirm them below. You can also leave them blank.
                 </p>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{identitySuggestion.note}</p>
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="mt-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-2">
                   <TextInput
                     label="Charger Brand/Model"
                     value={context.charger_brand_model || ""}
+                    placeholder="e.g. PROTON e.MAS"
+                    helper="Edit if the detected brand/model is not correct."
                     onChange={(value) => setContext({ ...context, charger_brand_model: value })}
                   />
                   <TextInput
                     label="Charger Serial Number"
                     value={context.charger_serial_number || ""}
+                    placeholder="Enter serial number if visible"
+                    helper="Leave blank if the label is unreadable."
                     onChange={(value) => setContext({ ...context, charger_serial_number: value })}
                   />
                 </div>
@@ -777,7 +780,7 @@ export default function NewTicketPage() {
                   onClick={runTriageOnly}
                   disabled={!file || state === "checking"}
                 >
-                  {state === "checking" ? checkStageLabels[checkStage] || "Checking photo..." : "Check Photo"}
+                  {state === "checking" ? <ButtonLoadingLabel label="Checking photo..." /> : "Check Photo"}
                 </Button>
               ) : (
                 <Button
@@ -785,7 +788,7 @@ export default function NewTicketPage() {
                   onClick={createTicketAfterIdentityReview}
                   disabled={state === "creating"}
                 >
-                  {getCreateTicketButtonLabel(triageResult, state, createStage)}
+                  {state === "creating" ? <ButtonLoadingLabel label="Creating ticket..." /> : getCreateTicketButtonLabel(triageResult, state, createStage)}
                 </Button>
               )}
             </div>
@@ -908,11 +911,28 @@ function getWhatHappensNextNote(triage: ApiTriageResponse) {
   return "The ticket will store the diagnosis and evidence for your records.";
 }
 
-function TextInput({ label, value, helper, onChange }: { label: string; value: string; helper?: string; onChange: (value: string) => void }) {
+function TextInput({
+  label,
+  value,
+  helper,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-2">
       <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl" />
+      <Input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 rounded-xl border-slate-300 bg-white font-semibold text-slate-950 shadow-sm placeholder:text-slate-400"
+      />
       {helper && <p className="text-xs font-semibold leading-5 text-slate-500">{helper}</p>}
     </div>
   );

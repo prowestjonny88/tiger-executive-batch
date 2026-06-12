@@ -23,7 +23,7 @@ import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { formatTicketStatus, nextActionForTicket, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { buildWhatsAppThread, hiddenCustomerEventTypes } from "../../../../lib/whatsapp-thread";
 import { PageShell } from "../../../../components/layout/page-shell";
-import { CommandCard, PriorityBadge, StatusBadge, SupportCard, SupportTimeline } from "../../../../components/support";
+import { ButtonLoadingLabel, CommandCard, LoadingSpinner, PriorityBadge, StatusBadge, SupportCard, SupportTimeline, TicketDetailSkeleton } from "../../../../components/support";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { UploadDropzone } from "../../../../components/triage/upload-dropzone";
 import { Button } from "../../../../components/ui/button";
@@ -39,6 +39,10 @@ export default function CustomerTicketDetailPage() {
   const [whatsApp, setWhatsApp] = useState<WhatsAppPreview | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofStatus, setProofStatus] = useState<"idle" | "uploading" | "done" | "error">("idle");
+  const [isLoadingTicket, setIsLoadingTicket] = useState(true);
+  const [isLoadingWhatsApp, setIsLoadingWhatsApp] = useState(true);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [isRequestingReschedule, setIsRequestingReschedule] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState({
     issue_resolved: "yes" as "yes" | "partially" | "no",
@@ -49,10 +53,16 @@ export default function CustomerTicketDetailPage() {
   });
 
   const refresh = () => {
+    setIsLoadingTicket((current) => current || !ticket);
+    setIsLoadingWhatsApp(true);
     fetchTicket(ticketId)
       .then(setTicket)
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load ticket."));
-    fetchWhatsAppPreview(ticketId).then(setWhatsApp).catch(() => setWhatsApp(null));
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load ticket."))
+      .finally(() => setIsLoadingTicket(false));
+    fetchWhatsAppPreview(ticketId)
+      .then(setWhatsApp)
+      .catch(() => setWhatsApp(null))
+      .finally(() => setIsLoadingWhatsApp(false));
   };
 
   useEffect(refresh, [ticketId]);
@@ -60,10 +70,14 @@ export default function CustomerTicketDetailPage() {
 
   if (!ticket) {
     return (
-      <PageShell maxWidth="4xl">
-        <Card className="app-card p-8">
-          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : <p className="text-slate-500">Loading ticket...</p>}
-        </Card>
+      <PageShell maxWidth="6xl" density="detail">
+        {error && !isLoadingTicket ? (
+          <Card className="app-card p-8">
+            <p className="text-sm font-semibold text-red-700">{error}</p>
+          </Card>
+        ) : (
+          <TicketDetailSkeleton />
+        )}
       </PageShell>
     );
   }
@@ -91,18 +105,30 @@ export default function CustomerTicketDetailPage() {
   }));
 
   const submitFeedback = async () => {
-    const updated = await submitTicketFeedback(ticket.ticket_id, feedback);
-    setTicket(updated);
+    if (isSubmittingFeedback) return;
+    setIsSubmittingFeedback(true);
+    try {
+      const updated = await submitTicketFeedback(ticket.ticket_id, feedback);
+      setTicket(updated);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const requestReschedule = async () => {
-    const updated = await updateTicketStatus(ticket.ticket_id, {
-      status: "reschedule_requested",
-      actor_role: "customer",
-      actor_name: ticket.customer_profile.full_name,
-      note: "Customer requested schedule review.",
-    });
-    setTicket(updated);
+    if (isRequestingReschedule) return;
+    setIsRequestingReschedule(true);
+    try {
+      const updated = await updateTicketStatus(ticket.ticket_id, {
+        status: "reschedule_requested",
+        actor_role: "customer",
+        actor_name: ticket.customer_profile.full_name,
+        note: "Customer requested schedule review.",
+      });
+      setTicket(updated);
+    } finally {
+      setIsRequestingReschedule(false);
+    }
   };
 
   const uploadProof = async () => {
@@ -233,8 +259,11 @@ export default function CustomerTicketDetailPage() {
                       disabled={!proofFile || proofStatus === "uploading"}
                       onClick={uploadProof}
                     >
-                      {proofStatus === "uploading" ? "Uploading proof..." : "Upload Proof"}
+                      {proofStatus === "uploading" ? <ButtonLoadingLabel label="Uploading proof..." /> : "Upload Proof"}
                     </Button>
+                    {proofStatus === "uploading" && (
+                      <p className="text-xs font-bold text-amber-800">Uploading and attaching this proof to your ticket.</p>
+                    )}
                     {proofStatus === "done" && <p className="text-xs font-bold text-amber-800">Proof uploaded. Your ticket has returned to after-sales review.</p>}
                     {proofStatus === "error" && <p className="text-xs font-bold text-red-700">Proof upload failed. Please try again.</p>}
                   </div>
@@ -262,14 +291,35 @@ export default function CustomerTicketDetailPage() {
 
         <div className="space-y-6">
           <SupportCard className="p-6">
-            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Uploaded proof and Home charger details</h2>
+            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Uploaded Proof</h2>
+            <div className="space-y-3 text-sm font-semibold leading-6 text-slate-600">
+              <SummaryBox label="Main issue photo" value={ticket.evidence_photos[0]?.filename || "Uploaded evidence available"} />
+              <SummaryBox label="Additional proof" value={`${Math.max(ticket.evidence_photos.length - 1, 0)} file(s) attached`} />
+              {needsProof && (
+                <Button variant="outline" className="w-full rounded-xl" onClick={() => document.getElementById("proof-upload")?.scrollIntoView({ behavior: "smooth" })}>
+                  Upload More Proof
+                </Button>
+              )}
+            </div>
+          </SupportCard>
+
+          <SupportCard className="p-6" aria-label="Charger / Installation Details">
+            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Home charger details</h2>
             <div className="grid gap-4">
+              <SummaryBox label="Charger details" value={chargerIdentity} />
               <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
               <SummaryBox label="Charger position" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
               {ticket.charger_context.charger_location_notes && (
                 <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes} />
               )}
-              <SummaryBox label="Charger details" value={chargerIdentity} />
+              <SummaryBox
+                label="GPS status"
+                value={
+                  ticket.charger_context.location_lat != null && ticket.charger_context.location_lng != null
+                    ? "GPS captured"
+                    : "GPS not captured"
+                }
+              />
             </div>
           </SupportCard>
 
@@ -288,7 +338,7 @@ export default function CustomerTicketDetailPage() {
               )}
               {canRequestReschedule && (
                 <Button variant="outline" className="mt-5 w-full rounded-xl" onClick={requestReschedule}>
-                  Request Reschedule
+                  {isRequestingReschedule ? <ButtonLoadingLabel label="Requesting..." /> : "Request Reschedule"}
                 </Button>
               )}
             </Card>
@@ -339,6 +389,11 @@ export default function CustomerTicketDetailPage() {
               </div>
             </Card>
           )}
+          {!whatsApp && isLoadingWhatsApp && (
+            <SupportCard className="p-6">
+              <LoadingSpinner label="Preparing WhatsApp update..." />
+            </SupportCard>
+          )}
 
           {ticket.status === "resolved" && (
             <Card className="app-card p-6">
@@ -352,8 +407,8 @@ export default function CustomerTicketDetailPage() {
                   <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Comment</Label>
                   <Textarea value={feedback.comment} onChange={(event) => setFeedback({ ...feedback, comment: event.target.value })} className="resize-none rounded-xl" />
                 </div>
-                <Button className="w-full rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={submitFeedback}>
-                  Submit Feedback
+                <Button className="w-full rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={submitFeedback} disabled={isSubmittingFeedback}>
+                  {isSubmittingFeedback ? <ButtonLoadingLabel label="Submitting..." /> : "Submit Feedback"}
                 </Button>
               </div>
             </Card>

@@ -23,7 +23,7 @@ import {
 import { getPriorityMeta, type TicketTone } from "../../../lib/ticket-ui";
 import { PageShell } from "../../../components/layout/page-shell";
 import { Button } from "../../../components/ui/button";
-import { EmptyState, KpiCard, PriorityBadge, StatusBadge, SupportCard } from "../../../components/support";
+import { EmptyState, KpiCard, LoadingSpinner, PriorityBadge, StatusBadge, SupportCard, TicketListSkeleton } from "../../../components/support";
 
 const filterOptions = {
   priority: ["", "Critical", "High", "Medium", "Low"],
@@ -56,17 +56,24 @@ export default function StaffDashboardPage() {
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<WorkflowTab>("needs_review");
   const [error, setError] = useState("");
+  const [isLoadingAllTickets, setIsLoadingAllTickets] = useState(true);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(true);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
   const loadAllTickets = () => {
+    setIsLoadingAllTickets(true);
     fetchTickets({})
       .then((data) => setAllTickets(data.tickets))
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."))
+      .finally(() => setIsLoadingAllTickets(false));
   };
 
   const loadFilteredTickets = () => {
+    setIsLoadingTickets(true);
     fetchTickets(filters)
       .then((data) => setTickets(data.tickets))
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."))
+      .finally(() => setIsLoadingTickets(false));
   };
 
   useEffect(loadAllTickets, []);
@@ -143,6 +150,20 @@ export default function StaffDashboardPage() {
 
   const hasSearchOrFilters = search.trim().length > 0 || Object.values(filters).some(Boolean);
   const emptyState = getEmptyStateCopy(activeTab, allTickets.length > 0, hasSearchOrFilters);
+  const selectedTicket =
+    visibleTickets.find((ticket) => ticket.ticket_id === selectedTicketId) ??
+    visibleTickets[0] ??
+    null;
+
+  useEffect(() => {
+    if (!visibleTickets.length) {
+      setSelectedTicketId(null);
+      return;
+    }
+    if (!selectedTicketId || !visibleTickets.some((ticket) => ticket.ticket_id === selectedTicketId)) {
+      setSelectedTicketId(visibleTickets[0].ticket_id);
+    }
+  }, [selectedTicketId, visibleTickets]);
 
   return (
     <PageShell maxWidth="7xl" density="dashboard">
@@ -161,25 +182,37 @@ export default function StaffDashboardPage() {
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => (
-          <KpiCard
-            key={card.label}
-            label={card.label}
-            value={card.count}
-            helper={card.helper}
-            tone={card.tone}
-            icon={card.icon}
-            active={
-              (card.label === "Waiting Customer" && activeTab === "waiting_customer") ||
-              (card.label === "To Schedule" && activeTab === "to_schedule") ||
-              (card.label === "Reopened" && activeTab === "reopened") ||
-              (card.label === "High Priority" && filters.priority === "High")
-            }
-            onClick={card.onClick}
-          />
-        ))}
-      </div>
+      {isLoadingAllTickets ? (
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((card) => (
+            <SupportCard key={card.label} className="p-4">
+              <div className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 h-8 w-16 animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 h-3 w-full animate-pulse rounded bg-slate-100" />
+            </SupportCard>
+          ))}
+        </div>
+      ) : (
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((card) => (
+            <KpiCard
+              key={card.label}
+              label={card.label}
+              value={card.count}
+              helper={card.helper}
+              tone={card.tone}
+              icon={card.icon}
+              active={
+                (card.label === "Waiting Customer" && activeTab === "waiting_customer") ||
+                (card.label === "To Schedule" && activeTab === "to_schedule") ||
+                (card.label === "Reopened" && activeTab === "reopened") ||
+                (card.label === "High Priority" && filters.priority === "High")
+              }
+              onClick={card.onClick}
+            />
+          ))}
+        </div>
+      )}
 
       <SupportCard className="mb-5 p-4">
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -195,19 +228,19 @@ export default function StaffDashboardPage() {
           </label>
 
           <div className="flex flex-wrap gap-2">
-            <QuickFilterButton active={filters.priority === "High"} onClick={() => {
+            <QuickFilterButton tone="red" active={filters.priority === "High"} onClick={() => {
               setActiveTab("all");
               setFilters((current) => ({ ...current, priority: current.priority === "High" ? "" : "High" }));
             }}>
               High Priority
             </QuickFilterButton>
-            <QuickFilterButton active={activeTab === "waiting_customer"} onClick={() => setActiveTab("waiting_customer")}>
+            <QuickFilterButton tone="amber" active={activeTab === "waiting_customer"} onClick={() => setActiveTab("waiting_customer")}>
               Waiting Proof
             </QuickFilterButton>
-            <QuickFilterButton active={activeTab === "to_schedule"} onClick={() => setActiveTab("to_schedule")}>
+            <QuickFilterButton tone="blue" active={activeTab === "to_schedule"} onClick={() => setActiveTab("to_schedule")}>
               To Schedule
             </QuickFilterButton>
-            <QuickFilterButton active={activeTab === "reopened"} onClick={() => setActiveTab("reopened")}>
+            <QuickFilterButton tone="red" active={activeTab === "reopened"} onClick={() => setActiveTab("reopened")}>
               Reopened
             </QuickFilterButton>
             {hasSearchOrFilters && (
@@ -263,7 +296,7 @@ export default function StaffDashboardPage() {
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm font-extrabold transition ${
-              activeTab === tab.id ? "bg-blue-700 text-white" : "text-slate-600 hover:bg-slate-100"
+              activeTab === tab.id ? "bg-green-700 text-white" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
             {tab.label}
@@ -271,26 +304,50 @@ export default function StaffDashboardPage() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {visibleTickets.length === 0 ? (
+      {isLoadingTickets && tickets.length > 0 && (
+        <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm font-bold text-blue-800">
+          <LoadingSpinner label="Refreshing queue..." />
+        </div>
+      )}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-3">
+          {isLoadingTickets && tickets.length === 0 ? (
+            <TicketListSkeleton count={4} />
+          ) : visibleTickets.length === 0 ? (
           <EmptyState title={emptyState.title} body={emptyState.body} />
         ) : (
           visibleTickets.map((ticket) => (
-            <TicketQueueCard key={ticket.ticket_id} ticket={ticket} />
+            <TicketQueueCard
+              key={ticket.ticket_id}
+              ticket={ticket}
+              selected={selectedTicket?.ticket_id === ticket.ticket_id}
+              onSelect={() => setSelectedTicketId(ticket.ticket_id)}
+            />
           ))
         )}
+        </div>
+
+        <SelectedTicketPreview ticket={selectedTicket} />
       </div>
     </PageShell>
   );
 }
 
-function QuickFilterButton({ active, children, onClick }: { active: boolean; children: string; onClick: () => void }) {
+function QuickFilterButton({ active, children, onClick, tone }: { active: boolean; children: string; onClick: () => void; tone: TicketTone }) {
+  const activeClass = {
+    red: "border-red-200 bg-red-50 text-red-800",
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+    green: "border-green-200 bg-green-50 text-green-800",
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+  }[tone];
   return (
     <button
       type="button"
       onClick={onClick}
       className={`rounded-full border px-3 py-2 text-xs font-extrabold transition ${
-        active ? "border-blue-200 bg-blue-50 text-blue-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+        active ? activeClass : "border-slate-200 text-slate-600 hover:bg-slate-50"
       }`}
     >
       {children}
@@ -298,13 +355,16 @@ function QuickFilterButton({ active, children, onClick }: { active: boolean; chi
   );
 }
 
-function TicketQueueCard({ ticket }: { ticket: TicketRecord }) {
+function TicketQueueCard({ ticket, selected, onSelect }: { ticket: TicketRecord; selected: boolean; onSelect: () => void }) {
   const priorityTone = getPriorityMeta(ticket.priority).tone;
   const tone = ticket.status === "waiting_customer" ? "amber" : priorityTone;
   const locationSummary = getLocationSummary(ticket);
 
   return (
-    <SupportCard className="overflow-hidden transition hover:border-blue-300 hover:shadow-md">
+    <SupportCard
+      className={`overflow-hidden transition hover:border-blue-300 hover:shadow-md ${selected ? "border-green-300 ring-2 ring-green-100" : ""}`}
+      onClick={onSelect}
+    >
       <div className="grid gap-0 lg:grid-cols-[6px_1.35fr_1fr_auto]">
         <div className={`hidden lg:block ${queueRailClass(tone)}`} />
         <div className="p-4">
@@ -359,10 +419,71 @@ function DashboardField({ label, value, strong = false }: { label: string; value
 }
 
 function getLocationSummary(ticket: TicketRecord) {
-  if (ticket.charger_context.location_lat && ticket.charger_context.location_lng) {
-    return "Address available in ticket detail / GPS captured";
+  const address = ticket.charger_context.installation_address?.trim();
+  const gps = ticket.charger_context.location_lat != null && ticket.charger_context.location_lng != null;
+
+  if (!address) {
+    return gps ? "GPS captured" : "Address available in ticket detail";
   }
-  return "Address available in ticket detail";
+
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  const shortLocation = parts.slice(-3, -1).join(", ") || parts.slice(-2).join(", ") || "Address available";
+  return `${shortLocation}${gps ? " / GPS captured" : ""}`;
+}
+
+function SelectedTicketPreview({ ticket }: { ticket: TicketRecord | null }) {
+  if (!ticket) {
+    return (
+      <SupportCard className="hidden p-5 xl:block">
+        <p className="technical-label text-slate-500">Selected Ticket</p>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-500">Select a ticket to preview recommended action and quick links.</p>
+      </SupportCard>
+    );
+  }
+
+  const evidence = ticket.evidence_photos[0];
+
+  return (
+    <aside className="hidden xl:block">
+      <SupportCard className="sticky top-24 p-5">
+        <p className="technical-label text-green-700">Selected Ticket Preview</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="font-mono text-sm font-extrabold text-slate-950">{ticket.ticket_id}</span>
+          <PriorityBadge priority={ticket.priority} />
+          <StatusBadge status={ticket.status} />
+        </div>
+        <h2 className="mt-4 text-xl font-extrabold text-slate-950">{formatObservationResult(ticket.observation_result)}</h2>
+        <p className="mt-1 text-sm font-semibold text-slate-500">{formatFaultTypeV2(ticket.fault_type_v2)}</p>
+        <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-700">
+          <DashboardField label="Recommended action" value={getTicketActionNeeded(ticket)} strong />
+          <DashboardField label="Proof status" value={getProofStatus(ticket)} />
+          <DashboardField label="Schedule status" value={getScheduleStatus(ticket)} />
+          <DashboardField label="Assigned team" value={ticket.assigned_team_id || ticket.recipient_type.replaceAll("_", " ")} />
+          <DashboardField label="Customer" value={ticket.customer_profile.full_name || "Unknown customer"} />
+        </div>
+        {evidence && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+            <p className="technical-label text-slate-500">Evidence thumbnail</p>
+            <p className="mt-2 truncate text-sm font-bold text-slate-700">{evidence.filename || evidence.storage_path || "Uploaded evidence"}</p>
+          </div>
+        )}
+        <div className="mt-4 grid gap-2">
+          <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+            <Link href={`/staff/tickets/${ticket.ticket_id}`}>Open Ticket</Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>Request Proof</Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>WhatsApp</Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>Assign</Link>
+          </Button>
+        </div>
+      </SupportCard>
+    </aside>
+  );
 }
 
 function queueRailClass(tone: TicketTone) {

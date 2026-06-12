@@ -349,6 +349,7 @@ def test_ticket_post_audit_frontend_contracts():
     ticket_ui = _read(FRONTEND_ROOT / "lib" / "ticket-ui.ts")
     page_shell = _read(FRONTEND_ROOT / "components" / "layout" / "page-shell.tsx")
     support_index = _read(FRONTEND_ROOT / "components" / "support" / "index.ts")
+    loading_state = _read(FRONTEND_ROOT / "components" / "support" / "loading-state.tsx")
     section_header = _read(FRONTEND_ROOT / "components" / "support" / "section-header.tsx")
     command_header = _read(FRONTEND_ROOT / "components" / "support" / "command-header.tsx")
     action_panel_card = _read(FRONTEND_ROOT / "components" / "support" / "action-panel-card.tsx")
@@ -357,6 +358,11 @@ def test_ticket_post_audit_frontend_contracts():
     kpi_card = _read(FRONTEND_ROOT / "components" / "support" / "kpi-card.tsx")
     status_badge = _read(FRONTEND_ROOT / "components" / "support" / "status-badge.tsx")
     priority_badge = _read(FRONTEND_ROOT / "components" / "support" / "priority-badge.tsx")
+    customer_dashboard_loading = _read(FRONTEND_ROOT / "app" / "customer" / "dashboard" / "loading.tsx")
+    customer_ticket_loading = _read(FRONTEND_ROOT / "app" / "customer" / "tickets" / "[ticketId]" / "loading.tsx")
+    staff_dashboard_loading = _read(FRONTEND_ROOT / "app" / "staff" / "dashboard" / "loading.tsx")
+    staff_ticket_loading = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "loading.tsx")
+    new_ticket_loading = _read(FRONTEND_ROOT / "app" / "customer" / "new-ticket" / "loading.tsx")
     role_helper = _read(FRONTEND_ROOT / "lib" / "demo-role.ts")
     whatsapp_helper = _read(FRONTEND_ROOT / "lib" / "whatsapp-thread.ts")
 
@@ -422,9 +428,24 @@ def test_ticket_post_audit_frontend_contracts():
     assert "CommandCard" in support_index
     assert "TicketSummaryCard" in support_index
     assert "EvidenceStrip" in support_index
+    assert "LoadingSpinner" in support_index
+    assert "TicketListSkeleton" in support_index
+    assert "TicketDetailSkeleton" in support_index
+    assert "DiagnosisLoadingCard" in support_index
+    assert "ButtonLoadingLabel" in support_index
+    assert "animate-spin" in loading_state
+    assert "Checking your charger photo" in loading_state
+    assert "Loading ChargerDoc support view" in loading_state
+    assert "TicketListSkeleton" in customer_dashboard_loading
+    assert "TicketDetailSkeleton" in customer_ticket_loading
+    assert "TicketListSkeleton" in staff_dashboard_loading
+    assert "TicketDetailSkeleton" in staff_ticket_loading
+    assert "Loading ChargerDoc support ticket flow" in new_ticket_loading
     assert "Your Charger Support Tickets" in customer_dashboard
     assert "Report New Issue" in customer_dashboard
     assert "TicketSummaryCard" in customer_dashboard
+    assert "isLoadingTickets" in customer_dashboard
+    assert "TicketListSkeleton" in customer_dashboard
     assert "Recent Updates" in customer_dashboard
     assert "No support tickets yet" in customer_dashboard
     assert "Ticket Details" in customer_detail
@@ -432,16 +453,32 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Next Action" in customer_detail
     assert "SupportTimeline" in customer_detail
     assert "Open WhatsApp" in customer_detail
+    assert "TicketDetailSkeleton" in customer_detail
+    assert "ButtonLoadingLabel" in customer_detail
+    assert "Uploaded Proof" in customer_detail
+    assert "Charger / Installation Details" in customer_detail
     assert "CommandHeader" in staff_detail
     assert "Workflow Snapshot" in staff_detail
     assert "lg:sticky lg:top-24" in staff_detail
     assert "ActionPanelCard" in staff_detail
     assert "SupportTimeline" in staff_detail
+    assert "getPrimaryStaffAction" in staff_detail
+    assert "Request More Proof" in staff_detail
+    assert "Mark In Progress" in staff_detail
+    assert "Mark Resolved" in staff_detail
+    assert "Close Ticket" in staff_detail
+    assert "Internal Note" in staff_detail
+    assert "Not visible to customer." in staff_detail
+    assert "ButtonLoadingLabel" in staff_detail
+    assert "TicketDetailSkeleton" in staff_detail
     assert "Show us what happened" in new_ticket
     assert "Photo Guidance" in new_ticket
     assert "Privacy and safety" in new_ticket
     assert "Required Evidence" in new_ticket
     assert "Optional Charger Identity" in new_ticket
+    assert "DiagnosisLoadingCard" in new_ticket
+    assert "ButtonLoadingLabel" in new_ticket
+    assert "placeholder=\"Enter serial number if visible\"" in new_ticket
     assert "SectionHeader" in section_header
     assert "CommandHeader" in command_header
     assert "ActionPanelCard" in action_panel_card
@@ -467,6 +504,15 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Advanced filters" in staff_dashboard
     assert "Open Ticket" in staff_dashboard
     assert "Address available in ticket detail" in staff_dashboard
+    assert "isLoadingAllTickets" in staff_dashboard
+    assert "isLoadingTickets" in staff_dashboard
+    assert "Refreshing queue..." in staff_dashboard
+    assert "selectedTicketId" in staff_dashboard
+    assert "Selected Ticket Preview" in staff_dashboard
+    assert "GPS captured" in staff_dashboard
+    assert 'activeTab === tab.id ? "bg-green-700 text-white"' in staff_dashboard
+    assert '<QuickFilterButton tone="red" active={filters.priority === "High"}' in staff_dashboard
+    assert '<QuickFilterButton tone="amber" active={activeTab === "waiting_customer"}' in staff_dashboard
     assert "Needs Review" in staff_dashboard
     assert "Waiting Customer" in staff_dashboard
     assert "High Priority" in staff_dashboard

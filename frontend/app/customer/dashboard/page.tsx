@@ -12,25 +12,29 @@ import {
 import { loadDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { PageShell } from "../../../components/layout/page-shell";
 import { Button } from "../../../components/ui/button";
-import { EmptyState, SectionHeader, SupportCard, TicketSummaryCard } from "../../../components/support";
+import { EmptyState, SectionHeader, SupportCard, TicketListSkeleton, TicketSummaryCard } from "../../../components/support";
 
 export default function CustomerDashboardPage() {
   useDemoRoleGuard("customer");
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
   const [error, setError] = useState("");
   const [hasProfile, setHasProfile] = useState(true);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(true);
 
   useEffect(() => {
     const profile = loadDemoCustomerProfile<CustomerProfile>();
     if (!profile?.email) {
       setHasProfile(false);
       setTickets([]);
+      setIsLoadingTickets(false);
       return;
     }
     setHasProfile(true);
+    setIsLoadingTickets(true);
     fetchTickets({ customer_email: profile.email })
       .then((data) => setTickets(data.tickets))
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."));
+      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tickets."))
+      .finally(() => setIsLoadingTickets(false));
   }, []);
 
   return (
@@ -68,7 +72,9 @@ export default function CustomerDashboardPage() {
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       <div className="grid gap-4">
-        {!hasProfile ? (
+        {isLoadingTickets ? (
+          <TicketListSkeleton count={2} />
+        ) : !hasProfile ? (
           <EmptyState
             title="No customer profile found"
             body="Start your first support ticket so this demo dashboard can show only your tickets."

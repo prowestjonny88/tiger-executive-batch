@@ -5,6 +5,14 @@ export { CommandHeader } from "./command-header";
 export { EvidenceStrip } from "./evidence-strip";
 export { InfoGrid, type InfoGridItem } from "./info-grid";
 export { KpiCard } from "./kpi-card";
+export {
+  ButtonLoadingLabel,
+  DiagnosisLoadingCard,
+  LoadingSpinner,
+  PageLoading,
+  TicketDetailSkeleton,
+  TicketListSkeleton,
+} from "./loading-state";
 export { PriorityBadge } from "./priority-badge";
 export { SectionHeader } from "./section-header";
 export { StatusBadge } from "./status-badge";

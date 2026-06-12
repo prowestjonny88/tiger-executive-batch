@@ -29,7 +29,17 @@ import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { getProofStatus, getScheduleStatus, getTicketActionNeeded } from "../../../../lib/ticket-actions";
 import { formatTicketStatus, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { PageShell } from "../../../../components/layout/page-shell";
-import { ActionPanelCard, CommandHeader, PriorityBadge, StatusBadge, SupportCard, SupportTimeline } from "../../../../components/support";
+import {
+  ActionPanelCard,
+  ButtonLoadingLabel,
+  CommandHeader,
+  LoadingSpinner,
+  PriorityBadge,
+  StatusBadge,
+  SupportCard,
+  SupportTimeline,
+  TicketDetailSkeleton,
+} from "../../../../components/support";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { Button } from "../../../../components/ui/button";
 import { Card } from "../../../../components/ui/card";
@@ -56,11 +66,20 @@ export default function StaffTicketDetailPage() {
   const [selectedTechnician, setSelectedTechnician] = useState("");
   const [showScheduling, setShowScheduling] = useState(false);
   const [error, setError] = useState("");
+  const [isLoadingTicket, setIsLoadingTicket] = useState(true);
+  const [isLoadingAuxiliary, setIsLoadingAuxiliary] = useState(true);
+  const [submittingStatus, setSubmittingStatus] = useState<TicketStatus | null>(null);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isMarkingWhatsApp, setIsMarkingWhatsApp] = useState(false);
 
   const refresh = () => {
+    setIsLoadingTicket((current) => current || !ticket);
+    setIsLoadingAuxiliary(true);
     fetchTicket(ticketId)
       .then((data) => {
         setTicket(data);
+        setIsLoadingTicket(false);
         return Promise.all([fetchScheduleSuggestions(data.ticket_id), fetchWhatsAppPreview(data.ticket_id)]);
       })
       .then(([slotData, whatsAppData]) => {
@@ -69,17 +88,25 @@ export default function StaffTicketDetailPage() {
         setSelectedSlot((current) => current || slotData.slots[0]?.scheduled_at || "");
         setSelectedTechnician((current) => current || slotData.technicians[0]?.name || "");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load ticket."));
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Unable to load ticket.");
+        setIsLoadingTicket(false);
+      })
+      .finally(() => setIsLoadingAuxiliary(false));
   };
 
   useEffect(refresh, [ticketId]);
 
   if (!ticket) {
     return (
-      <PageShell maxWidth="4xl">
-        <Card className="app-card p-8">
-          {error ? <p className="text-sm font-semibold text-red-700">{error}</p> : <p className="text-slate-500">Loading ticket...</p>}
-        </Card>
+      <PageShell maxWidth="7xl" density="detail">
+        {error && !isLoadingTicket ? (
+          <Card className="app-card p-8">
+            <p className="text-sm font-semibold text-red-700">{error}</p>
+          </Card>
+        ) : (
+          <TicketDetailSkeleton />
+        )}
       </PageShell>
     );
   }
@@ -120,53 +147,83 @@ export default function StaffTicketDetailPage() {
     body: event.message,
     timestamp: new Date(event.created_at).toLocaleString(),
   }));
+  const primaryAction = getPrimaryStaffAction(ticket, shouldShowScheduling);
 
   const setStatus = async (status: TicketStatus) => {
-    const updated = await updateTicketStatus(ticket.ticket_id, {
-      status,
-      actor_role: "staff",
-      actor_name: "Demo Staff",
-      note: note || `Staff changed status to ${formatTicketStatus(status)}.`,
-    });
-    setTicket(updated);
-    setNote("");
+    if (submittingStatus) return;
+    setSubmittingStatus(status);
+    try {
+      const updated = await updateTicketStatus(ticket.ticket_id, {
+        status,
+        actor_role: "staff",
+        actor_name: "Demo Staff",
+        note: `Staff changed status to ${formatTicketStatus(status)}.`,
+      });
+      setTicket(updated);
+    } finally {
+      setSubmittingStatus(null);
+    }
   };
 
   const addInternalNote = async () => {
-    if (!note.trim()) return;
-    await addTicketEvent(ticket.ticket_id, {
-      event_type: "staff_note_added",
-      actor_role: "staff",
-      actor_name: "Demo Staff",
-      message: note,
-      payload_json: {},
-    });
-    setNote("");
-    refresh();
+    if (!note.trim() || isAddingNote) return;
+    setIsAddingNote(true);
+    try {
+      await addTicketEvent(ticket.ticket_id, {
+        event_type: "staff_note_added",
+        actor_role: "staff",
+        actor_name: "Demo Staff",
+        message: note,
+        payload_json: {},
+      });
+      setNote("");
+      refresh();
+    } finally {
+      setIsAddingNote(false);
+    }
   };
 
   const scheduleVisit = async () => {
     const slot = suggestions?.slots.find((item) => item.scheduled_at === selectedSlot);
-    if (!slot || !selectedTechnician) return;
-    const updated = await scheduleTicket(ticket.ticket_id, {
-      scheduled_at: slot.scheduled_at,
-      scheduled_window: slot.scheduled_window,
-      assigned_technician: selectedTechnician,
-      actor_name: "Demo Staff",
-    });
-    setTicket(updated);
-    refresh();
+    if (!slot || !selectedTechnician || isScheduling) return;
+    setIsScheduling(true);
+    try {
+      const updated = await scheduleTicket(ticket.ticket_id, {
+        scheduled_at: slot.scheduled_at,
+        scheduled_window: slot.scheduled_window,
+        assigned_technician: selectedTechnician,
+        actor_name: "Demo Staff",
+      });
+      setTicket(updated);
+      refresh();
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   const markWhatsAppSent = async () => {
-    await addTicketEvent(ticket.ticket_id, {
-      event_type: "whatsapp_preview_marked_sent",
-      actor_role: "staff",
-      actor_name: "Demo Staff",
-      message: "Staff marked the WhatsApp simulation message as sent.",
-      payload_json: { simulation_only: true },
-    });
-    refresh();
+    if (isMarkingWhatsApp) return;
+    setIsMarkingWhatsApp(true);
+    try {
+      await addTicketEvent(ticket.ticket_id, {
+        event_type: "whatsapp_preview_marked_sent",
+        actor_role: "staff",
+        actor_name: "Demo Staff",
+        message: "Staff marked the WhatsApp simulation message as sent.",
+        payload_json: { simulation_only: true },
+      });
+      refresh();
+    } finally {
+      setIsMarkingWhatsApp(false);
+    }
+  };
+
+  const runPrimaryAction = () => {
+    if (primaryAction.status) {
+      setStatus(primaryAction.status);
+      return;
+    }
+    document.getElementById(primaryAction.targetId)?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -187,8 +244,8 @@ export default function StaffTicketDetailPage() {
           </>
         }
         primaryAction={
-          <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={() => document.getElementById("staff-action-panel")?.scrollIntoView({ behavior: "smooth" })}>
-            {getTicketActionNeeded(ticket)}
+          <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={runPrimaryAction} disabled={Boolean(submittingStatus)}>
+            {submittingStatus === primaryAction.status ? <ButtonLoadingLabel label="Updating..." /> : primaryAction.label}
           </Button>
         }
         secondaryAction={
@@ -312,22 +369,48 @@ export default function StaffTicketDetailPage() {
         </div>
 
         <div id="staff-action-panel" className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <ActionPanelCard title="Status actions" icon={<Wrench className="h-5 w-5 text-blue-700" />}>
-            <div className="mb-4 space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Internal note</Label>
-              <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="min-h-[90px] resize-none rounded-xl" />
-            </div>
+          <ActionPanelCard title="Recommended Action" icon={<Wrench className="h-5 w-5 text-green-700" />}>
+            <p className="text-sm font-semibold leading-6 text-slate-700">{getTicketActionNeeded(ticket)}</p>
+            <Button className="mt-4 w-full rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={runPrimaryAction} disabled={Boolean(submittingStatus)}>
+              {submittingStatus === primaryAction.status ? <ButtonLoadingLabel label="Updating..." /> : primaryAction.label}
+            </Button>
+          </ActionPanelCard>
+
+          <ActionPanelCard title="Status Actions" icon={<Wrench className="h-5 w-5 text-blue-700" />}>
             <div className="grid gap-2 sm:grid-cols-2">
               {statusActions.map((action) => (
-                <Button key={action.status} variant="outline" className="rounded-xl" onClick={() => setStatus(action.status)}>
-                  {action.label}
+                <Button key={action.status} variant="outline" className="rounded-xl" onClick={() => setStatus(action.status)} disabled={Boolean(submittingStatus)}>
+                  {submittingStatus === action.status ? <ButtonLoadingLabel label="Updating..." /> : action.label}
                 </Button>
               ))}
-              <Button className="rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={addInternalNote}>
-                Add Note
-              </Button>
             </div>
           </ActionPanelCard>
+
+          {whatsApp ? (
+            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
+              <p className="rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
+              <p className="mt-3 text-xs font-bold text-slate-500">{whatsApp.label}</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <Button variant="outline" className="rounded-xl" onClick={() => navigator.clipboard.writeText(whatsApp.message)}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
+                </Button>
+                <Button asChild variant="outline" className="rounded-xl">
+                  <a href={whatsApp.wa_url || "#"} target="_blank" rel="noreferrer">
+                    <Send className="mr-2 h-4 w-4" />
+                    Open
+                  </a>
+                </Button>
+                <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={markWhatsAppSent} disabled={isMarkingWhatsApp}>
+                  {isMarkingWhatsApp ? <ButtonLoadingLabel label="Saving..." /> : "Mark Sent"}
+                </Button>
+              </div>
+            </ActionPanelCard>
+          ) : isLoadingAuxiliary ? (
+            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
+              <LoadingSpinner label="Preparing WhatsApp preview..." />
+            </ActionPanelCard>
+          ) : null}
 
           {isTerminalStatus && ticket.scheduled_at ? (
             <ActionPanelCard title="Previous scheduled visit" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
@@ -343,6 +426,7 @@ export default function StaffTicketDetailPage() {
           ) : shouldShowScheduling ? (
             <ActionPanelCard title="Assisted scheduling" icon={<CalendarClock className="h-5 w-5 text-blue-700" />}>
               <div className="space-y-4">
+                {isLoadingAuxiliary && <LoadingSpinner label="Loading schedule suggestions..." />}
                 <SelectField
                   label="Suggested slot"
                   value={selectedSlot}
@@ -361,8 +445,8 @@ export default function StaffTicketDetailPage() {
                     label: `${tech.name} / ${tech.skills.join(", ")} / ${tech.area}`,
                   }))}
                 />
-                <Button className="w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={scheduleVisit}>
-                  Schedule Visit
+                <Button className="w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={scheduleVisit} disabled={isScheduling || !selectedSlot || !selectedTechnician}>
+                  {isScheduling ? <ButtonLoadingLabel label="Scheduling..." /> : "Schedule Visit"}
                 </Button>
               </div>
             </ActionPanelCard>
@@ -377,27 +461,13 @@ export default function StaffTicketDetailPage() {
             </ActionPanelCard>
           )}
 
-          {whatsApp && (
-            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
-              <p className="rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
-              <p className="mt-3 text-xs font-bold text-slate-500">{whatsApp.label}</p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <Button variant="outline" className="rounded-xl" onClick={() => navigator.clipboard.writeText(whatsApp.message)}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </Button>
-                <Button asChild variant="outline" className="rounded-xl">
-                  <a href={whatsApp.wa_url || "#"} target="_blank" rel="noreferrer">
-                    <Send className="mr-2 h-4 w-4" />
-                    Open
-                  </a>
-                </Button>
-                <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={markWhatsAppSent}>
-                  Mark Sent
-                </Button>
-              </div>
-            </ActionPanelCard>
-          )}
+          <ActionPanelCard title="Internal Note">
+            <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">Not visible to customer.</p>
+            <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="min-h-[100px] resize-none rounded-xl" />
+            <Button className="mt-3 w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={addInternalNote} disabled={!note.trim() || isAddingNote}>
+              {isAddingNote ? <ButtonLoadingLabel label="Adding note..." /> : "Add Internal Note"}
+            </Button>
+          </ActionPanelCard>
 
           {ticket.feedback.length > 0 && (
             <ActionPanelCard title="Customer feedback">
@@ -416,6 +486,15 @@ export default function StaffTicketDetailPage() {
       </div>
     </PageShell>
   );
+}
+
+function getPrimaryStaffAction(ticket: TicketRecord, shouldShowScheduling: boolean): { label: string; status?: TicketStatus; targetId: string } {
+  if (ticket.status === "waiting_customer") return { label: "Request More Proof", targetId: "staff-action-panel" };
+  if (shouldShowScheduling && !ticket.scheduled_at) return { label: "Schedule Visit", targetId: "staff-action-panel" };
+  if (ticket.status === "assigned") return { label: "Mark In Progress", status: "in_progress", targetId: "staff-action-panel" };
+  if (ticket.status === "in_progress") return { label: "Mark Resolved", status: "resolved", targetId: "staff-action-panel" };
+  if (ticket.status === "resolved") return { label: "Close Ticket", status: "closed", targetId: "staff-action-panel" };
+  return { label: "Review Actions", targetId: "staff-action-panel" };
 }
 
 function InfoBox({ label, value }: { label: string; value: ReactNode }) {
