@@ -23,6 +23,7 @@ import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { formatTicketStatus, nextActionForTicket, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { buildWhatsAppThread, hiddenCustomerEventTypes } from "../../../../lib/whatsapp-thread";
 import { PageShell } from "../../../../components/layout/page-shell";
+import { CommandCard, PriorityBadge, StatusBadge, SupportCard, SupportTimeline } from "../../../../components/support";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { UploadDropzone } from "../../../../components/triage/upload-dropzone";
 import { Button } from "../../../../components/ui/button";
@@ -80,6 +81,14 @@ export default function CustomerTicketDetailPage() {
           ticket.charger_context.charger_serial_number || "Serial not provided"
         }`
       : "Not provided";
+  const timelineItems = customerEvents.map((event) => ({
+    title: event.event_type.replaceAll("_", " "),
+    body:
+      event.event_type === "status_changed"
+        ? `Your ticket status is now: ${formatTicketStatus(String(event.payload_json?.status || event.payload_json?.new_status || ticket.status))}.`
+        : event.message,
+    timestamp: new Date(event.created_at).toLocaleString(),
+  }));
 
   const submitFeedback = async () => {
     const updated = await submitTicketFeedback(ticket.ticket_id, feedback);
@@ -118,21 +127,56 @@ export default function CustomerTicketDetailPage() {
   };
 
   return (
-    <PageShell maxWidth="5xl">
+    <PageShell maxWidth="6xl" density="detail">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="technical-label text-green-700">Customer Ticket Tracker</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">{ticket.ticket_id}</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">{nextActionForTicket(ticket.status, ticket.required_proof_next)}</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">Ticket Details</h1>
+          <p className="mt-2 text-sm font-medium text-slate-600">
+            We are tracking this charger issue and will show the current step first.
+          </p>
         </div>
         <Button asChild variant="outline" className="rounded-xl">
           <Link href="/customer/dashboard">Back to tickets</Link>
         </Button>
       </div>
 
+      <CommandCard tone={needsProof ? "amber" : "green"} className="mb-6">
+        <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge status={ticket.status} />
+              <PriorityBadge priority={ticket.priority} />
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-xs font-extrabold text-slate-700">
+                {ticket.ticket_id}
+              </span>
+            </div>
+            <h2 className="mt-4 text-2xl font-extrabold text-slate-950">{formatObservationResult(ticket.observation_result)}</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-700">{formatFaultTypeV2(ticket.fault_type_v2)}</p>
+            <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-slate-700">
+              {needsProof
+                ? "More proof is needed before after-sales can continue reviewing this ticket."
+                : "No action is needed from you right now unless the ticket requests more proof."}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {whatsApp?.wa_url && (
+              <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+                <a href={whatsApp.wa_url} target="_blank" rel="noreferrer">Open WhatsApp</a>
+              </Button>
+            )}
+            {needsProof && (
+              <Button variant="outline" className="rounded-xl bg-white" onClick={() => document.getElementById("proof-upload")?.scrollIntoView({ behavior: "smooth" })}>
+                Upload More Proof
+              </Button>
+            )}
+          </div>
+        </div>
+      </CommandCard>
+
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
-          <Card className="app-card p-6">
+          <SupportCard className="p-6">
             <div className="flex flex-wrap gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClass(ticket.status)}`}>
                 {formatTicketStatus(ticket.status)}
@@ -146,19 +190,26 @@ export default function CustomerTicketDetailPage() {
               <SummaryBox label="Fault type" value={formatFaultTypeV2(ticket.fault_type_v2)} />
               <SummaryBox label="Route" value={ticket.assigned_team_id || ticket.recipient_type.replace("_", " ")} />
             </div>
-          </Card>
+          </SupportCard>
 
-          <Card className="app-card p-6">
-            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Home charger details</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
-              <SummaryBox label="Charger position" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
-              {ticket.charger_context.charger_location_notes && (
-                <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes} />
-              )}
-              <SummaryBox label="Charger details" value={chargerIdentity} />
-            </div>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <SupportCard className="p-6">
+              <p className="technical-label text-green-700">Current Status</p>
+              <h2 className="mt-2 text-xl font-extrabold text-slate-950">{formatTicketStatus(ticket.status)}</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                Last updated {new Date(ticket.updated_at || ticket.created_at).toLocaleString()}.
+              </p>
+            </SupportCard>
+            <SupportCard className="p-6">
+              <p className="technical-label text-green-700">Next Action</p>
+              <h2 className="mt-2 text-xl font-extrabold text-slate-950">
+                {needsProof ? "Upload requested proof" : "No action needed right now"}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                {nextActionForTicket(ticket.status, ticket.required_proof_next)}
+              </p>
+            </SupportCard>
+          </div>
 
           {needsProof && (
             <Card id="proof-upload" className="rounded-2xl border-amber-200 bg-amber-50 p-5">
@@ -203,25 +254,25 @@ export default function CustomerTicketDetailPage() {
 
           {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={annotations} />}
 
-          <Card id="ticket-timeline" className="app-card p-6">
+          <SupportCard id="ticket-timeline" className="p-6">
             <h2 className="mb-4 text-xl font-extrabold text-slate-950">Ticket timeline</h2>
-            <div className="space-y-4">
-              {customerEvents.map((event) => (
-                <div key={event.id} className="border-l-2 border-green-200 pl-4">
-                  <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">{event.event_type.replaceAll("_", " ")}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {event.event_type === "status_changed"
-                      ? `Your ticket status is now: ${formatTicketStatus(String(event.payload_json?.status || event.payload_json?.new_status || ticket.status))}.`
-                      : event.message}
-                  </p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">{new Date(event.created_at).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+            <SupportTimeline items={timelineItems} />
+          </SupportCard>
         </div>
 
         <div className="space-y-6">
+          <SupportCard className="p-6">
+            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Uploaded proof and Home charger details</h2>
+            <div className="grid gap-4">
+              <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
+              <SummaryBox label="Charger position" value={formatHomeChargerLocation(ticket.charger_context.home_charger_location)} />
+              {ticket.charger_context.charger_location_notes && (
+                <SummaryBox label="Location notes" value={ticket.charger_context.charger_location_notes} />
+              )}
+              <SummaryBox label="Charger details" value={chargerIdentity} />
+            </div>
+          </SupportCard>
+
           {ticket.scheduled_at && (
             <Card className="app-card p-6">
               <div className="mb-4 flex items-center gap-3">

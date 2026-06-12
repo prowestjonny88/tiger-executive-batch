@@ -2,20 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PlusCircle, Ticket } from "lucide-react";
+import { HelpCircle, PlusCircle } from "lucide-react";
 
 import {
   fetchTickets,
-  formatFaultTypeV2,
-  formatObservationResult,
   type TicketRecord,
   type CustomerProfile,
 } from "../../../lib/api";
 import { loadDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
-import { formatTicketStatus, nextActionForTicket, statusClass } from "../../../lib/ticket-ui";
 import { PageShell } from "../../../components/layout/page-shell";
 import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
+import { EmptyState, SectionHeader, SupportCard, TicketSummaryCard } from "../../../components/support";
 
 export default function CustomerDashboardPage() {
   useDemoRoleGuard("customer");
@@ -37,69 +34,94 @@ export default function CustomerDashboardPage() {
   }, []);
 
   return (
-    <PageShell maxWidth="5xl">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="technical-label text-green-700">Customer Dashboard</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">Your support tickets</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">
-            Track ChargerDoc ticket status, required proof, appointments, and feedback.
-          </p>
-        </div>
-        <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+    <PageShell maxWidth="6xl" density="detail">
+      <SectionHeader
+        eyebrow="Customer Dashboard"
+        title="Your Charger Support Tickets"
+        description="Track diagnosis, proof requests, appointments, and after-sales updates in one place."
+        action={
+          <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+            <Link href="/customer/new-ticket">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Report New Issue
+            </Link>
+          </Button>
+        }
+        className="mb-8"
+      />
+
+      {tickets.length > 0 && (
+        <SupportCard className="mb-6 grid gap-4 bg-green-50 p-5 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <p className="technical-label text-green-700">Active Support</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">{tickets.length} ticket{tickets.length === 1 ? "" : "s"} on record</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Open a ticket to see the current step, next action, proof request, WhatsApp-style updates, and visit details.
+            </p>
+          </div>
           <Link href="/customer/new-ticket">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Ticket
+            <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800">Report Another Issue</Button>
           </Link>
-        </Button>
-      </div>
+        </SupportCard>
+      )}
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
       <div className="grid gap-4">
         {!hasProfile ? (
-          <Card className="app-card p-8 text-center">
-            <Ticket className="mx-auto mb-4 h-10 w-10 text-slate-400" />
-            <h2 className="text-xl font-extrabold text-slate-950">No customer profile found</h2>
-            <p className="mt-2 text-sm font-medium text-slate-500">
-              Start your first support ticket so this demo dashboard can show only your tickets.
-            </p>
-            <Button asChild className="mt-5 rounded-xl bg-green-700 font-bold hover:bg-green-800">
-              <Link href="/customer/new-ticket">Start your first support ticket</Link>
-            </Button>
-          </Card>
+          <EmptyState
+            title="No customer profile found"
+            body="Start your first support ticket so this demo dashboard can show only your tickets."
+            action={
+              <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+                <Link href="/customer/new-ticket">Start your first support ticket</Link>
+              </Button>
+            }
+          />
         ) : tickets.length === 0 ? (
-          <Card className="app-card p-8 text-center">
-            <Ticket className="mx-auto mb-4 h-10 w-10 text-slate-400" />
-            <h2 className="text-xl font-extrabold text-slate-950">No tickets yet</h2>
-            <p className="mt-2 text-sm font-medium text-slate-500">Start a new support ticket to create your first case.</p>
-          </Card>
-        ) : (
-          tickets.map((ticket) => (
-            <Link
-              key={ticket.ticket_id}
-              href={`/customer/tickets/${ticket.ticket_id}`}
-              className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-green-300 hover:shadow-md"
-            >
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm font-extrabold text-slate-950">{ticket.ticket_id}</span>
-                    <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClass(ticket.status)}`}>
-                      {formatTicketStatus(ticket.status)}
-                    </span>
-                  </div>
-                  <h2 className="mt-3 text-lg font-extrabold text-slate-950">
-                    {formatObservationResult(ticket.observation_result)}
-                  </h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">{formatFaultTypeV2(ticket.fault_type_v2)}</p>
-                </div>
-                <div className="max-w-md text-sm font-medium leading-6 text-slate-600">
-                  {nextActionForTicket(ticket.status, ticket.required_proof_next)}
-                </div>
+          <EmptyState
+            title="No support tickets yet"
+            body="When you report a charger issue, your diagnosis, ticket status, and after-sales updates will appear here."
+            action={
+              <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
+                  <Link href="/customer/new-ticket">Report Charger Issue</Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-xl">
+                  <Link href="/safety">Learn what photos to upload</Link>
+                </Button>
               </div>
-            </Link>
-          ))
+            }
+          />
+        ) : (
+          <>
+            {tickets.map((ticket) => (
+              <TicketSummaryCard
+                key={ticket.ticket_id}
+                ticket={ticket}
+                href={`/customer/tickets/${ticket.ticket_id}`}
+                proofAction={ticket.status === "waiting_customer"}
+              />
+            ))}
+            <div className="grid gap-4 md:grid-cols-2">
+              <SupportCard className="p-5">
+                <p className="technical-label text-slate-500">Recent Updates</p>
+                <h2 className="mt-2 text-xl font-extrabold text-slate-950">Latest activity stays inside each ticket</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Open a ticket to view proof requests, status changes, scheduled visits, and WhatsApp-style updates.
+                </p>
+              </SupportCard>
+              <SupportCard className="p-5">
+                <div className="mb-3 flex items-center gap-3">
+                  <HelpCircle className="h-5 w-5 text-green-700" />
+                  <h2 className="text-xl font-extrabold text-slate-950">Need help?</h2>
+                </div>
+                <p className="text-sm font-semibold leading-6 text-slate-600">
+                  If your charger status changes, upload clearer proof from the ticket page or start a new check.
+                </p>
+              </SupportCard>
+            </div>
+          </>
         )}
       </div>
     </PageShell>

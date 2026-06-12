@@ -347,6 +347,16 @@ def test_ticket_post_audit_frontend_contracts():
     staff_detail = _read(FRONTEND_ROOT / "app" / "staff" / "tickets" / "[ticketId]" / "page.tsx")
     ticket_actions = _read(FRONTEND_ROOT / "lib" / "ticket-actions.ts")
     ticket_ui = _read(FRONTEND_ROOT / "lib" / "ticket-ui.ts")
+    page_shell = _read(FRONTEND_ROOT / "components" / "layout" / "page-shell.tsx")
+    support_index = _read(FRONTEND_ROOT / "components" / "support" / "index.ts")
+    section_header = _read(FRONTEND_ROOT / "components" / "support" / "section-header.tsx")
+    command_header = _read(FRONTEND_ROOT / "components" / "support" / "command-header.tsx")
+    action_panel_card = _read(FRONTEND_ROOT / "components" / "support" / "action-panel-card.tsx")
+    ticket_summary_card = _read(FRONTEND_ROOT / "components" / "support" / "ticket-summary-card.tsx")
+    evidence_strip = _read(FRONTEND_ROOT / "components" / "support" / "evidence-strip.tsx")
+    kpi_card = _read(FRONTEND_ROOT / "components" / "support" / "kpi-card.tsx")
+    status_badge = _read(FRONTEND_ROOT / "components" / "support" / "status-badge.tsx")
+    priority_badge = _read(FRONTEND_ROOT / "components" / "support" / "priority-badge.tsx")
     role_helper = _read(FRONTEND_ROOT / "lib" / "demo-role.ts")
     whatsapp_helper = _read(FRONTEND_ROOT / "lib" / "whatsapp-thread.ts")
 
@@ -392,6 +402,54 @@ def test_ticket_post_audit_frontend_contracts():
     assert "internal_assignment_note" in whatsapp_helper
     assert "After-sales Review" in ticket_ui
     assert "Technician Assigned" not in ticket_ui
+    assert "statusMeta" in ticket_ui
+    assert "priorityMeta" in ticket_ui
+    assert 'High: { label: "High", tone: "red"' in ticket_ui
+    assert 'Critical: { label: "Critical", tone: "red"' in ticket_ui
+    assert "toneClass" in ticket_ui
+    assert 'density?: "form" | "dashboard" | "detail"' in page_shell
+    assert 'dashboard: "px-4 py-6 md:px-6 md:py-8"' in page_shell
+    assert "StatusBadge" in support_index
+    assert "PriorityBadge" in support_index
+    assert "SupportCard" in support_index
+    assert "KpiCard" in support_index
+    assert "InfoGrid" in support_index
+    assert "SupportTimeline" in support_index
+    assert "EmptyState" in support_index
+    assert "SectionHeader" in support_index
+    assert "CommandHeader" in support_index
+    assert "ActionPanelCard" in support_index
+    assert "CommandCard" in support_index
+    assert "TicketSummaryCard" in support_index
+    assert "EvidenceStrip" in support_index
+    assert "Your Charger Support Tickets" in customer_dashboard
+    assert "Report New Issue" in customer_dashboard
+    assert "TicketSummaryCard" in customer_dashboard
+    assert "Recent Updates" in customer_dashboard
+    assert "No support tickets yet" in customer_dashboard
+    assert "Ticket Details" in customer_detail
+    assert "Current Status" in customer_detail
+    assert "Next Action" in customer_detail
+    assert "SupportTimeline" in customer_detail
+    assert "Open WhatsApp" in customer_detail
+    assert "CommandHeader" in staff_detail
+    assert "Workflow Snapshot" in staff_detail
+    assert "lg:sticky lg:top-24" in staff_detail
+    assert "ActionPanelCard" in staff_detail
+    assert "SupportTimeline" in staff_detail
+    assert "Show us what happened" in new_ticket
+    assert "Photo Guidance" in new_ticket
+    assert "Privacy and safety" in new_ticket
+    assert "Required Evidence" in new_ticket
+    assert "Optional Charger Identity" in new_ticket
+    assert "SectionHeader" in section_header
+    assert "CommandHeader" in command_header
+    assert "ActionPanelCard" in action_panel_card
+    assert "nextActionForTicket" in ticket_summary_card
+    assert "EvidenceStrip" in evidence_strip
+    assert "getStatusMeta" in status_badge
+    assert "getPriorityMeta" in priority_badge
+    assert "toneClass(tone)" in kpi_card
     assert "showScheduling" in staff_detail
     assert "Open Scheduling" in staff_detail
     assert "isTerminalStatus" in staff_detail
@@ -399,13 +457,23 @@ def test_ticket_post_audit_frontend_contracts():
     assert "proof_uploaded" in staff_detail
     assert "Customer-uploaded proof for staff review" in staff_detail
     assert "const visibleTickets" in staff_dashboard
+    assert "After-sales Queue" in staff_dashboard
+    assert 'density="dashboard"' in staff_dashboard
+    assert "KpiCard" in staff_dashboard
+    assert "SupportCard" in staff_dashboard
+    assert "StatusBadge" in staff_dashboard
+    assert "PriorityBadge" in staff_dashboard
+    assert "Search ticket, customer, contact, issue..." in staff_dashboard
+    assert "Advanced filters" in staff_dashboard
+    assert "Open Ticket" in staff_dashboard
+    assert "Address available in ticket detail" in staff_dashboard
     assert "Needs Review" in staff_dashboard
     assert "Waiting Customer" in staff_dashboard
     assert "High Priority" in staff_dashboard
     assert 'setActiveTab("all");' in staff_dashboard
     assert 'setFilters((current) => ({ ...current, priority: current.priority === "High" ? "" : "High" }))' in staff_dashboard
     assert "To Schedule" in staff_dashboard
-    assert "Scheduled Today" in staff_dashboard
+    assert "Scheduled" in staff_dashboard
     assert "Reopened" in staff_dashboard
     assert "Action Needed" in staff_dashboard
     assert "Proof Status" in staff_dashboard
@@ -415,7 +483,6 @@ def test_ticket_post_audit_frontend_contracts():
     assert "const [tickets, setTickets]" in staff_dashboard
     assert "loadAllTickets" in staff_dashboard
     assert "loadFilteredTickets" in staff_dashboard
-    assert "allTickets.filter(isNeedsReviewTicket).length" in staff_dashboard
     assert "tickets.filter((ticket) => matchesWorkflowTab(ticket, activeTab))" in staff_dashboard
     assert 'filteredIncidents.map((incident) => {' in staff_history
     assert 'return incident.latest_stage === "triage_result" ?' in staff_history

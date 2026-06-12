@@ -29,6 +29,7 @@ import { useDemoRoleGuard } from "../../../../lib/demo-role";
 import { getProofStatus, getScheduleStatus, getTicketActionNeeded } from "../../../../lib/ticket-actions";
 import { formatTicketStatus, priorityClass, statusClass } from "../../../../lib/ticket-ui";
 import { PageShell } from "../../../../components/layout/page-shell";
+import { ActionPanelCard, CommandHeader, PriorityBadge, StatusBadge, SupportCard, SupportTimeline } from "../../../../components/support";
 import { EvidencePanel } from "../../../../components/triage/evidence-panel";
 import { Button } from "../../../../components/ui/button";
 import { Card } from "../../../../components/ui/card";
@@ -114,6 +115,11 @@ export default function StaffTicketDetailPage() {
       ticket.recipient_type === "after_sales_team" ||
       ["assigned", "scheduled", "reschedule_requested"].includes(ticket.status) ||
       ["pending", "scheduled", "reschedule_requested"].includes(ticket.schedule_status));
+  const timelineItems = ticket.events.map((event) => ({
+    title: event.event_type.replaceAll("_", " "),
+    body: event.message,
+    timestamp: new Date(event.created_at).toLocaleString(),
+  }));
 
   const setStatus = async (status: TicketStatus) => {
     const updated = await updateTicketStatus(ticket.ticket_id, {
@@ -164,31 +170,50 @@ export default function StaffTicketDetailPage() {
   };
 
   return (
-    <PageShell maxWidth="6xl">
-      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="technical-label text-blue-700">Staff Ticket Detail</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">{ticket.ticket_id}</h1>
-          <p className="mt-2 text-sm font-medium text-slate-600">{ticket.ai_summary}</p>
-        </div>
-        <Button asChild variant="outline" className="rounded-xl">
-          <Link href="/staff/dashboard">Back to queue</Link>
-        </Button>
-      </div>
+    <PageShell maxWidth="7xl" density="detail">
+      <CommandHeader
+        eyebrow="Staff Ticket Detail"
+        title={ticket.ticket_id}
+        description={`${formatObservationResult(ticket.observation_result)} / ${formatFaultTypeV2(ticket.fault_type_v2)}. Recommended action: ${getTicketActionNeeded(ticket)}`}
+        badges={
+          <>
+            <PriorityBadge priority={ticket.priority} />
+            <StatusBadge status={ticket.status} />
+            {ticket.charger_context.installed_by === "third_party" && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
+                Warranty review required
+              </span>
+            )}
+          </>
+        }
+        primaryAction={
+          <Button className="rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={() => document.getElementById("staff-action-panel")?.scrollIntoView({ behavior: "smooth" })}>
+            {getTicketActionNeeded(ticket)}
+          </Button>
+        }
+        secondaryAction={
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href="/staff/dashboard">Back to queue</Link>
+          </Button>
+        }
+        className="mb-6"
+      />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
-          <Card className="app-card border-blue-100 bg-blue-50 p-6">
-            <p className="technical-label text-blue-700">Recommended Staff Action</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">{getTicketActionNeeded(ticket)}</h2>
+          <SupportCard className="border-blue-100 bg-blue-50 p-6">
+            <p className="technical-label text-blue-700">Workflow Snapshot</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Recommended Staff Action: {getTicketActionNeeded(ticket)}</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-3">
               <InfoBox label="Proof status" value={getProofStatus(ticket)} />
               <InfoBox label="Schedule status" value={getScheduleStatus(ticket)} />
               <InfoBox label="Last updated" value={new Date(ticket.updated_at || ticket.created_at).toLocaleString()} />
             </div>
-          </Card>
+          </SupportCard>
 
-          <Card className="app-card p-6">
+          {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={annotations} />}
+
+          <SupportCard className="p-6">
             <div className="flex flex-wrap gap-2">
               <span className={`rounded-full border px-3 py-1 text-xs font-bold ${priorityClass(ticket.priority)}`}>{ticket.priority}</span>
               <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClass(ticket.status)}`}>{formatTicketStatus(ticket.status)}</span>
@@ -203,9 +228,9 @@ export default function StaffTicketDetailPage() {
               <InfoBox label="Observation" value={formatObservationResult(ticket.observation_result)} />
               <InfoBox label="Fault type" value={formatFaultTypeV2(ticket.fault_type_v2)} />
             </div>
-          </Card>
+          </SupportCard>
 
-          <Card className="app-card p-6">
+          <SupportCard className="p-6">
             <h2 className="mb-4 text-xl font-extrabold text-slate-950">Customer and installation context</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <InfoBox label="Customer" value={ticket.customer_profile.full_name} />
@@ -240,12 +265,10 @@ export default function StaffTicketDetailPage() {
               <InfoBox label="Charger identity" value={chargerIdentity} />
               <InfoBox label="Customer comments" value={ticket.customer_comments || ticket.charger_context.symptom_text || "None"} />
             </div>
-          </Card>
-
-          {evidenceUrl && <EvidencePanel imageUrl={evidenceUrl} annotations={annotations} />}
+          </SupportCard>
 
           {(additionalProof.length > 0 || proofEvents.length > 0) && (
-            <Card className="app-card p-6">
+            <SupportCard className="p-6">
               <h2 className="mb-1 text-xl font-extrabold text-slate-950">Customer-uploaded proof for staff review</h2>
               <p className="mb-4 text-sm font-semibold leading-6 text-slate-600">
                 Supplemental proof is attached for staff review and does not imply automatic AI re-analysis.
@@ -279,29 +302,17 @@ export default function StaffTicketDetailPage() {
                   ))}
                 </div>
               )}
-            </Card>
+            </SupportCard>
           )}
 
-          <Card className="app-card p-6">
+          <SupportCard className="p-6">
             <h2 className="mb-4 text-xl font-extrabold text-slate-950">Activity timeline</h2>
-            <div className="space-y-4">
-              {ticket.events.map((event) => (
-                <div key={event.id} className="border-l-2 border-blue-200 pl-4">
-                  <p className="text-xs font-extrabold uppercase tracking-widest text-slate-500">{event.event_type.replaceAll("_", " ")}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{event.message}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-500">{new Date(event.created_at).toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+            <SupportTimeline items={timelineItems} />
+          </SupportCard>
         </div>
 
-        <div className="space-y-6">
-          <Card className="app-card p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <Wrench className="h-5 w-5 text-blue-700" />
-              <h2 className="text-xl font-extrabold text-slate-950">Status actions</h2>
-            </div>
+        <div id="staff-action-panel" className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          <ActionPanelCard title="Status actions" icon={<Wrench className="h-5 w-5 text-blue-700" />}>
             <div className="mb-4 space-y-2">
               <Label className="text-xs font-bold uppercase tracking-widest text-slate-500">Internal note</Label>
               <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="min-h-[90px] resize-none rounded-xl" />
@@ -316,14 +327,10 @@ export default function StaffTicketDetailPage() {
                 Add Note
               </Button>
             </div>
-          </Card>
+          </ActionPanelCard>
 
           {isTerminalStatus && ticket.scheduled_at ? (
-            <Card className="app-card p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <CalendarClock className="h-5 w-5 text-slate-500" />
-                <h2 className="text-xl font-extrabold text-slate-950">Previous scheduled visit</h2>
-              </div>
+            <ActionPanelCard title="Previous scheduled visit" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
               <p className="text-sm font-semibold text-slate-700">{new Date(ticket.scheduled_at).toLocaleString()}</p>
               <p className="mt-1 text-sm font-semibold text-slate-700">{ticket.scheduled_window}</p>
               {ticket.assigned_technician && (
@@ -332,13 +339,9 @@ export default function StaffTicketDetailPage() {
               <p className="mt-4 text-sm font-semibold leading-6 text-slate-500">
                 This ticket is {formatTicketStatus(ticket.status).toLowerCase()}; scheduling controls are locked.
               </p>
-            </Card>
+            </ActionPanelCard>
           ) : shouldShowScheduling ? (
-            <Card className="app-card p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <CalendarClock className="h-5 w-5 text-blue-700" />
-                <h2 className="text-xl font-extrabold text-slate-950">Assisted scheduling</h2>
-              </div>
+            <ActionPanelCard title="Assisted scheduling" icon={<CalendarClock className="h-5 w-5 text-blue-700" />}>
               <div className="space-y-4">
                 <SelectField
                   label="Suggested slot"
@@ -362,28 +365,20 @@ export default function StaffTicketDetailPage() {
                   Schedule Visit
                 </Button>
               </div>
-            </Card>
+            </ActionPanelCard>
           ) : (
-            <Card className="app-card p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <CalendarClock className="h-5 w-5 text-slate-500" />
-                <h2 className="text-xl font-extrabold text-slate-950">Scheduling not required yet</h2>
-              </div>
+            <ActionPanelCard title="Scheduling not required yet" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
               <p className="text-sm font-semibold leading-6 text-slate-600">
                 Open scheduling manually only if staff decides a technician visit is needed.
               </p>
               <Button variant="outline" className="mt-4 w-full rounded-xl" onClick={() => setShowScheduling(true)}>
                 Open Scheduling
               </Button>
-            </Card>
+            </ActionPanelCard>
           )}
 
           {whatsApp && (
-            <Card className="app-card p-6">
-              <div className="mb-4 flex items-center gap-3">
-                <MessageCircle className="h-5 w-5 text-green-700" />
-                <h2 className="text-xl font-extrabold text-slate-950">WhatsApp preview</h2>
-              </div>
+            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
               <p className="rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
               <p className="mt-3 text-xs font-bold text-slate-500">{whatsApp.label}</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -401,11 +396,11 @@ export default function StaffTicketDetailPage() {
                   Mark Sent
                 </Button>
               </div>
-            </Card>
+            </ActionPanelCard>
           )}
 
           {ticket.feedback.length > 0 && (
-            <Card className="app-card p-6">
+            <ActionPanelCard title="Customer feedback">
               <h2 className="text-xl font-extrabold text-slate-950">Customer feedback</h2>
               {ticket.feedback.map((item) => (
                 <div key={item.id} className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700">
@@ -415,7 +410,7 @@ export default function StaffTicketDetailPage() {
                   {item.comment && <p className="mt-2">{item.comment}</p>}
                 </div>
               ))}
-            </Card>
+            </ActionPanelCard>
           )}
         </div>
       </div>
