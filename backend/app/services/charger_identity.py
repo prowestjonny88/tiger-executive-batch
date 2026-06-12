@@ -5,7 +5,7 @@ import re
 import time
 from typing import Any
 
-from app.core.models import ChargerIdentityScanRequest, ChargerIdentityScanResponse
+from app.core.models import ChargerIdentityScanRequest, ChargerIdentityScanResponse, IncidentInput
 from app.services.gemini_client import GEMINI_MODEL, get_gemini_client
 from app.services.storage import read_photo_bytes
 
@@ -160,6 +160,34 @@ def _fallback_response(error_message: str | None = None) -> ChargerIdentityScanR
 
 
 def scan_charger_identity(request: ChargerIdentityScanRequest) -> ChargerIdentityScanResponse:
+    try:
+        from app.services.theme2_perception import assess_theme2_perception
+
+        perception = assess_theme2_perception(
+            IncidentInput(
+                site_id="identity-scan",
+                photo_evidence=request.photo_evidence,
+                photo_hint=request.photo_hint or "optional charger label photo",
+                symptom_text="Read charger brand/model and serial number from the uploaded label photo.",
+            )
+        )
+        extraction = perception.extraction
+        if extraction.charger_serial_number or extraction.charger_brand_model:
+            return ChargerIdentityScanResponse(
+                charger_serial_number=extraction.charger_serial_number,
+                charger_brand_model=extraction.charger_brand_model,
+                confidence_score=extraction.confidence_score,
+                source="vlm",
+                raw_visible_text=extraction.raw_visible_text,
+                note="Charger label details were read from the optional label photo. Please confirm or edit before creating the ticket.",
+                provider_attempted=perception.provider_attempted,
+                fallback_used=perception.fallback_used,
+                error_message=perception.error_message,
+            )
+    except Exception:
+        # Continue into the lightweight identity-only prompt below.
+        pass
+
     client = get_gemini_client()
     if client is None:
         return _fallback_response("gemini_client_unavailable")
