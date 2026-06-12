@@ -65,6 +65,16 @@ def _extract_serial_from_text(text: str) -> str | None:
     return match.group(1).strip() if match else None
 
 
+def _extract_field_line(raw: str, field: str) -> str | None:
+    match = re.search(rf"^\s*{re.escape(field)}\s*[:=]\s*(.+?)\s*$", raw, flags=re.IGNORECASE | re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).strip(" \t\r\n,.;")
+    if value.lower() in {"unknown", "none", "null", "not visible", "unreadable"}:
+        return None
+    return value or None
+
+
 def _extract_model_from_text(text: str) -> str | None:
     match = re.search(r"\bmodel(?:\s*name)?\s*[:#-]?\s*([A-Za-z0-9][A-Za-z0-9._ -]{2,40})", text, flags=re.IGNORECASE)
     return match.group(1).strip(" .;,") if match else None
@@ -107,6 +117,27 @@ def _response_from_data(data: dict[str, object], raw: str = "") -> ChargerIdenti
         charger_serial_number=serial,
         charger_brand_model=brand_model,
         confidence_score=max(0.0, min(confidence_score, 1.0)),
+        source="vlm",
+        raw_visible_text=raw_visible_text,
+        note=(
+            "Charger label details were read from the optional label photo. Please confirm or edit before creating the ticket."
+            if found_any
+            else "The charger label photo was scanned, but no reliable serial or brand/model was readable."
+        ),
+        provider_attempted=True,
+        fallback_used=False,
+    )
+
+
+def _response_from_plain_text(raw: str) -> ChargerIdentityScanResponse:
+    serial = _extract_field_line(raw, "SERIAL") or _extract_serial_from_text(raw)
+    brand_model = _extract_field_line(raw, "BRAND_MODEL") or _extract_brand_model_from_text(raw)
+    raw_visible_text = _raw_text_lines(raw)
+    found_any = bool(serial or brand_model)
+    return ChargerIdentityScanResponse(
+        charger_serial_number=serial,
+        charger_brand_model=brand_model,
+        confidence_score=0.78 if found_any else 0.0,
         source="vlm",
         raw_visible_text=raw_visible_text,
         note=(
@@ -187,6 +218,32 @@ def scan_charger_identity(request: ChargerIdentityScanRequest) -> ChargerIdentit
             salvaged = _response_from_data({}, raw)
             if salvaged.charger_serial_number or salvaged.charger_brand_model:
                 return salvaged
+        plain_prompt = (
+            "Read the EV charger label in this image. Do not return JSON.\n"
+            "Return exactly these three lines and nothing else:\n"
+            "SERIAL: <the value after SN, S/N, Serial No, or Serial Number; UNKNOWN if not readable>\n"
+            "BRAND_MODEL: <brand plus model if readable; UNKNOWN if not readable>\n"
+            "RAW_TEXT: <short visible text snippets used>\n"
+            "Important: a value printed after 'SN:' is the charger serial number. "
+            "A QR batch sticker is not the charger serial unless it is clearly labeled SN/Serial.\n"
+            f"Context hint: {request.photo_hint or 'optional charger label photo'}"
+        )
+        try:
+            plain_response = client.models.generate_content(  # type: ignore[attr-defined]
+                model=GEMINI_MODEL,
+                contents=[image_part, plain_prompt],
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.0,
+                    max_output_tokens=512,
+                ),
+            )
+            plain_raw = (plain_response.text or "").strip()
+            plain_result = _response_from_plain_text(plain_raw)
+            if plain_result.charger_serial_number or plain_result.charger_brand_model:
+                return plain_result
+            raw = plain_raw or raw
+        except Exception as exc:
+            last_error = exc
         raise RuntimeError(str(last_error) if last_error else "identity_scan_failed")
     except Exception as exc:
         return _fallback_response(str(exc))
