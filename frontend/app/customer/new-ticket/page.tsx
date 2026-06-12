@@ -20,6 +20,7 @@ import {
   type ApiTriageResponse,
   type ChargerContext,
   type CustomerProfile,
+  type ObservationResultV2,
   type UploadedPhotoEvidence,
   uploadIncidentPhoto,
 } from "../../../lib/api";
@@ -84,6 +85,14 @@ const stepLabels: Array<{ step: Step; label: string }> = [
 
 const CUSTOMER_DIRECT_TRIAGE = process.env.NEXT_PUBLIC_CUSTOMER_DIRECT_TRIAGE !== "false";
 
+const SELF_HELP_FIRST_OBSERVATIONS = new Set<ObservationResultV2>([
+  "isolator_off_open_circuit",
+  "mcb_tripped",
+  "charger_no_light",
+]);
+
+const SELF_HELP_FIRST_ERROR_KEYS = new Set(["red_light_flashes_7", "red_light_flashes_9"]);
+
 type CheckStage = "idle" | "uploading" | "previewing" | "checking" | "scanning_label" | "preparing" | "ready" | "error";
 type CreateStage = "idle" | "creating" | "attaching_label" | "redirecting" | "error";
 
@@ -143,6 +152,7 @@ export default function NewTicketPage() {
   const [error, setError] = useState("");
   const [rememberDetails, setRememberDetails] = useState(true);
   const [customerResolved, setCustomerResolved] = useState(false);
+  const [selfHelpAttempted, setSelfHelpAttempted] = useState(false);
   const [locationStatus, setLocationStatus] = useState<"idle" | "locating" | "success" | "denied" | "error">("idle");
   const [locationError, setLocationError] = useState("");
   const [uploadedEvidence, setUploadedEvidence] = useState<UploadedPhotoEvidence | null>(null);
@@ -278,6 +288,7 @@ export default function NewTicketPage() {
     setTriageResult(null);
     setIdentitySuggestion(null);
     setCustomerResolved(false);
+    setSelfHelpAttempted(false);
     setError("");
     setState("idle");
     setCheckStage("idle");
@@ -294,6 +305,7 @@ export default function NewTicketPage() {
     setTriageResult(null);
     setIdentitySuggestion(null);
     setCustomerResolved(false);
+    setSelfHelpAttempted(false);
 
     try {
       let siteId = "site-mall-01";
@@ -384,10 +396,17 @@ export default function NewTicketPage() {
 
   const createTicketAfterIdentityReview = async () => {
     if (!triageResult || state === "creating") return;
+    if (customerResolved) {
+      setError("No ticket is needed because the issue was marked as solved.");
+      return;
+    }
+    if (isSelfHelpFirstCase(triageResult) && !selfHelpAttempted) {
+      setError("Try the safe customer action first. Create a support ticket only if the issue is not resolved.");
+      return;
+    }
     setState("creating");
     setCreateStage("creating");
     setError("");
-    setCustomerResolved(false);
 
     try {
       const createStartedAt = performance.now();
@@ -636,6 +655,7 @@ export default function NewTicketPage() {
                       setTriageResult(null);
                       setIdentitySuggestion(null);
                       setCustomerResolved(false);
+                      setSelfHelpAttempted(false);
                       setState("idle");
                       setCheckStage("idle");
                       setCreateStage("idle");
@@ -658,6 +678,7 @@ export default function NewTicketPage() {
                       setTriageResult(null);
                       setIdentitySuggestion(null);
                       setCustomerResolved(false);
+                      setSelfHelpAttempted(false);
                       setState("idle");
                       setCheckStage("idle");
                       setCreateStage("idle");
@@ -733,7 +754,7 @@ export default function NewTicketPage() {
                 )}
               </Card>
             )}
-            {triageResult && isCustomerRouted(triageResult) && !needsProof(triageResult) && (
+            {triageResult && isSelfHelpFirstCase(triageResult) && (
               <Card className="rounded-2xl border border-green-200 bg-white p-5">
                 <p className="technical-label text-green-700">Try this first</p>
                 <h3 className="mt-2 text-xl font-extrabold text-slate-950">Safe customer action</h3>
@@ -759,10 +780,44 @@ export default function NewTicketPage() {
                     </div>
                   </div>
                 ) : (
-                  <Button type="button" variant="outline" className="mt-4 rounded-xl" onClick={() => setCustomerResolved(true)}>
-                    Issue Solved
-                  </Button>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => {
+                        setCustomerResolved(true);
+                        setSelfHelpAttempted(false);
+                        setError("");
+                      }}
+                    >
+                      Issue Solved
+                    </Button>
+                    <Button
+                      type="button"
+                      className="rounded-xl bg-green-700 font-bold hover:bg-green-800"
+                      onClick={() => {
+                        setSelfHelpAttempted(true);
+                        setCustomerResolved(false);
+                        setError("");
+                      }}
+                    >
+                      Still Not Fixed
+                    </Button>
+                  </div>
                 )}
+              </Card>
+            )}
+            {triageResult && isSelfHelpFirstCase(triageResult) && selfHelpAttempted && !customerResolved && (
+              <Card className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                <p className="technical-label text-amber-700">Still not fixed?</p>
+                <h3 className="mt-2 text-xl font-extrabold text-slate-950">Create a ticket for after-sales review</h3>
+                <p className="mt-4 text-sm font-semibold leading-6 text-amber-900">
+                  If the charger still does not work after the safe visible step, create a support ticket for after-sales review.
+                </p>
+                <p className="mt-4 rounded-xl bg-white p-4 text-sm font-semibold leading-6 text-slate-800">
+                  Recommended proof: {getEscalationProofNext(triageResult)}
+                </p>
               </Card>
             )}
             {triageResult && (
@@ -841,7 +896,7 @@ export default function NewTicketPage() {
                 >
                   {state === "checking" ? <ButtonLoadingLabel label="Checking photo..." /> : "Check Photo"}
                 </Button>
-              ) : (
+              ) : canCreateTicketFromCurrentState(triageResult, selfHelpAttempted, customerResolved) ? (
                 <Button
                   className="rounded-xl bg-green-700 font-bold hover:bg-green-800"
                   onClick={createTicketAfterIdentityReview}
@@ -849,6 +904,10 @@ export default function NewTicketPage() {
                 >
                   {state === "creating" ? <ButtonLoadingLabel label="Creating ticket..." /> : getCreateTicketButtonLabel(triageResult, state, createStage)}
                 </Button>
+              ) : (
+                <p className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm font-semibold leading-6 text-green-800">
+                  Try the safe action first. A support ticket will only be created if the issue is not resolved.
+                </p>
               )}
             </div>
           </section>
@@ -873,7 +932,8 @@ function SummaryBox({ label, value }: { label: string; value: ReactNode }) {
 
 function getCustomerNextStep(triage: ApiTriageResponse) {
   const output = triage.competition_output;
-  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "More proof may be needed";
+  if (isSelfHelpFirstCase(triage)) return "Try safe self-help first";
+  if (isMoreProofCase(triage)) return "More proof may be needed";
   if (output.recipient_type === "after_sales_team") return "After-sales review required";
   if (output.recipient_type === "customer") return "Customer guidance available";
   if (output.recipient_type === "none") return "No routing required";
@@ -882,7 +942,8 @@ function getCustomerNextStep(triage: ApiTriageResponse) {
 
 function getPriorityPreview(triage: ApiTriageResponse) {
   const output = triage.competition_output;
-  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "Verification needed";
+  if (isSelfHelpFirstCase(triage)) return "Customer action";
+  if (isMoreProofCase(triage)) return "Verification needed";
   if (output.recipient_type === "after_sales_team") return output.fault_type_v2 === "protection_issue" ? "High" : "Medium";
   if (output.recipient_type === "customer") return "Customer action";
   return "Low";
@@ -912,6 +973,41 @@ function needsProof(triage: ApiTriageResponse) {
   return Boolean(triage.competition_output.required_proof_next || triage.follow_up_prompts.length > 0);
 }
 
+function isSelfHelpFirstCase(triage: ApiTriageResponse) {
+  const output = triage.competition_output;
+  const errorLogKey = triage.debug?.error_log_key;
+  return (
+    output.recipient_type === "customer" &&
+    (SELF_HELP_FIRST_OBSERVATIONS.has(output.observation_result) || Boolean(errorLogKey && SELF_HELP_FIRST_ERROR_KEYS.has(errorLogKey)))
+  );
+}
+
+function isAfterSalesCase(triage: ApiTriageResponse) {
+  return triage.competition_output.recipient_type === "after_sales_team";
+}
+
+function isMoreProofCase(triage: ApiTriageResponse) {
+  return !isSelfHelpFirstCase(triage) && needsProof(triage);
+}
+
+function getEscalationProofNext(triage: ApiTriageResponse) {
+  return (
+    triage.competition_output.escalation_proof_next ||
+    triage.competition_output.required_proof_next ||
+    "Please upload updated evidence showing the issue still persists."
+  );
+}
+
+function canCreateTicketFromCurrentState(
+  triage: ApiTriageResponse,
+  selfHelpAttempted: boolean,
+  customerResolved: boolean
+) {
+  if (customerResolved) return false;
+  if (isSelfHelpFirstCase(triage)) return selfHelpAttempted;
+  return true;
+}
+
 function getCreateTicketButtonLabel(
   triage: ApiTriageResponse,
   state: "idle" | "checking" | "ready" | "creating" | "error",
@@ -919,12 +1015,14 @@ function getCreateTicketButtonLabel(
 ) {
   if (state === "creating") return createStageLabels[createStage] || "Creating support ticket...";
   if (state === "error" && createStage === "error") return "Retry Create Support Ticket";
+  if (isSelfHelpFirstCase(triage)) return "Create Support Ticket";
   if (isCustomerRouted(triage) && !needsProof(triage)) return "Create Support Ticket if Issue Persists";
   return "Create Support Ticket";
 }
 
 function getDiagnosisNote(triage: ApiTriageResponse) {
   const output = triage.competition_output;
+  if (isSelfHelpFirstCase(triage)) return output.action_message;
   if (output.required_proof_next) return output.required_proof_next;
   if (triage.perception.hazard_signals.length > 0) return "Safety signals were detected. Keep distance and wait for proper support if unsure.";
   if (output.evidence_notes.length > 0) return output.evidence_notes[0];
@@ -932,17 +1030,25 @@ function getDiagnosisNote(triage: ApiTriageResponse) {
 }
 
 function getWhatHappensNextTitle(triage: ApiTriageResponse) {
-  if (needsProof(triage)) return "More evidence may be needed";
+  if (isSelfHelpFirstCase(triage)) return "Try the safe step first";
+  if (isMoreProofCase(triage)) return "More evidence may be needed";
   if (isCustomerRouted(triage)) return "Try the safe steps first";
   return "Create a support ticket and track progress";
 }
 
 function getWhatHappensNextSteps(triage: ApiTriageResponse) {
-  if (needsProof(triage)) {
+  if (isSelfHelpFirstCase(triage)) {
+    return [
+      "Try the safe visible step shown above.",
+      "If the issue is solved, no support ticket is created.",
+      "If the issue persists or trips again, create a support ticket for after-sales review.",
+    ];
+  }
+  if (isMoreProofCase(triage)) {
     return [
       "ChargerDoc needs clearer evidence to confirm the issue.",
-      "You may upload the requested proof.",
-      "You can still create a support ticket if the issue is urgent.",
+      "Upload the requested proof if available.",
+      "Create a support ticket only if the issue is urgent or still unclear.",
     ];
   }
   if (isCustomerRouted(triage)) {
@@ -962,8 +1068,11 @@ function getWhatHappensNextSteps(triage: ApiTriageResponse) {
 
 function getWhatHappensNextNote(triage: ApiTriageResponse) {
   const output = triage.competition_output;
-  if (output.required_proof_next || triage.follow_up_prompts.length > 0) return "More proof may be requested after ticket creation.";
-  if (output.recipient_type === "after_sales_team") return "This will be routed to after-sales for review.";
+  if (isSelfHelpFirstCase(triage)) {
+    return "This looks like a customer-action case. ChargerDoc will only create a support ticket if the issue is not resolved.";
+  }
+  if (isMoreProofCase(triage)) return "More proof may be requested after ticket creation.";
+  if (isAfterSalesCase(triage)) return "This will be routed to after-sales for review.";
   if (output.recipient_type === "customer") {
     return "This looks like a customer-action case. Try the safe step first, then create a ticket only if the issue persists.";
   }

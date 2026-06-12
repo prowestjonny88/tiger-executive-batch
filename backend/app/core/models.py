@@ -155,6 +155,7 @@ class CompetitionOutput(BaseModel):
     assigned_team_id: Optional[str] = None
     action_message: str
     required_proof_next: Optional[str] = None
+    escalation_proof_next: Optional[str] = None
     confidence_score: float = Field(ge=0.0, le=1.0)
     evidence_notes: List[str] = Field(default_factory=list)
     source: Literal["theme2_rule_mapper", "fallback"] = "theme2_rule_mapper"

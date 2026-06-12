@@ -305,6 +305,7 @@ def build_competition_output(
         assigned_team_id=str(rule["assigned_team_id"]) if rule.get("assigned_team_id") is not None else None,
         action_message=str(rule.get("action_message") or "Review the Theme 2 evidence and collect clearer proof."),
         required_proof_next=str(required_proof_next) if required_proof_next else None,
+        escalation_proof_next=str(rule.get("escalation_proof_next")) if rule.get("escalation_proof_next") else None,
         confidence_score=confidence_score,
         evidence_notes=_evidence_notes(perception, observation, applied_error_log_key),
         source="theme2_rule_mapper" if observation != "unknown" else "fallback",

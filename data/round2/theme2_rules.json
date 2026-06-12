@@ -20,8 +20,9 @@
       "fault_type_v2": "supply_issue",
       "recipient_type": "customer",
       "assigned_team_id": null,
-      "action_message": "Please check whether the breaker in the EVDB has tripped.",
-      "required_proof_next": "Photo of EVDB breaker state if the charger remains off."
+      "action_message": "Please check whether the isolator is ON and whether the EVDB breaker has tripped. Only perform visible checks if safe.",
+      "required_proof_next": null,
+      "escalation_proof_next": "Photo of EVDB breaker state and charger indicator if the charger remains off after checking the isolator and breaker."
     },
     "charger_serial_brand_visible": {
       "fault_type_v2": "identification_only",
@@ -48,8 +49,9 @@
       "fault_type_v2": "protection_issue",
       "recipient_type": "customer",
       "assigned_team_id": null,
-      "action_message": "MCB/RCCB appears tripped. Please check or reset only if safe, and escalate if it trips repeatedly.",
-      "required_proof_next": "Photo showing breaker state after reset attempt."
+      "action_message": "MCB/RCCB appears tripped. Please reset only if safe. If it trips again, stop using the charger and create a support ticket.",
+      "required_proof_next": null,
+      "escalation_proof_next": "Photo showing breaker state after reset attempt if it trips again or the charger remains unavailable."
     },
     "missing_mcb_rccb": {
       "fault_type_v2": "protection_issue",
@@ -76,8 +78,9 @@
       "fault_type_v2": "power_cut",
       "recipient_type": "customer",
       "assigned_team_id": null,
-      "action_message": "Please turn ON the isolator and check whether the breaker in the EVDB has tripped.",
-      "required_proof_next": "Photo after turning isolator ON if the charger still has no power."
+      "action_message": "Please turn ON the isolator and check whether the charger powers on. Only perform visible checks if safe.",
+      "required_proof_next": null,
+      "escalation_proof_next": "Photo after turning isolator ON if the charger still has no power."
     },
     "unknown": {
       "fault_type_v2": "unknown",
@@ -100,7 +103,8 @@
       "recipient_type": "customer",
       "assigned_team_id": null,
       "action_message": "Please release the emergency stop button and retry the charger.",
-      "required_proof_next": "Photo confirming the emergency stop button is released."
+      "required_proof_next": null,
+      "escalation_proof_next": "Photo confirming the emergency stop button is released if the issue persists."
     },
     "red_light_flashes_8": {
       "fault_type_v2": "charger_issue",
@@ -114,7 +118,8 @@
       "recipient_type": "customer",
       "assigned_team_id": null,
       "action_message": "Please shut down the charger for a while, then restart the charger.",
-      "required_proof_next": "Photo or app screenshot after the restart attempt."
+      "required_proof_next": null,
+      "escalation_proof_next": "Photo or app screenshot after the restart attempt if the issue persists."
     }
   }
 }

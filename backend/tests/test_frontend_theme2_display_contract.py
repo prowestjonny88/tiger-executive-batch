@@ -129,6 +129,7 @@ def test_ticket_routes_and_role_flows_exist():
     assert "scheduleTicket" in api_source
     assert "submitTicketFeedback" in api_source
     assert "addTicketEvidence" in api_source
+    assert "escalation_proof_next?: string | null" in api_source
 
 
 def test_frontend_api_helpers_parse_errors_and_use_timeouts():
@@ -273,12 +274,22 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Only perform simple visible checks" in step4_source
     assert "Do not open the charger casing, EVDB, isolator, or any electrical panels." in step4_source
     assert "Issue Solved" in step4_source
+    assert "Still Not Fixed" in step4_source
+    assert "selfHelpAttempted" in new_ticket
+    assert "isSelfHelpFirstCase" in new_ticket
+    assert "isMoreProofCase" in new_ticket
+    assert "isAfterSalesCase" in new_ticket
+    assert "getEscalationProofNext" in new_ticket
+    assert "canCreateTicketFromCurrentState" in new_ticket
+    assert "Try the safe customer action first. Create a support ticket only if the issue is not resolved." in new_ticket
     assert "Issue marked as solved." in step4_source
     assert "No support ticket was created because you indicated the issue was resolved." in step4_source
     assert "Start a New Check" in step4_source
     assert "Go to Home" in step4_source
     assert "Create Support Ticket if Issue Persists" in step4_source
     assert "getCreateTicketButtonLabel" in new_ticket
+    assert "A support ticket will only be created if the issue is not resolved." in step4_source
+    assert "Recommended proof:" in step4_source
     assert "Try the safe steps shown above." in new_ticket
     assert "If the issue is solved, no ticket is needed." in new_ticket
     assert "If the issue persists, create a support ticket and after-sales can review it." in new_ticket

@@ -86,6 +86,7 @@ export type CompetitionOutput = {
   assigned_team_id?: string | null;
   action_message: string;
   required_proof_next?: string | null;
+  escalation_proof_next?: string | null;
   confidence_score: number;
   evidence_notes: string[];
   source: "theme2_rule_mapper" | "fallback";

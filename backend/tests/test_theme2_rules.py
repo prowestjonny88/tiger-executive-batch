@@ -37,3 +37,19 @@ def test_blinking_red_error_log_rules_exist():
     assert get_error_log_rule("red_light_flashes_7")["fault_type_v2"] == "manual_error"  # type: ignore[index]
     assert get_error_log_rule("red_light_flashes_8")["fault_type_v2"] == "charger_issue"  # type: ignore[index]
     assert get_error_log_rule("red_light_flashes_9")["fault_type_v2"] == "charger_issue"  # type: ignore[index]
+
+
+def test_self_help_first_rules_use_escalation_proof_not_required_proof():
+    for observation in ["charger_no_light", "mcb_tripped", "isolator_off_open_circuit"]:
+        rule = get_theme2_rule(observation)  # type: ignore[arg-type]
+        assert rule["recipient_type"] == "customer"
+        assert rule["assigned_team_id"] is None
+        assert rule["required_proof_next"] is None
+        assert rule["escalation_proof_next"]
+
+    for error_key in ["red_light_flashes_7", "red_light_flashes_9"]:
+        rule = get_error_log_rule(error_key)
+        assert rule["recipient_type"] == "customer"  # type: ignore[index]
+        assert rule["assigned_team_id"] is None  # type: ignore[index]
+        assert rule["required_proof_next"] is None  # type: ignore[index]
+        assert rule["escalation_proof_next"]  # type: ignore[index]

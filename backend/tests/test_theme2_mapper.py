@@ -35,6 +35,8 @@ def test_charger_no_light_maps_to_customer_supply_issue():
     assert output.fault_type_v2 == "supply_issue"
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
 
 
 def test_isolator_off_maps_to_customer_power_cut():
@@ -52,6 +54,8 @@ def test_isolator_off_maps_to_customer_power_cut():
 
     assert output.fault_type_v2 == "power_cut"
     assert output.recipient_type == "customer"
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
 
 
 def test_missing_mcb_rccb_maps_to_after_sales_protection_issue():
@@ -133,6 +137,8 @@ def test_blinking_red_with_flash_count_7_maps_to_manual_error_customer():
     assert output.fault_type_v2 == "manual_error"
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
     assert meta["error_log_key"] == "red_light_flashes_7"
 
 
@@ -164,6 +170,9 @@ def test_blinking_red_flash_count_refinements(flash_count: str, fault_type: str,
     assert output.fault_type_v2 == fault_type
     assert output.recipient_type == recipient
     assert output.assigned_team_id == team_id
+    if recipient == "customer":
+        assert output.required_proof_next is None
+        assert output.escalation_proof_next
     assert meta["error_log_key"] == f"red_light_flashes_{flash_count[0]}"
 
 
@@ -455,6 +464,8 @@ def test_pure_mcb_tripped_routes_to_customer_reset_check():
     assert output.fault_type_v2 == "protection_issue"
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
 
 
 @pytest.mark.parametrize(
@@ -502,6 +513,8 @@ def test_mcb_tripped_with_wrong_specs_preserves_tripped_observation(theme2: Them
     assert output.fault_type_v2 == "protection_issue"
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
 
 
 def test_mcb_tripped_with_missing_protection_refines_to_after_sales():
@@ -563,6 +576,8 @@ def test_mcb_trip_does_not_escalate_from_hot_substring_in_photo_text():
 
     assert output.recipient_type == "customer"
     assert output.assigned_team_id is None
+    assert output.required_proof_next is None
+    assert output.escalation_proof_next
     assert meta["override_key"] is None
 
 
