@@ -154,6 +154,7 @@ def test_frontend_api_helpers_parse_errors_and_use_timeouts():
 def test_home_location_and_identity_confirmation_contracts():
     api_source = _read(FRONTEND_ROOT / "lib" / "api.ts")
     identity_helper = _read(FRONTEND_ROOT / "lib" / "charger-identity.ts")
+    identity_scan_route = _read(FRONTEND_ROOT / "app" / "api" / "charger-identity" / "scan" / "route.ts")
     phone_helper = _read(FRONTEND_ROOT / "lib" / "phone.ts")
     google_maps_helper = _read(FRONTEND_ROOT / "lib" / "google-maps.ts")
     address_autocomplete = _read(FRONTEND_ROOT / "components" / "location" / "address-autocomplete.tsx")
@@ -190,9 +191,15 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY" in deployment_doc
     assert "GOOGLE_MAPS_SERVER_KEY" in deployment_doc
     assert "extractChargerIdentitySuggestion" in identity_helper
+    assert "mergeLabelScanIdentitySuggestion" in identity_helper
+    assert '"label_scan"' in identity_helper
     assert "competition_output" in identity_helper
     assert "perception" in identity_helper
     assert "The charger label was not readable" in identity_helper
+    assert "ChargerIdentityScanResponse" in api_source
+    assert "scanChargerIdentity" in api_source
+    assert '"/api/charger-identity/scan"' in api_source
+    assert '"/api/v1/charger-identity/scan"' in identity_scan_route
     assert "digitsOnly" in phone_helper
     assert "toMalaysiaLocalNumber" in phone_helper
     assert "toMalaysiaPhoneNumber" in phone_helper
@@ -293,6 +300,7 @@ def test_home_location_and_identity_confirmation_contracts():
     assert 'setCheckStage("uploading")' in new_ticket
     assert 'setCheckStage("previewing")' in new_ticket
     assert 'setCheckStage("checking")' in new_ticket
+    assert 'setCheckStage("scanning_label")' in new_ticket
     assert 'setCheckStage("preparing")' in new_ticket
     assert 'setCreateStage("creating")' in new_ticket
     assert 'setCreateStage("attaching_label")' in new_ticket
@@ -300,6 +308,7 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Uploading photo..." in new_ticket
     assert "Preparing intake..." in new_ticket
     assert "Checking charger issue..." in new_ticket
+    assert "Reading optional charger label..." in new_ticket
     assert "Preparing diagnosis summary..." in new_ticket
     assert "Creating support ticket..." in new_ticket
     assert "Attaching optional charger label photo..." in new_ticket
@@ -308,6 +317,9 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "Ticket creation failed, but your diagnosis is still available." in new_ticket
     assert "logTiming(\"uploadIncidentPhoto\"" in new_ticket
     assert "logTiming(\"fetchTriage\"" in new_ticket
+    assert "logTiming(\"scanChargerIdentity\"" in new_ticket
+    assert "uploadOptionalLabelPhotoForScan" in new_ticket
+    assert "mergeLabelScanIdentitySuggestion" in new_ticket
     assert "logTiming(\"createTicketFromTriage\"" in new_ticket
     assert "incidentId = preview.incident_id" in new_ticket
     assert landing.index("<EvidenceTabsSection />") < landing.index("<OutputPreviewSection />")

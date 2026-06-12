@@ -269,6 +269,23 @@ class TicketEvidenceRequest(BaseModel):
     message: Optional[str] = None
 
 
+class ChargerIdentityScanRequest(BaseModel):
+    photo_evidence: StoredPhotoEvidence
+    photo_hint: Optional[str] = None
+
+
+class ChargerIdentityScanResponse(BaseModel):
+    charger_serial_number: Optional[str] = None
+    charger_brand_model: Optional[str] = None
+    confidence_score: float = 0.0
+    source: Literal["vlm", "fallback"] = "fallback"
+    raw_visible_text: List[str] = Field(default_factory=list)
+    note: str = "No readable charger identity was detected."
+    provider_attempted: bool = False
+    fallback_used: bool = True
+    error_message: Optional[str] = None
+
+
 class TicketScheduleRequest(BaseModel):
     scheduled_at: str
     scheduled_window: str

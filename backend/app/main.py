@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.data import load_demo_scenarios, load_sites
 from app.core.models import (
+    ChargerIdentityScanRequest,
     IncidentInput,
     TicketEvidenceRequest,
     TicketEventCreateRequest,
@@ -23,6 +24,7 @@ from app.core.models import (
 from app.db.persistence import init_db, save_audit, save_incident, update_incident
 from app.services.history import get_incident_history_by_id, list_incident_history
 from app.services.intake import assess_image_quality, build_follow_up_questions, store_uploaded_photo
+from app.services.charger_identity import scan_charger_identity
 from app.services.storage import get_upload_root, read_evidence_object
 from app.services.theme2_rules import load_theme2_rules
 from app.services.theme2_triage import run_theme2_triage_with_debug
@@ -271,6 +273,11 @@ def ticket_schedule_suggestions(ticket_id: str):
 @app.post("/api/v1/uploads")
 def upload_photo(payload: UploadedPhotoPayload):
     return store_uploaded_photo(payload)
+
+
+@app.post("/api/v1/charger-identity/scan")
+def charger_identity_scan(payload: ChargerIdentityScanRequest):
+    return scan_charger_identity(payload)
 
 
 @app.get("/api/v1/evidence/{storage_key:path}")

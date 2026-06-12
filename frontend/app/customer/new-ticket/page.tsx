@@ -16,13 +16,19 @@ import {
   fetchSites,
   fetchTriage,
   reverseGeocodeLocation,
+  scanChargerIdentity,
   type ApiTriageResponse,
   type ChargerContext,
   type CustomerProfile,
   type UploadedPhotoEvidence,
   uploadIncidentPhoto,
 } from "../../../lib/api";
-import { extractChargerIdentitySuggestion, formatIdentityConfidence, type ChargerIdentitySuggestion } from "../../../lib/charger-identity";
+import {
+  extractChargerIdentitySuggestion,
+  formatIdentityConfidence,
+  mergeLabelScanIdentitySuggestion,
+  type ChargerIdentitySuggestion,
+} from "../../../lib/charger-identity";
 import { loadDemoCustomerProfile, saveDemoCustomerProfile, useDemoRoleGuard } from "../../../lib/demo-role";
 import { isValidMalaysiaPhoneNumber, toMalaysiaLocalNumber, toMalaysiaPhoneNumber } from "../../../lib/phone";
 import { AddressAutocomplete } from "../../../components/location/address-autocomplete";
@@ -78,7 +84,7 @@ const stepLabels: Array<{ step: Step; label: string }> = [
 
 const CUSTOMER_DIRECT_TRIAGE = process.env.NEXT_PUBLIC_CUSTOMER_DIRECT_TRIAGE !== "false";
 
-type CheckStage = "idle" | "uploading" | "previewing" | "checking" | "preparing" | "ready" | "error";
+type CheckStage = "idle" | "uploading" | "previewing" | "checking" | "scanning_label" | "preparing" | "ready" | "error";
 type CreateStage = "idle" | "creating" | "attaching_label" | "redirecting" | "error";
 
 const checkStageLabels: Record<CheckStage, string> = {
@@ -86,6 +92,7 @@ const checkStageLabels: Record<CheckStage, string> = {
   uploading: "Uploading photo...",
   previewing: "Preparing intake...",
   checking: "Checking charger issue...",
+  scanning_label: "Reading optional charger label...",
   preparing: "Preparing diagnosis summary...",
   ready: "Diagnosis ready.",
   error: "Photo check needs retry.",
@@ -309,9 +316,33 @@ export default function NewTicketPage() {
         follow_up_answers: {},
       });
       logTiming("fetchTriage", triageStartedAt);
+      let labelScan = null;
+      let uploadedLabelForScan = labelEvidence;
+      if (labelFile) {
+        try {
+          setCheckStage("scanning_label");
+          if (!uploadedLabelForScan) {
+            const labelUploadStartedAt = performance.now();
+            uploadedLabelForScan = await uploadIncidentPhoto(labelFile);
+            logTiming("uploadOptionalLabelPhotoForScan", labelUploadStartedAt);
+            setLabelEvidence(uploadedLabelForScan);
+          }
+          const labelScanStartedAt = performance.now();
+          labelScan = await scanChargerIdentity({
+            photo_evidence: uploadedLabelForScan,
+            photo_hint: `Customer charger label photo: ${labelFile.name}`,
+          });
+          logTiming("scanChargerIdentity", labelScanStartedAt);
+        } catch (labelErr) {
+          console.warn("Optional charger label scan failed", labelErr);
+        }
+      }
       setCheckStage("preparing");
       const preparingStartedAt = performance.now();
-      const suggestion = extractChargerIdentitySuggestion(triage, { labelPhotoUploaded: Boolean(labelFile) });
+      const suggestion = mergeLabelScanIdentitySuggestion(
+        extractChargerIdentitySuggestion(triage, { labelPhotoUploaded: Boolean(labelFile) }),
+        labelScan
+      );
       logTiming("prepareDiagnosisSummary", preparingStartedAt);
       setUploadedEvidence(uploaded);
       setTriageResult(triage);
@@ -351,9 +382,13 @@ export default function NewTicketPage() {
       if (labelFile) {
         try {
           setCreateStage("attaching_label");
-          const labelUploadStartedAt = performance.now();
-          const uploadedLabel = await uploadIncidentPhoto(labelFile);
-          logTiming("uploadOptionalLabelPhoto", labelUploadStartedAt);
+          let uploadedLabel = labelEvidence;
+          if (!uploadedLabel) {
+            const labelUploadStartedAt = performance.now();
+            uploadedLabel = await uploadIncidentPhoto(labelFile);
+            logTiming("uploadOptionalLabelPhoto", labelUploadStartedAt);
+            setLabelEvidence(uploadedLabel);
+          }
           setLabelEvidence(uploadedLabel);
           const evidenceStartedAt = performance.now();
           await addTicketEvidence(created.ticket_id, {

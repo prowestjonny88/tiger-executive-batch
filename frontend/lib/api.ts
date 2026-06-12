@@ -157,6 +157,18 @@ export type PreviewResponse = {
   follow_up_questions: Theme2FollowUpPrompt[];
 };
 
+export type ChargerIdentityScanResponse = {
+  charger_serial_number?: string | null;
+  charger_brand_model?: string | null;
+  confidence_score: number;
+  source: "vlm" | "fallback";
+  raw_visible_text: string[];
+  note: string;
+  provider_attempted: boolean;
+  fallback_used: boolean;
+  error_message?: string | null;
+};
+
 export type SiteOption = {
   site_id: string;
   site_name: string;
@@ -515,6 +527,13 @@ export async function addTicketEvent(ticketId: string, payload: {
 
 export async function addTicketEvidence(ticketId: string, payload: TicketEvidencePayload) {
   return postJson<TicketRecord>(`/api/tickets/${encodeURIComponent(ticketId)}/evidence`, payload, TICKET_EVIDENCE_TIMEOUT_MS);
+}
+
+export async function scanChargerIdentity(payload: {
+  photo_evidence: UploadedPhotoEvidence;
+  photo_hint?: string;
+}) {
+  return postJson<ChargerIdentityScanResponse>("/api/charger-identity/scan", payload, PREVIEW_TIMEOUT_MS);
 }
 
 export async function scheduleTicket(ticketId: string, payload: {

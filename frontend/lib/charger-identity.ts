@@ -1,10 +1,10 @@
-import type { ApiTriageResponse } from "./api";
+import type { ApiTriageResponse, ChargerIdentityScanResponse } from "./api";
 
 export type ChargerIdentitySuggestion = {
   brand_model?: string;
   serial_number?: string;
   confidence: "high" | "medium" | "low" | "unknown";
-  source: "triage_output" | "perception" | "none";
+  source: "label_scan" | "triage_output" | "perception" | "none";
   needs_closeup: boolean;
   note: string;
 };
@@ -45,6 +45,27 @@ export function extractChargerIdentitySuggestion(
   };
 }
 
+export function mergeLabelScanIdentitySuggestion(
+  base: ChargerIdentitySuggestion,
+  scan: ChargerIdentityScanResponse | null
+): ChargerIdentitySuggestion {
+  if (!scan) return base;
+  const serialNumber = clean(scan.charger_serial_number) || base.serial_number;
+  const brandModel = clean(scan.charger_brand_model) || base.brand_model;
+  const hasScanIdentity = Boolean(clean(scan.charger_serial_number) || clean(scan.charger_brand_model));
+  const hasAnyIdentity = Boolean(serialNumber || brandModel);
+  return {
+    serial_number: serialNumber,
+    brand_model: brandModel,
+    confidence: hasScanIdentity ? confidenceFromScore(scan.confidence_score) : base.confidence,
+    source: hasScanIdentity ? "label_scan" : base.source,
+    needs_closeup: !hasAnyIdentity,
+    note: hasScanIdentity
+      ? "Charger label details were read from the optional label photo. Please confirm or edit before creating the ticket."
+      : scan.note || base.note,
+  };
+}
+
 export function formatIdentityConfidence(value?: ChargerIdentitySuggestion["confidence"]) {
   switch (value) {
     case "high":
@@ -56,4 +77,11 @@ export function formatIdentityConfidence(value?: ChargerIdentitySuggestion["conf
     default:
       return "Unknown";
   }
+}
+
+function confidenceFromScore(value: number) {
+  if (value >= 0.85) return "high";
+  if (value >= 0.55) return "medium";
+  if (value > 0) return "low";
+  return "unknown";
 }
