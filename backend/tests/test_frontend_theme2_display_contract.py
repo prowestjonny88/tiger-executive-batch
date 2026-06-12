@@ -312,7 +312,7 @@ def test_home_location_and_identity_confirmation_contracts():
     assert "incidentId = preview.incident_id" in new_ticket
     assert landing.index("<EvidenceTabsSection />") < landing.index("<OutputPreviewSection />")
     assert "Check Photo and Create Ticket" not in new_ticket
-    assert "Home charger details" in customer_detail
+    assert "Charger / Installation Details" in customer_detail
     assert "formatHomeChargerLocation" in customer_detail
     assert "canRequestReschedule" in customer_detail
     assert "Previous Scheduled Visit" in customer_detail
@@ -458,7 +458,15 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Uploaded Proof" in customer_detail
     assert "Charger / Installation Details" in customer_detail
     assert "CommandHeader" in staff_detail
-    assert "Workflow Snapshot" in staff_detail
+    assert "Case Snapshot" in staff_detail
+    assert "Workflow Snapshot" not in staff_detail
+    assert "Operational state" in staff_detail
+    assert 'label="Owner"' in staff_detail
+    assert 'id="recommended-action"' in staff_detail
+    assert 'id="status-actions"' in staff_detail
+    assert 'id="whatsapp-preview"' in staff_detail
+    assert 'id="scheduling"' in staff_detail
+    assert 'id="internal-note"' in staff_detail
     assert "lg:sticky lg:top-24" in staff_detail
     assert "ActionPanelCard" in staff_detail
     assert "SupportTimeline" in staff_detail
@@ -509,6 +517,13 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Refreshing queue..." in staff_dashboard
     assert "selectedTicketId" in staff_dashboard
     assert "Selected Ticket Preview" in staff_dashboard
+    assert "staffTicketActionHref" in staff_dashboard
+    assert 'staffTicketActionHref(ticket.ticket_id, "recommended-action")' in staff_dashboard
+    assert 'staffTicketActionHref(ticket.ticket_id, "whatsapp-preview")' in staff_dashboard
+    assert 'staffTicketActionHref(ticket.ticket_id, "status-actions")' in staff_dashboard
+    assert 'staffTicketActionHref(ticket.ticket_id, "scheduling")' in staff_dashboard
+    assert 'staffTicketActionHref(ticket.ticket_id, "internal-note")' in staff_dashboard
+    assert "#staff-action-panel" not in staff_dashboard
     assert "GPS captured" in staff_dashboard
     assert 'activeTab === tab.id ? "bg-green-700 text-white"' in staff_dashboard
     assert '<QuickFilterButton tone="red" active={filters.priority === "High"}' in staff_dashboard
@@ -538,7 +553,7 @@ def test_ticket_post_audit_frontend_contracts():
     assert "Try Waiting Customer, To Schedule, Scheduled, or All Tickets." in staff_dashboard
     assert "No tickets yet" in staff_dashboard
     assert "Try clearing search or filters." in staff_dashboard
-    assert "Recommended Staff Action" in staff_detail
+    assert "Recommended Staff Action" not in staff_detail
     assert "getTicketActionNeeded" in ticket_actions
     assert "getProofStatus" in ticket_actions
     assert "getScheduleStatus" in ticket_actions

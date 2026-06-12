@@ -259,12 +259,13 @@ export default function StaffTicketDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           <SupportCard className="border-blue-100 bg-blue-50 p-6">
-            <p className="technical-label text-blue-700">Workflow Snapshot</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Recommended Staff Action: {getTicketActionNeeded(ticket)}</h2>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <InfoBox label="Proof status" value={getProofStatus(ticket)} />
-              <InfoBox label="Schedule status" value={getScheduleStatus(ticket)} />
+            <p className="technical-label text-blue-700">Case Snapshot</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Operational state</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <InfoBox label="Proof" value={getProofStatus(ticket)} />
+              <InfoBox label="Schedule" value={getScheduleStatus(ticket)} />
               <InfoBox label="Last updated" value={new Date(ticket.updated_at || ticket.created_at).toLocaleString()} />
+              <InfoBox label="Owner" value={ticket.assigned_technician || ticket.assigned_team_id || ticket.recipient_type.replaceAll("_", " ")} />
             </div>
           </SupportCard>
 
@@ -369,14 +370,14 @@ export default function StaffTicketDetailPage() {
         </div>
 
         <div id="staff-action-panel" className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          <ActionPanelCard title="Recommended Action" icon={<Wrench className="h-5 w-5 text-green-700" />}>
+          <ActionPanelCard id="recommended-action" title="Recommended Action" icon={<Wrench className="h-5 w-5 text-green-700" />}>
             <p className="text-sm font-semibold leading-6 text-slate-700">{getTicketActionNeeded(ticket)}</p>
             <Button className="mt-4 w-full rounded-xl bg-green-700 font-bold hover:bg-green-800" onClick={runPrimaryAction} disabled={Boolean(submittingStatus)}>
               {submittingStatus === primaryAction.status ? <ButtonLoadingLabel label="Updating..." /> : primaryAction.label}
             </Button>
           </ActionPanelCard>
 
-          <ActionPanelCard title="Status Actions" icon={<Wrench className="h-5 w-5 text-blue-700" />}>
+          <ActionPanelCard id="status-actions" title="Status Actions" icon={<Wrench className="h-5 w-5 text-blue-700" />}>
             <div className="grid gap-2 sm:grid-cols-2">
               {statusActions.map((action) => (
                 <Button key={action.status} variant="outline" className="rounded-xl" onClick={() => setStatus(action.status)} disabled={Boolean(submittingStatus)}>
@@ -387,7 +388,7 @@ export default function StaffTicketDetailPage() {
           </ActionPanelCard>
 
           {whatsApp ? (
-            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
+            <ActionPanelCard id="whatsapp-preview" title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
               <p className="rounded-xl bg-green-50 p-4 text-sm font-semibold leading-6 text-green-950">{whatsApp.message}</p>
               <p className="mt-3 text-xs font-bold text-slate-500">{whatsApp.label}</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -407,13 +408,13 @@ export default function StaffTicketDetailPage() {
               </div>
             </ActionPanelCard>
           ) : isLoadingAuxiliary ? (
-            <ActionPanelCard title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
+            <ActionPanelCard id="whatsapp-preview" title="WhatsApp preview" icon={<MessageCircle className="h-5 w-5 text-green-700" />}>
               <LoadingSpinner label="Preparing WhatsApp preview..." />
             </ActionPanelCard>
           ) : null}
 
           {isTerminalStatus && ticket.scheduled_at ? (
-            <ActionPanelCard title="Previous scheduled visit" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
+            <ActionPanelCard id="scheduling" title="Previous scheduled visit" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
               <p className="text-sm font-semibold text-slate-700">{new Date(ticket.scheduled_at).toLocaleString()}</p>
               <p className="mt-1 text-sm font-semibold text-slate-700">{ticket.scheduled_window}</p>
               {ticket.assigned_technician && (
@@ -424,7 +425,7 @@ export default function StaffTicketDetailPage() {
               </p>
             </ActionPanelCard>
           ) : shouldShowScheduling ? (
-            <ActionPanelCard title="Assisted scheduling" icon={<CalendarClock className="h-5 w-5 text-blue-700" />}>
+            <ActionPanelCard id="scheduling" title="Assisted scheduling" icon={<CalendarClock className="h-5 w-5 text-blue-700" />}>
               <div className="space-y-4">
                 {isLoadingAuxiliary && <LoadingSpinner label="Loading schedule suggestions..." />}
                 <SelectField
@@ -451,7 +452,7 @@ export default function StaffTicketDetailPage() {
               </div>
             </ActionPanelCard>
           ) : (
-            <ActionPanelCard title="Scheduling not required yet" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
+            <ActionPanelCard id="scheduling" title="Scheduling not required yet" icon={<CalendarClock className="h-5 w-5 text-slate-500" />}>
               <p className="text-sm font-semibold leading-6 text-slate-600">
                 Open scheduling manually only if staff decides a technician visit is needed.
               </p>
@@ -461,7 +462,7 @@ export default function StaffTicketDetailPage() {
             </ActionPanelCard>
           )}
 
-          <ActionPanelCard title="Internal Note">
+          <ActionPanelCard id="internal-note" title="Internal Note">
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">Not visible to customer.</p>
             <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="min-h-[100px] resize-none rounded-xl" />
             <Button className="mt-3 w-full rounded-xl bg-blue-700 font-bold hover:bg-blue-800" onClick={addInternalNote} disabled={!note.trim() || isAddingNote}>
@@ -489,12 +490,12 @@ export default function StaffTicketDetailPage() {
 }
 
 function getPrimaryStaffAction(ticket: TicketRecord, shouldShowScheduling: boolean): { label: string; status?: TicketStatus; targetId: string } {
-  if (ticket.status === "waiting_customer") return { label: "Request More Proof", targetId: "staff-action-panel" };
-  if (shouldShowScheduling && !ticket.scheduled_at) return { label: "Schedule Visit", targetId: "staff-action-panel" };
-  if (ticket.status === "assigned") return { label: "Mark In Progress", status: "in_progress", targetId: "staff-action-panel" };
-  if (ticket.status === "in_progress") return { label: "Mark Resolved", status: "resolved", targetId: "staff-action-panel" };
-  if (ticket.status === "resolved") return { label: "Close Ticket", status: "closed", targetId: "staff-action-panel" };
-  return { label: "Review Actions", targetId: "staff-action-panel" };
+  if (ticket.status === "waiting_customer") return { label: "Request More Proof", targetId: "recommended-action" };
+  if (shouldShowScheduling && !ticket.scheduled_at) return { label: "Schedule Visit", targetId: "scheduling" };
+  if (ticket.status === "assigned") return { label: "Mark In Progress", status: "in_progress", targetId: "status-actions" };
+  if (ticket.status === "in_progress") return { label: "Mark Resolved", status: "resolved", targetId: "status-actions" };
+  if (ticket.status === "resolved") return { label: "Close Ticket", status: "closed", targetId: "status-actions" };
+  return { label: "Review Actions", targetId: "recommended-action" };
 }
 
 function InfoBox({ label, value }: { label: string; value: ReactNode }) {

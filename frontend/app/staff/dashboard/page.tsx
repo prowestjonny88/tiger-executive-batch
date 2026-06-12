@@ -442,6 +442,8 @@ function SelectedTicketPreview({ ticket }: { ticket: TicketRecord | null }) {
   }
 
   const evidence = ticket.evidence_photos[0];
+  const canRequestProof = ticket.status === "waiting_customer" || Boolean(ticket.required_proof_next);
+  const canSchedule = isToScheduleTicket(ticket);
 
   return (
     <aside className="hidden xl:block">
@@ -471,19 +473,33 @@ function SelectedTicketPreview({ ticket }: { ticket: TicketRecord | null }) {
           <Button asChild className="rounded-xl bg-green-700 font-bold hover:bg-green-800">
             <Link href={`/staff/tickets/${ticket.ticket_id}`}>Open Ticket</Link>
           </Button>
+          {canRequestProof && (
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link href={staffTicketActionHref(ticket.ticket_id, "recommended-action")}>Request Proof</Link>
+            </Button>
+          )}
           <Button asChild variant="outline" className="rounded-xl">
-            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>Request Proof</Link>
+            <Link href={staffTicketActionHref(ticket.ticket_id, "whatsapp-preview")}>WhatsApp</Link>
           </Button>
           <Button asChild variant="outline" className="rounded-xl">
-            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>WhatsApp</Link>
+            <Link href={staffTicketActionHref(ticket.ticket_id, "status-actions")}>Assign</Link>
           </Button>
+          {canSchedule && (
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link href={staffTicketActionHref(ticket.ticket_id, "scheduling")}>Schedule</Link>
+            </Button>
+          )}
           <Button asChild variant="outline" className="rounded-xl">
-            <Link href={`/staff/tickets/${ticket.ticket_id}#staff-action-panel`}>Assign</Link>
+            <Link href={staffTicketActionHref(ticket.ticket_id, "internal-note")}>Internal Note</Link>
           </Button>
         </div>
       </SupportCard>
     </aside>
   );
+}
+
+function staffTicketActionHref(ticketId: string, section: string) {
+  return `/staff/tickets/${ticketId}#${section}`;
 }
 
 function queueRailClass(tone: TicketTone) {

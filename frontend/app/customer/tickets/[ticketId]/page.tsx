@@ -304,7 +304,7 @@ export default function CustomerTicketDetailPage() {
           </SupportCard>
 
           <SupportCard className="p-6" aria-label="Charger / Installation Details">
-            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Home charger details</h2>
+            <h2 className="mb-4 text-xl font-extrabold text-slate-950">Charger / Installation Details</h2>
             <div className="grid gap-4">
               <SummaryBox label="Charger details" value={chargerIdentity} />
               <SummaryBox label="Address" value={ticket.charger_context.installation_address} />
